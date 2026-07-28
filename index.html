@@ -2,7 +2,13 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Casa Regina">
+  <meta name="theme-color" content="#0f1410">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="application-name" content="Casa Regina PMS">
   <title>Hotel Casa Regina - PMS</title>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -14,7 +20,7 @@
       box-sizing: border-box;
     }
 
-    :root {
+    :root, [data-theme="dark"] {
       --bg: #0f1410;
       --surface: #182018;
       --surface2: #1f2b1f;
@@ -27,6 +33,20 @@
       --text: #e4e8e0;
       --text2: #8a9a80;
       --radius: 14px;
+    }
+
+    [data-theme="light"] {
+      --bg: #f5f5f0;
+      --surface: #ffffff;
+      --surface2: #f0efe8;
+      --surface3: #e4e3d8;
+      --accent: #6b8a4a;
+      --green: #2e9e45;
+      --red: #c0392b;
+      --yellow: #b8941e;
+      --blue: #2980b9;
+      --text: #1a1a18;
+      --text2: #6b6b60;
     }
 
     html, body {
@@ -1340,13 +1360,200 @@
       color: var(--text2);
     }
 
-    /* Responsive */
-    @media (max-width: 480px) {
-      .stats-grid { grid-template-columns: 1fr 1fr; }
-      .form-row { grid-template-columns: 1fr; }
+    /* Report Charts */
+    .report-chart-bar {
+      display: flex;
+      align-items: flex-end;
+      gap: 6px;
+      height: 140px;
+      padding: 0 4px;
+      margin-bottom: 8px;
     }
+    .report-bar-col {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      min-width: 0;
+    }
+    .report-bar {
+      width: 100%;
+      max-width: 32px;
+      border-radius: 4px 4px 0 0;
+      background: var(--accent);
+      transition: height 0.4s ease;
+      min-height: 2px;
+    }
+    .report-bar-label {
+      font-size: 9px;
+      color: var(--text2);
+      text-align: center;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 100%;
+    }
+    .report-bar-value {
+      font-size: 9px;
+      font-weight: 700;
+      font-family: 'Space Mono', monospace;
+      color: var(--text);
+    }
+    .report-date-nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .report-date-nav button {
+      background: var(--surface3);
+      border: none;
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 16px;
+      cursor: pointer;
+      color: var(--text);
+    }
+    .report-date-nav span {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .report-summary-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .report-summary-card {
+      flex: 1;
+      background: var(--surface3);
+      border-radius: 10px;
+      padding: 10px;
+      text-align: center;
+    }
+    .report-summary-val {
+      font-size: 18px;
+      font-weight: 800;
+      font-family: 'Space Mono', monospace;
+    }
+    .report-summary-lbl {
+      font-size: 10px;
+      color: var(--text2);
+      margin-top: 2px;
+    }
+    .report-client-row {
+      display: flex;
+      align-items: center;
+      padding: 10px 12px;
+      background: var(--surface2);
+      border-radius: var(--radius);
+      margin-bottom: 6px;
+      gap: 10px;
+    }
+    .report-client-rank {
+      font-size: 16px;
+      font-weight: 800;
+      font-family: 'Space Mono', monospace;
+      color: var(--accent);
+      width: 28px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+    .report-client-info {
+      flex: 1;
+      min-width: 0;
+    }
+    .report-client-name {
+      font-size: 13px;
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .report-client-meta {
+      font-size: 11px;
+      color: var(--text2);
+    }
+    .report-client-amount {
+      font-size: 14px;
+      font-weight: 700;
+      font-family: 'Space Mono', monospace;
+      color: var(--green);
+      flex-shrink: 0;
+    }
+    .report-export-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      width: 100%;
+      padding: 10px;
+      background: var(--surface3);
+      border: 1px solid var(--surface2);
+      border-radius: 10px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text);
+      cursor: pointer;
+      margin-top: 12px;
+    }
+
+    /* ============ RESPONSIVE ============ */
+    /* Safe area for notched phones */
+    .header { padding-top: max(12px, env(safe-area-inset-top)); }
+    .nav-bar { padding-bottom: max(8px, env(safe-area-inset-bottom)); }
+    .modal { padding-bottom: env(safe-area-inset-bottom); }
+
+    /* Tablets & wider phones (> 600px) */
+    @media (min-width: 600px) {
+      .stats-grid { grid-template-columns: repeat(4, 1fr); }
+      .actions-grid { grid-template-columns: repeat(4, 1fr); }
+      .rooms-grid { grid-template-columns: repeat(3, 1fr); }
+      .report-summary-row { max-width: 600px; }
+    }
+
+    /* Desktop (> 900px) — center app like a phone frame */
+    @media (min-width: 900px) {
+      #appContainer { max-width: 480px; margin: 0 auto; border-left: 1px solid var(--surface3); border-right: 1px solid var(--surface3); }
+      #loginScreen { max-width: 480px; margin: 0 auto; }
+    }
+
+    /* Small phones */
+    @media (max-width: 380px) {
+      .stats-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+      .stat-box { padding: 12px 10px; }
+      .stat-value { font-size: 18px; }
+      .stat-label { font-size: 10px; }
+      .actions-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+      .action-btn { padding: 12px 8px; font-size: 11px; }
+      .action-btn-icon { font-size: 18px; }
+      .rooms-grid { grid-template-columns: 1fr; }
+      .form-row { grid-template-columns: 1fr; }
+      .pill { padding: 6px 10px; font-size: 11px; }
+      .header-title { font-size: 14px; }
+      .report-summary-row { flex-direction: column; }
+      .report-summary-card { padding: 8px; }
+      .report-summary-val { font-size: 16px; }
+      .cobro-amounts { flex-wrap: wrap; }
+      .report-chart-bar { height: 110px; }
+      .report-bar-value { font-size: 8px; }
+      .report-bar-label { font-size: 8px; }
+      .section-title { font-size: 13px; }
+      .modal-title { font-size: 15px; }
+    }
+
+    /* Very small phones */
     @media (max-width: 320px) {
       .rooms-grid { grid-template-columns: 1fr; }
+      .report-summary-row { flex-direction: column; }
+      .nav-grid { grid-template-columns: repeat(3, 1fr); }
+    }
+
+    /* Landscape phones */
+    @media (max-height: 500px) and (orientation: landscape) {
+      .modal { max-height: 100vh; border-radius: 0; }
+      .nav-panel { max-height: 60vh; }
     }
 
     /* Autocomplete */
@@ -1439,9 +1646,9 @@
   <!-- Setup Screen -->
   <div class="setup-screen" id="setupScreen">
     <div style="width: 100%; max-width: 300px;">
-      <div style="font-size: 48px; text-align: center; margin-bottom: 20px;">🏨</div>
+      <div style="text-align:center;margin-bottom:20px"><img id="setupLogo" style="width:120px;height:120px;border-radius:16px;object-fit:cover" alt="Casa Regina"></div>
       <h1 class="login-title">Configurar PMS</h1>
-      <p class="login-subtitle">Hotel Casa Regina</p>
+      <p class="login-subtitle">Casa Regina — Hotel Boutique</p>
 
       <div class="login-form">
         <div class="login-step active" id="setupStep1">
@@ -1477,9 +1684,9 @@
   <!-- Login Screen -->
   <div class="login-screen" id="loginScreen">
     <div style="width: 100%; max-width: 300px;">
-      <div style="font-size: 48px; text-align: center; margin-bottom: 20px;">🏨</div>
+      <div style="text-align:center;margin-bottom:20px"><img id="loginLogo" style="width:140px;height:140px;border-radius:20px;object-fit:cover" alt="Casa Regina"></div>
       <h1 class="login-title">Hotel Casa Regina</h1>
-      <p class="login-subtitle">Sistema de Gestión</p>
+      <p class="login-subtitle">Hotel Boutique — Sistema de Gestión</p>
 
       <div class="login-form">
         <div>
@@ -1502,13 +1709,14 @@
     <!-- Header -->
     <div class="header">
       <div class="header-left">
-        <div style="font-size: 20px;">🏨</div>
+        <img src="data:image/jpeg;base64,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" style="width:36px;height:36px;border-radius:8px;object-fit:cover" alt="Logo">
         <div>
-          <div class="header-title">Hotel Casa Regina</div>
-          <div style="font-size: 10px; color: var(--text2);">PMS</div>
+          <div class="header-title">Casa Regina</div>
+          <div style="font-size: 10px; color: var(--text2);">Hotel Boutique · PMS</div>
         </div>
       </div>
       <div style="display: flex; align-items: center; gap: 12px;">
+        <div id="themeToggle" onclick="toggleTheme()" style="width:32px;height:32px;border-radius:50%;background:var(--surface2);border:1px solid var(--surface3);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;transition:all .2s" title="Cambiar tema">🌙</div>
         <div id="refreshBtn" onclick="refreshData()" style="width:32px;height:32px;border-radius:50%;background:var(--surface2);border:1px solid var(--surface3);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;transition:all .2s" title="Actualizar datos">🔄</div>
         <div class="connection-dot" id="connectionDot"></div>
         <div class="user-badge" id="userBadge" onclick="showProfile()"></div>
@@ -1577,7 +1785,7 @@
             </div>
 
             <div>
-              <div class="section-title">Alertas</div>
+              <div class="section-title" style="display:flex;align-items:center;gap:8px">Alertas <span id="alertsBadge" style="background:var(--red);color:#fff;font-size:10px;font-weight:700;border-radius:10px;padding:1px 7px;display:none"></span></div>
               <div class="items-list" id="alerts"></div>
             </div>
           </div>
@@ -1663,22 +1871,9 @@
       <!-- Config Tab -->
       <div class="tab-content" id="tabConfig">
         <div class="tab-scroll">
-          <div style="margin-bottom:16px">
-            <div class="section-title">Términos y Condiciones</div>
-            <div style="font-size:12px;color:var(--text2);margin-bottom:16px">Edita las políticas que aparecen en la confirmación de reservación. Los cambios se guardan automáticamente en este dispositivo.</div>
-          </div>
-          <div id="termsEditor"></div>
-          <div style="display:flex;gap:10px;margin-top:16px">
-            <button class="form-button" onclick="saveTerms()" style="flex:1">💾 Guardar Cambios</button>
-          </div>
-          <div style="display:flex;gap:10px;margin-top:10px">
-            <button class="form-button secondary" onclick="addNewTerm()" style="flex:1">➕ Agregar Política</button>
-            <button class="form-button secondary" onclick="resetTermsToDefault()" style="flex:1;border-color:var(--red);color:var(--red)">🔄 Restaurar Default</button>
-          </div>
-          <div style="margin-top:24px">
-            <div class="section-title">Vista Previa</div>
-            <button class="form-button secondary" onclick="previewTerms()" style="width:100%">👁️ Ver cómo se ve en la confirmación</button>
-          </div>
+          <!-- Config Sub-tabs -->
+          <div class="tabs-pills" id="configPills"></div>
+          <div id="configContent"></div>
         </div>
       </div>
     </div>
@@ -1997,6 +2192,40 @@
     </div>
   </div>
 
+  <!-- User Form Modal -->
+  <div class="modal" id="userFormModal">
+    <div class="modal-header">
+      <div class="modal-title" id="userFormTitle">👤 Nuevo Usuario</div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <form onsubmit="saveUser(event)">
+        <input type="hidden" id="userFormId" value="">
+        <div class="form-group">
+          <label class="form-label">Nombre Completo</label>
+          <input class="form-input" id="userFormNombre" required placeholder="Nombre del empleado">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Usuario (login)</label>
+          <input class="form-input" id="userFormUsuario" required placeholder="usuario123">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Contraseña</label>
+          <input class="form-input" id="userFormPassword" required placeholder="Contraseña">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Rol</label>
+          <select class="form-input" id="userFormRol" required>
+            <option value="admin">Administrador</option>
+            <option value="recepcion">Recepción</option>
+            <option value="ama_llaves">Ama de Llaves</option>
+          </select>
+        </div>
+        <button type="submit" class="form-button" style="background:var(--accent);color:var(--bg)">💾 Guardar Usuario</button>
+      </form>
+    </div>
+  </div>
+
   <!-- Checkin Blocked Modal -->
   <div class="modal" id="checkinBlockedModal">
     <div class="modal-header">
@@ -2027,7 +2256,8 @@
 
   <script>
     // ============ CONFIG ============
-    const LOGO = 'logo.png';
+    const LOGO = 'data:image/jpeg;base64,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';
+    const LOGO_SMALL = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAB4AHgDASIAAhEBAxEB/8QAGwABAAIDAQEAAAAAAAAAAAAAAAUGAQIEAwf/xAA0EAACAgIBAgQDBgQHAAAAAAABAgADBBEFEiEGMUFhEyJRBxUjMnGBFHKh0RYzQlKCkcH/xAAWAQEBAQAAAAAAAAAAAAAAAAAAAQL/xAAXEQEBAQEAAAAAAAAAAAAAAAAAEQEx/9oADAMBAAIRAxEAPwD4FERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERARJ7J4mviRRi349mXyt1S2tjLsLQrDqUMF7s/TpiBoKCN7O9cdbYORj3C/DfHsCFqrsfqK9QHYMrb7Hy2CNe8URsREBERAREQEREBERAREQE3pZEvraxepAwLD6jfeaRA+ucByWHxH2+35/JZCVY2VZa+PksdIFuTdTb9BpgNzs+0PhsvPzOT5zA5arAxuIx1S+lbWUHJLna1hew6upW9yx16z5WvMG7ApweQx1yqaAVofqKW1KTvpDd9rsk6IIG+2tmXJcqnDTFyhbTVj/AqN+Mw+dqWrHz1XMDqwa6BrR6l+nYYk1pX/GtNNWbxlhqSnPv46q3kKkUL03nfcqPysU6GI+rGVmTfivh/ubn76a8h8vEu1fi5bd/4ip+6vv1PofcESEms4yREShERAREQETEQPSqqy5wlVb2Of9KKSf8AoTFlb1WGuxWR17FWGiP2kzzqtxVmNxuOWrRcWm6xlOja9la2Ek+oHUAPYe5nK2Xmc3k4OPk2Nb8FBSjEbYJ1Fjs+Z1s+fkBryEgjol3zrsCzxPxvIZ1orxuT41Q2SiEimzoan4mvM9LJs+vnrvIusZ/B+LxbyTKMnjGR2Y/MrhenoII/MpBXR9QQYork9Dda1K1NY5qQkqhY9IJ89Dykh4lwl47xRyeIgArqyrBX/J1Er/QiWtkvTlfDeVcOnilwMUZllq/gms9XWrehJUHQ8z6d4oqFPMZlWAMByl+GpLLTegdayfMrvuu/XRG/WcLHrcsFA330o0BLXXaKvBld2LlHFCcte1JbfUQKUKr29fId+3ec+ZRk4CeH8Xiw38Tk46ZX4Q+a217GCj30FUAfXf1gVqJaUNq+FKOvddw509Whrpb4a7/rNvFQW0W8tSorp5UV5LVqNKtoLraNfzhj+jCKKpEtHLVLZ4J47TKbOPynx30O4FiLYAf0ZbJV5QiIgYiIgTNvK4vJYGLRyVVq5OJWKasqjRL1j8qup1vp2QGBB1oHehOenNxsUWrj12/PUyfEYjqJI1+w7+nf3kdECYflsPJ4fj8HJxrS2ItyCxHA7OwZdDXo3V29er0mnIcuM/H+GUYMlVOOjEg/h1qR39ydfoBqcByrSvSejWtf5a/2nomdbXSKgtXSEZNmsb0ff1Mg6Oc5NOW5BMxa2RzRTXZ1MD1OlaoW/fp3+8k/8V9GRiaxfi4a4FeFl4tz/LkKu/p+U77qfNSAZCWZ9tqFLFrbZYkle+zr+w1NhyFwoWoLV0rWawegb0Tvz+sQWW6rjbODpw8G85eCMxss9V9dV6KyKvw3RvUdP512Dv08pGY3NJi5XE2ZVQus4qxWqNVgIZA/xBWT7MT3G/P2Ei3zrXfZWoDq6goQaB7en/ETduSuZrG+HSC/VvSf7hqIO377qbi1xHocN95HNZlYa0VA6QPr285gc2j8J91X0M9K54ykfq+ZVIIdP30p9ivvIxMm1FCjo0PLdan/AMnlEEtXy6fdXLYdtLOc26q5G6hqtkLdyPXYdhIiZiUIiIDUaiICIiAjURAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQP/2Q==';
     const HOTEL_NAME = 'Hotel Casa Regina';
     const ROOMS_COUNT = 9;
     const ROLES = {
@@ -2064,6 +2294,11 @@
 
     // ============ INIT ============
     function init() {
+      // Set logo images
+      var loginLogoEl = document.getElementById('loginLogo');
+      if (loginLogoEl) loginLogoEl.src = LOGO;
+      var setupLogoEl = document.getElementById('setupLogo');
+      if (setupLogoEl) setupLogoEl.src = LOGO;
       if (S.sheetId && S.apiKey) {
         // Check if user is logged in
         const storedUser = localStorage.getItem('user');
@@ -2379,7 +2614,7 @@
       renderReports();
       renderCobros();
       renderClientes();
-      renderTermsEditor();
+      renderConfig();
       updateUserBadge();
     }
 
@@ -2425,38 +2660,96 @@
       document.getElementById('departurestoday').innerHTML = departuresHtml;
 
       // Alerts
-      let alertItems = [];
+      var alertItems = [];
 
-      // Guests with pending balance (especially those checking out today)
-      const guestsWithDebt = S.reservas.filter(r => r.estado === 'Check-in').filter(r => {
-        var paid = S.cobros.filter(c => c.reservaId === r.id).reduce((s, c) => s + c.monto, 0);
-        return r.tarifaTotal - paid > 0;
-      });
-      guestsWithDebt.forEach(r => {
-        var paid = S.cobros.filter(c => c.reservaId === r.id).reduce((s, c) => s + c.monto, 0);
+      // 1. CRITICAL: Guests checking out TODAY with pending balance
+      var checkoutsToday = S.reservas.filter(function(r) { return r.fechaSalida === today && r.estado === 'Check-in'; });
+      checkoutsToday.forEach(function(r) {
+        var paid = S.cobros.filter(function(c){return c.reservaId===r.id}).reduce(function(s,c){return s+c.monto},0);
         var bal = r.tarifaTotal - paid;
-        var isCheckoutToday = r.fechaSalida === today;
-        alertItems.push(`
-          <div class="item" style="border-left-color: var(--red);">
-            <div class="item-title">${isCheckoutToday ? '🚨' : '⚠️'} ${r.huesped} — Adeudo: $${bal}</div>
-            <div class="item-meta">Hab. ${r.habitacionNum} · ${isCheckoutToday ? 'SALE HOY — Liquidar antes de check-out' : 'Sale: ' + formatDate(r.fechaSalida)}</div>
-          </div>
-        `);
+        if (bal > 0) {
+          alertItems.push('<div class="item" style="border-left-color:var(--red);cursor:pointer" onclick="switchTab(\'cobros\')">' +
+            '<div class="item-title">🚨 ' + r.huesped + ' — Adeudo $' + bal.toLocaleString() + '</div>' +
+            '<div class="item-meta">Hab. ' + r.habitacionNum + ' · SALE HOY — Liquidar antes de check-out</div></div>');
+        }
       });
 
-      const needsCleaning = S.rooms.filter(r => r.estado === 'Limpieza');
-      needsCleaning.forEach(r => {
-        alertItems.push(`
-          <div class="item">
-            <div class="item-title">Hab. ${r.numero} necesita limpieza</div>
-            <div class="item-meta">Estado: Limpieza</div>
-          </div>
-        `);
+      // 2. Other guests with pending balance (not today checkout)
+      var guestsWithDebt = S.reservas.filter(function(r) {
+        return r.estado === 'Check-in' && r.fechaSalida !== today;
+      });
+      guestsWithDebt.forEach(function(r) {
+        var paid = S.cobros.filter(function(c){return c.reservaId===r.id}).reduce(function(s,c){return s+c.monto},0);
+        var bal = r.tarifaTotal - paid;
+        if (bal > 0) {
+          alertItems.push('<div class="item" style="border-left-color:var(--yellow);cursor:pointer" onclick="switchTab(\'cobros\')">' +
+            '<div class="item-title">⚠️ ' + r.huesped + ' — Adeudo $' + bal.toLocaleString() + '</div>' +
+            '<div class="item-meta">Hab. ' + r.habitacionNum + ' · Sale: ' + formatDate(r.fechaSalida) + '</div></div>');
+        }
       });
 
-      const alertsHtml = alertItems.length > 0
+      // 3. Reservations confirmed for today without 50% deposit (can't check in)
+      var noDeposit = S.reservas.filter(function(r) { return r.fechaEntrada === today && r.estado === 'Confirmada'; });
+      noDeposit.forEach(function(r) {
+        var paid = S.cobros.filter(function(c){return c.reservaId===r.id}).reduce(function(s,c){return s+c.monto},0);
+        var minReq = Math.ceil(r.tarifaTotal * 0.5);
+        if (paid < minReq) {
+          var falta = minReq - paid;
+          alertItems.push('<div class="item" style="border-left-color:var(--yellow);cursor:pointer" onclick="switchTab(\'cobros\')">' +
+            '<div class="item-title">💰 ' + r.huesped + ' — Sin anticipo suficiente</div>' +
+            '<div class="item-meta">Hab. ' + r.habitacionNum + ' · Llega HOY · Faltan $' + falta.toLocaleString() + ' para check-in (50%)</div></div>');
+        }
+      });
+
+      // 4. Rooms needing cleaning
+      var needsCleaning = S.rooms.filter(function(r){return r.estado==='Limpieza'});
+      if (needsCleaning.length > 0) {
+        var roomNums = needsCleaning.map(function(r){return r.numero}).join(', ');
+        alertItems.push('<div class="item" style="border-left-color:var(--accent);cursor:pointer" onclick="switchTab(\'housekeeping\')">' +
+          '<div class="item-title">🧹 ' + needsCleaning.length + ' habitación(es) en limpieza</div>' +
+          '<div class="item-meta">Hab. ' + roomNums + '</div></div>');
+      }
+
+      // 5. Unassigned housekeeping tasks
+      var unassigned = S.housekeeping.filter(function(h) { return h.estado === 'Pendiente' && (!h.asignadoA || h.asignadoA === ''); });
+      if (unassigned.length > 0) {
+        alertItems.push('<div class="item" style="border-left-color:var(--accent);cursor:pointer" onclick="switchTab(\'housekeeping\')">' +
+          '<div class="item-title">📋 ' + unassigned.length + ' tarea(s) sin asignar</div>' +
+          '<div class="item-meta">Tareas de limpieza pendientes sin responsable</div></div>');
+      }
+
+      // 6. Rooms in maintenance
+      var maintenance = S.rooms.filter(function(r){return r.estado==='Mantenimiento'});
+      if (maintenance.length > 0) {
+        var maintNums = maintenance.map(function(r){return r.numero}).join(', ');
+        alertItems.push('<div class="item" style="border-left-color:var(--red);cursor:pointer" onclick="switchTab(\'rooms\')">' +
+          '<div class="item-title">🔧 ' + maintenance.length + ' habitación(es) en mantenimiento</div>' +
+          '<div class="item-meta">Hab. ' + maintNums + ' — Fuera de servicio</div></div>');
+      }
+
+      // 7. Upcoming reservations tomorrow (informational)
+      var tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate()+1);
+      var tomorrowStr = normDate(tomorrow);
+      var arrivTomorrow = S.reservas.filter(function(r){return r.fechaEntrada===tomorrowStr && r.estado==='Confirmada'});
+      if (arrivTomorrow.length > 0) {
+        alertItems.push('<div class="item" style="border-left-color:var(--green);cursor:pointer" onclick="switchTab(\'reservas\')">' +
+          '<div class="item-title">📅 ' + arrivTomorrow.length + ' llegada(s) mañana</div>' +
+          '<div class="item-meta">' + arrivTomorrow.map(function(r){return r.huesped+' (Hab.'+r.habitacionNum+')'}).join(', ') + '</div></div>');
+      }
+
+      // Badge count (only warnings/critical, not informational)
+      var criticalCount = alertItems.filter(function(a){return a.indexOf('var(--red)')!==-1 || a.indexOf('💰')!==-1}).length;
+      var badge = document.getElementById('alertsBadge');
+      if (criticalCount > 0) {
+        badge.textContent = criticalCount;
+        badge.style.display = 'inline';
+      } else {
+        badge.style.display = 'none';
+      }
+
+      var alertsHtml = alertItems.length > 0
         ? alertItems.join('')
-        : '<div style="text-align: center; padding: 20px; color: var(--text2);">Sin alertas</div>';
+        : '<div style="text-align:center;padding:20px;color:var(--text2)">✅ Sin alertas — Todo en orden</div>';
       document.getElementById('alerts').innerHTML = alertsHtml;
     }
 
@@ -2803,93 +3096,445 @@
       document.getElementById('tasksList').innerHTML = listHtml;
     }
 
+    // ============ REPORTS STATE ============
+    if (!S.reportIngresoMode) S.reportIngresoMode = 'semanal';
+    if (!S.reportIngresoOffset) S.reportIngresoOffset = 0;
+
     function renderReports() {
-      // Render pills
-      const pills = [
+      var pills = [
         { id: 'ocupacion', label: 'Ocupación' },
+        { id: 'ingresos', label: 'Ingresos' },
+        { id: 'clientes', label: 'Top Clientes' },
         { id: 'diario', label: 'Diario' },
         { id: 'bitacora', label: 'Bitácora' }
       ];
-      const pillsHtml = pills.map(p => `
-        <div class="pill ${S.filterReports === p.id ? 'active' : ''}" onclick="filterReportsTab('${p.id}')">${p.label}</div>
-      `).join('');
+      var pillsHtml = pills.map(function(p) {
+        return '<div class="pill ' + (S.filterReports === p.id ? 'active' : '') + '" onclick="filterReportsTab(\'' + p.id + '\')">' + p.label + '</div>';
+      }).join('');
       document.getElementById('reportsPills').innerHTML = pillsHtml;
 
-      let content = '';
+      var content = '';
 
       if (S.filterReports === 'ocupacion') {
-        const occupied = S.rooms.filter(r => r.estado === 'Ocupada').length;
-        const occupancy = Math.round((occupied / ROOMS_COUNT) * 100);
-        const breakdown = [
-          { label: 'Ocupadas', value: S.rooms.filter(r => r.estado === 'Ocupada').length },
-          { label: 'Disponibles', value: S.rooms.filter(r => r.estado === 'Disponible').length },
-          { label: 'Reservadas', value: S.rooms.filter(r => r.estado === 'Reservada').length },
-          { label: 'Limpieza', value: S.rooms.filter(r => r.estado === 'Limpieza').length },
-          { label: 'Mantenimiento', value: S.rooms.filter(r => r.estado === 'Mantenimiento').length }
-        ];
-
-        content = `
-          <div class="report-box">
-            <div class="report-title">Ocupación Actual</div>
-            <div class="occupancy-bar">
-              <div class="occupancy-fill" style="width: ${occupancy}%"></div>
-            </div>
-            <div class="occupancy-percent">${occupancy}%</div>
-          </div>
-          <div class="report-box">
-            <div class="report-title">Desglose por Estado</div>
-            ${breakdown.map(b => `
-              <div class="breakdown-item">
-                <div class="breakdown-label">${b.label}</div>
-                <div class="breakdown-value">${b.value}</div>
-              </div>
-            `).join('')}
-          </div>
-        `;
+        content = renderReportOcupacion();
+      } else if (S.filterReports === 'ingresos') {
+        content = renderReportIngresos();
+      } else if (S.filterReports === 'clientes') {
+        content = renderReportClientes();
       } else if (S.filterReports === 'diario') {
-        const today = normDate(new Date());
-        const arrivals = S.reservas.filter(r => r.fechaEntrada === today && r.estado !== 'Cancelada').length;
-        const departures = S.reservas.filter(r => r.fechaSalida === today && r.estado !== 'Cancelada').length;
-        const housekeepingDone = S.housekeeping.filter(h => h.estado === 'Completada' && h.fecha === today).length;
-        const revenue = S.reservas.filter(r => r.fechaEntrada === today && r.estado !== 'Cancelada').reduce((sum, r) => sum + r.tarifaTotal, 0);
-
-        content = `
-          <div class="report-box">
-            <div class="report-title">Resumen de Hoy (${formatDate(today)})</div>
-            <div class="breakdown-item">
-              <div class="breakdown-label">Check-ins</div>
-              <div class="breakdown-value">${arrivals}</div>
-            </div>
-            <div class="breakdown-item">
-              <div class="breakdown-label">Check-outs</div>
-              <div class="breakdown-value">${departures}</div>
-            </div>
-            <div class="breakdown-item">
-              <div class="breakdown-label">Tareas de Limpieza Completadas</div>
-              <div class="breakdown-value">${housekeepingDone}</div>
-            </div>
-            <div class="breakdown-item">
-              <div class="breakdown-label">Ingresos Estimados</div>
-              <div class="breakdown-value">$${revenue}</div>
-            </div>
-          </div>
-        `;
+        content = renderReportDiario();
       } else if (S.filterReports === 'bitacora') {
-        const activities = S.bitacora.slice(-20).reverse();
-        content = `
-          <div>
-            ${activities.map(a => `
-              <div class="activity-item">
-                <div class="activity-time">${a.fecha} ${a.hora}</div>
-                <div class="activity-action">${a.accion}</div>
-                <div class="activity-user">${a.usuario}</div>
-              </div>
-            `).join('')}
-          </div>
-        `;
+        content = renderReportBitacora();
       }
 
       document.getElementById('reportsContent').innerHTML = content;
+    }
+
+    // --- Ocupación (existing, refactored) ---
+    function renderReportOcupacion() {
+      var occupied = S.rooms.filter(function(r){return r.estado==='Ocupada'}).length;
+      var occupancy = Math.round((occupied / ROOMS_COUNT) * 100);
+      var breakdown = [
+        { label: 'Ocupadas', value: S.rooms.filter(function(r){return r.estado==='Ocupada'}).length, color: 'var(--red)' },
+        { label: 'Disponibles', value: S.rooms.filter(function(r){return r.estado==='Disponible'}).length, color: 'var(--green)' },
+        { label: 'Reservadas', value: S.rooms.filter(function(r){return r.estado==='Reservada'}).length, color: 'var(--yellow)' },
+        { label: 'Limpieza', value: S.rooms.filter(function(r){return r.estado==='Limpieza'}).length, color: 'var(--accent)' },
+        { label: 'Mantenimiento', value: S.rooms.filter(function(r){return r.estado==='Mantenimiento'}).length, color: 'var(--text2)' }
+      ];
+
+      var h = '<div class="report-box">';
+      h += '<div class="report-title">Ocupación Actual</div>';
+      h += '<div class="occupancy-bar"><div class="occupancy-fill" style="width:' + occupancy + '%"></div></div>';
+      h += '<div class="occupancy-percent">' + occupancy + '% (' + occupied + '/' + ROOMS_COUNT + ')</div>';
+      h += '</div>';
+
+      h += '<div class="report-box"><div class="report-title">Desglose por Estado</div>';
+      breakdown.forEach(function(b) {
+        h += '<div class="breakdown-item"><div class="breakdown-label">' + b.label + '</div><div class="breakdown-value" style="color:' + b.color + '">' + b.value + '</div></div>';
+      });
+      h += '</div>';
+
+      // Ocupación de los últimos 7 días
+      h += '<div class="report-box"><div class="report-title">Ocupación Últimos 7 Días</div>';
+      h += '<div class="report-chart-bar">';
+      for (var i = 6; i >= 0; i--) {
+        var d = new Date(); d.setDate(d.getDate() - i);
+        var ds = normDate(d);
+        var occ = S.reservas.filter(function(r) {
+          return r.fechaEntrada <= ds && r.fechaSalida > ds && r.estado !== 'Cancelada';
+        }).length;
+        var pct = Math.round((occ / ROOMS_COUNT) * 100);
+        var dayLabel = new Intl.DateTimeFormat('es-ES', { weekday: 'short' }).format(d);
+        h += '<div class="report-bar-col">';
+        h += '<div class="report-bar-value">' + pct + '%</div>';
+        h += '<div class="report-bar" style="height:' + Math.max(pct, 3) + '%;background:' + (pct > 80 ? 'var(--red)' : pct > 50 ? 'var(--yellow)' : 'var(--accent)') + '"></div>';
+        h += '<div class="report-bar-label">' + dayLabel + '</div>';
+        h += '</div>';
+      }
+      h += '</div></div>';
+      h += '<button class="report-export-btn" onclick="exportReportPDF(\'ocupacion\')">📄 Exportar a PDF</button>';
+      return h;
+    }
+
+    // --- Ingresos ---
+    function getWeekRange(offset) {
+      var now = new Date();
+      var day = now.getDay() || 7; // Mon=1
+      var mon = new Date(now); mon.setDate(now.getDate() - day + 1 + (offset * 7));
+      var sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+      return { start: normDate(mon), end: normDate(sun), label: formatDate(normDate(mon)) + ' – ' + formatDate(normDate(sun)) };
+    }
+
+    function getMonthRange(offset) {
+      var now = new Date();
+      var d = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+      var end = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+      var label = new Intl.DateTimeFormat('es-ES', { month: 'long', year: 'numeric' }).format(d);
+      return { start: normDate(d), end: normDate(end), label: label.charAt(0).toUpperCase() + label.slice(1) };
+    }
+
+    function renderReportIngresos() {
+      var mode = S.reportIngresoMode;
+      var offset = S.reportIngresoOffset;
+      var range = mode === 'semanal' ? getWeekRange(offset) : getMonthRange(offset);
+
+      // Filter cobros in range
+      var cobrosRange = S.cobros.filter(function(c) {
+        return c.fecha >= range.start && c.fecha <= range.end;
+      });
+      var totalIngresos = cobrosRange.reduce(function(s, c) { return s + c.monto; }, 0);
+      var totalTxns = cobrosRange.length;
+
+      // By method
+      var byMethod = {};
+      cobrosRange.forEach(function(c) {
+        var m = c.metodoPago || 'Otro';
+        byMethod[m] = (byMethod[m] || 0) + c.monto;
+      });
+
+      // Daily breakdown for chart
+      var dailyData = {};
+      cobrosRange.forEach(function(c) {
+        dailyData[c.fecha] = (dailyData[c.fecha] || 0) + c.monto;
+      });
+
+      // Build bars
+      var startD = new Date(range.start + 'T00:00:00');
+      var endD = new Date(range.end + 'T00:00:00');
+      var bars = [];
+      var maxVal = 0;
+      for (var dt = new Date(startD); dt <= endD; dt.setDate(dt.getDate() + 1)) {
+        var ds = normDate(dt);
+        var val = dailyData[ds] || 0;
+        if (val > maxVal) maxVal = val;
+        bars.push({ date: ds, value: val, label: mode === 'semanal' ? new Intl.DateTimeFormat('es-ES', { weekday: 'short' }).format(new Date(dt)) : String(dt.getDate()) });
+      }
+
+      var h = '';
+      // Mode toggle
+      h += '<div style="display:flex;gap:6px;margin-bottom:12px">';
+      h += '<div class="pill ' + (mode === 'semanal' ? 'active' : '') + '" onclick="S.reportIngresoMode=\'semanal\';S.reportIngresoOffset=0;renderReports()">Semanal</div>';
+      h += '<div class="pill ' + (mode === 'mensual' ? 'active' : '') + '" onclick="S.reportIngresoMode=\'mensual\';S.reportIngresoOffset=0;renderReports()">Mensual</div>';
+      h += '</div>';
+
+      // Nav
+      h += '<div class="report-date-nav">';
+      h += '<button onclick="S.reportIngresoOffset--;renderReports()">◀</button>';
+      h += '<span>' + range.label + '</span>';
+      h += '<button onclick="if(S.reportIngresoOffset<0){S.reportIngresoOffset++;renderReports()}" style="opacity:' + (offset < 0 ? '1' : '0.3') + '">▶</button>';
+      h += '</div>';
+
+      // Summary cards
+      h += '<div class="report-summary-row">';
+      h += '<div class="report-summary-card"><div class="report-summary-val" style="color:var(--green)">$' + totalIngresos.toLocaleString() + '</div><div class="report-summary-lbl">Ingresos</div></div>';
+      h += '<div class="report-summary-card"><div class="report-summary-val" style="color:var(--accent)">' + totalTxns + '</div><div class="report-summary-lbl">Transacciones</div></div>';
+      h += '<div class="report-summary-card"><div class="report-summary-val" style="color:var(--yellow)">$' + (totalTxns > 0 ? Math.round(totalIngresos / totalTxns) : 0) + '</div><div class="report-summary-lbl">Promedio</div></div>';
+      h += '</div>';
+
+      // Chart
+      h += '<div class="report-box"><div class="report-title">Ingresos por Día</div>';
+      if (bars.length <= 31) {
+        h += '<div class="report-chart-bar">';
+        bars.forEach(function(b) {
+          var pct = maxVal > 0 ? Math.round((b.value / maxVal) * 100) : 0;
+          h += '<div class="report-bar-col">';
+          h += '<div class="report-bar-value">' + (b.value > 0 ? '$' + b.value : '') + '</div>';
+          h += '<div class="report-bar" style="height:' + Math.max(pct, 3) + '%;background:' + (b.value > 0 ? 'var(--green)' : 'var(--surface3)') + '"></div>';
+          h += '<div class="report-bar-label">' + b.label + '</div>';
+          h += '</div>';
+        });
+        h += '</div>';
+      }
+      h += '</div>';
+
+      // By payment method
+      h += '<div class="report-box"><div class="report-title">Por Método de Pago</div>';
+      var methods = Object.keys(byMethod).sort(function(a, b) { return byMethod[b] - byMethod[a]; });
+      if (methods.length === 0) {
+        h += '<div style="font-size:12px;color:var(--text2);text-align:center;padding:12px">Sin transacciones en este periodo</div>';
+      }
+      methods.forEach(function(m) {
+        var pct = totalIngresos > 0 ? Math.round((byMethod[m] / totalIngresos) * 100) : 0;
+        h += '<div class="breakdown-item"><div class="breakdown-label">' + m + ' (' + pct + '%)</div><div class="breakdown-value" style="color:var(--green)">$' + byMethod[m].toLocaleString() + '</div></div>';
+      });
+      h += '</div>';
+
+      h += '<button class="report-export-btn" onclick="exportReportPDF(\'ingresos\')">📄 Exportar a PDF</button>';
+      return h;
+    }
+
+    // --- Top Clientes ---
+    function renderReportClientes() {
+      var clientData = {};
+      S.reservas.filter(function(r) { return r.estado !== 'Cancelada'; }).forEach(function(r) {
+        var name = r.huesped;
+        if (!clientData[name]) clientData[name] = { visitas: 0, total: 0, ultima: '' };
+        clientData[name].visitas++;
+        clientData[name].total += r.tarifaTotal;
+        if (r.fechaEntrada > clientData[name].ultima) clientData[name].ultima = r.fechaEntrada;
+      });
+      // Add actual payments
+      S.cobros.forEach(function(c) {
+        var res = S.reservas.find(function(r) { return r.id === c.reservaId; });
+        if (res && clientData[res.huesped]) {
+          // Already counted via tarifaTotal, skip
+        }
+      });
+
+      var sorted = Object.keys(clientData).map(function(name) {
+        return { name: name, visitas: clientData[name].visitas, total: clientData[name].total, ultima: clientData[name].ultima };
+      }).sort(function(a, b) { return b.total - a.total; });
+
+      var top = sorted.slice(0, 15);
+
+      var h = '<div class="report-box"><div class="report-title">Top 15 Clientes por Gasto</div>';
+      if (top.length === 0) {
+        h += '<div style="font-size:12px;color:var(--text2);text-align:center;padding:12px">Sin datos de clientes aún</div>';
+      }
+      top.forEach(function(c, i) {
+        h += '<div class="report-client-row">';
+        h += '<div class="report-client-rank">#' + (i + 1) + '</div>';
+        h += '<div class="report-client-info"><div class="report-client-name">' + c.name + '</div><div class="report-client-meta">' + c.visitas + ' visita' + (c.visitas > 1 ? 's' : '') + ' · Última: ' + formatDate(c.ultima) + '</div></div>';
+        h += '<div class="report-client-amount">$' + c.total.toLocaleString() + '</div>';
+        h += '</div>';
+      });
+      h += '</div>';
+
+      // Summary
+      h += '<div class="report-summary-row">';
+      h += '<div class="report-summary-card"><div class="report-summary-val" style="color:var(--accent)">' + sorted.length + '</div><div class="report-summary-lbl">Clientes Total</div></div>';
+      var repeaters = sorted.filter(function(c) { return c.visitas > 1; }).length;
+      h += '<div class="report-summary-card"><div class="report-summary-val" style="color:var(--green)">' + repeaters + '</div><div class="report-summary-lbl">Recurrentes</div></div>';
+      var totalRev = sorted.reduce(function(s, c) { return s + c.total; }, 0);
+      h += '<div class="report-summary-card"><div class="report-summary-val" style="color:var(--yellow)">$' + (sorted.length > 0 ? Math.round(totalRev / sorted.length) : 0) + '</div><div class="report-summary-lbl">Gasto Promedio</div></div>';
+      h += '</div>';
+
+      h += '<button class="report-export-btn" onclick="exportReportPDF(\'clientes\')">📄 Exportar a PDF</button>';
+      return h;
+    }
+
+    // --- Diario (existing, refactored) ---
+    function renderReportDiario() {
+      var today = normDate(new Date());
+      var arrivals = S.reservas.filter(function(r) { return r.fechaEntrada === today && r.estado !== 'Cancelada'; }).length;
+      var departures = S.reservas.filter(function(r) { return r.fechaSalida === today && r.estado !== 'Cancelada'; }).length;
+      var hkDone = S.housekeeping.filter(function(h) { return h.estado === 'Completada' && h.fecha === today; }).length;
+      var hkPending = S.housekeeping.filter(function(h) { return h.estado === 'Pendiente' && h.fecha === today; }).length;
+      var todayCobros = S.cobros.filter(function(c) { return c.fecha === today; });
+      var revenue = todayCobros.reduce(function(s, c) { return s + c.monto; }, 0);
+      var occupied = S.rooms.filter(function(r) { return r.estado === 'Ocupada'; }).length;
+
+      var h = '<div class="report-summary-row">';
+      h += '<div class="report-summary-card"><div class="report-summary-val" style="color:var(--green)">$' + revenue.toLocaleString() + '</div><div class="report-summary-lbl">Ingresos Hoy</div></div>';
+      h += '<div class="report-summary-card"><div class="report-summary-val" style="color:var(--accent)">' + occupied + '/' + ROOMS_COUNT + '</div><div class="report-summary-lbl">Ocupación</div></div>';
+      h += '</div>';
+
+      h += '<div class="report-box"><div class="report-title">Resumen de Hoy (' + formatDate(today) + ')</div>';
+      var items = [
+        { label: 'Check-ins programados', value: arrivals },
+        { label: 'Check-outs programados', value: departures },
+        { label: 'Limpieza completada', value: hkDone },
+        { label: 'Limpieza pendiente', value: hkPending },
+        { label: 'Transacciones', value: todayCobros.length },
+        { label: 'Ingresos del día', value: '$' + revenue.toLocaleString() }
+      ];
+      items.forEach(function(item) {
+        h += '<div class="breakdown-item"><div class="breakdown-label">' + item.label + '</div><div class="breakdown-value">' + item.value + '</div></div>';
+      });
+      h += '</div>';
+
+      // Today's transactions detail
+      if (todayCobros.length > 0) {
+        h += '<div class="report-box"><div class="report-title">Transacciones de Hoy</div>';
+        todayCobros.forEach(function(c) {
+          var res = S.reservas.find(function(r) { return r.id === c.reservaId; });
+          h += '<div class="breakdown-item"><div class="breakdown-label">' + (res ? res.huesped : 'N/A') + ' · ' + c.concepto + ' (' + c.metodoPago + ')</div><div class="breakdown-value" style="color:var(--green)">$' + c.monto + '</div></div>';
+        });
+        h += '</div>';
+      }
+
+      h += '<button class="report-export-btn" onclick="exportReportPDF(\'diario\')">📄 Exportar a PDF</button>';
+      return h;
+    }
+
+    // --- Bitácora (existing, refactored) ---
+    function renderReportBitacora() {
+      var activities = S.bitacora.slice(-30).reverse();
+      var h = '<div>';
+      if (activities.length === 0) {
+        h += '<div style="font-size:12px;color:var(--text2);text-align:center;padding:20px">Sin actividad registrada</div>';
+      }
+      activities.forEach(function(a) {
+        var borderColor = a.tipo === 'warning' ? 'var(--red)' : a.tipo === 'success' ? 'var(--green)' : 'var(--accent)';
+        h += '<div class="activity-item" style="border-left-color:' + borderColor + '">';
+        h += '<div class="activity-time">' + a.fecha + ' ' + a.hora + '</div>';
+        h += '<div class="activity-action">' + a.accion + '</div>';
+        h += '<div class="activity-user">' + a.usuario + ' · ' + (a.detalle || '') + '</div>';
+        h += '</div>';
+      });
+      h += '</div>';
+      return h;
+    }
+
+    // --- Export to PDF ---
+    function exportReportPDF(type) {
+      var { jsPDF } = window.jspdf;
+      var doc = new jsPDF({ unit: 'mm', format: 'a4' });
+      var y = 15;
+      var pageW = 210;
+      var margin = 15;
+      var contentW = pageW - margin * 2;
+
+      // Add logo
+      try { doc.addImage(LOGO, 'JPEG', margin, y, 18, 18); } catch(e) {}
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(16);
+      doc.text(HOTEL_NAME, margin + 22, y + 8);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(120);
+      doc.text('Hotel Boutique', margin + 22, y + 13);
+      doc.setTextColor(0);
+      y += 22;
+      doc.setFontSize(10);
+      doc.text('Reporte generado: ' + now(), margin, y); y += 8;
+
+      doc.setDrawColor(200);
+      doc.line(margin, y, pageW - margin, y); y += 8;
+
+      if (type === 'ocupacion') {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(14);
+        doc.text('Reporte de Ocupación', margin, y); y += 10;
+
+        var occupied = S.rooms.filter(function(r){return r.estado==='Ocupada'}).length;
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(11);
+        doc.text('Ocupación actual: ' + Math.round((occupied/ROOMS_COUNT)*100) + '% (' + occupied + '/' + ROOMS_COUNT + ')', margin, y); y += 8;
+
+        var estados = ['Ocupada','Disponible','Reservada','Limpieza','Mantenimiento'];
+        estados.forEach(function(e) {
+          var count = S.rooms.filter(function(r){return r.estado===e}).length;
+          doc.text('  • ' + e + ': ' + count, margin, y); y += 6;
+        });
+
+      } else if (type === 'ingresos') {
+        var range = S.reportIngresoMode === 'semanal' ? getWeekRange(S.reportIngresoOffset) : getMonthRange(S.reportIngresoOffset);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(14);
+        doc.text('Reporte de Ingresos', margin, y); y += 8;
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(11);
+        doc.text('Periodo: ' + range.label, margin, y); y += 10;
+
+        var cobrosR = S.cobros.filter(function(c) { return c.fecha >= range.start && c.fecha <= range.end; });
+        var total = cobrosR.reduce(function(s,c){return s+c.monto},0);
+        doc.text('Total ingresos: $' + total.toLocaleString(), margin, y); y += 6;
+        doc.text('Transacciones: ' + cobrosR.length, margin, y); y += 6;
+        doc.text('Promedio por transacción: $' + (cobrosR.length > 0 ? Math.round(total/cobrosR.length) : 0), margin, y); y += 10;
+
+        // By method
+        var byM = {};
+        cobrosR.forEach(function(c) { var m = c.metodoPago||'Otro'; byM[m]=(byM[m]||0)+c.monto; });
+        doc.setFont('helvetica', 'bold');
+        doc.text('Por Método de Pago:', margin, y); y += 7;
+        doc.setFont('helvetica', 'normal');
+        Object.keys(byM).forEach(function(m) {
+          doc.text('  • ' + m + ': $' + byM[m].toLocaleString(), margin, y); y += 6;
+        });
+        y += 4;
+
+        // Detail table
+        doc.setFont('helvetica', 'bold');
+        doc.text('Detalle de Transacciones:', margin, y); y += 7;
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        cobrosR.forEach(function(c) {
+          if (y > 270) { doc.addPage(); y = 20; }
+          var res = S.reservas.find(function(r){return r.id===c.reservaId});
+          doc.text(c.fecha + ' | ' + (res ? res.huesped : 'N/A') + ' | ' + c.concepto + ' | ' + c.metodoPago + ' | $' + c.monto, margin, y);
+          y += 5;
+        });
+
+      } else if (type === 'clientes') {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(14);
+        doc.text('Reporte de Clientes Frecuentes', margin, y); y += 10;
+
+        var cd = {};
+        S.reservas.filter(function(r){return r.estado!=='Cancelada'}).forEach(function(r) {
+          if(!cd[r.huesped]) cd[r.huesped]={v:0,t:0};
+          cd[r.huesped].v++; cd[r.huesped].t+=r.tarifaTotal;
+        });
+        var sorted = Object.keys(cd).map(function(n){return{name:n,visitas:cd[n].v,total:cd[n].t}}).sort(function(a,b){return b.total-a.total}).slice(0,20);
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        sorted.forEach(function(c,i) {
+          if (y > 270) { doc.addPage(); y = 20; }
+          doc.text((i+1) + '. ' + c.name + ' — ' + c.visitas + ' visita(s) — $' + c.total.toLocaleString(), margin, y);
+          y += 6;
+        });
+
+      } else if (type === 'diario') {
+        var today = normDate(new Date());
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(14);
+        doc.text('Reporte Diario — ' + formatDate(today), margin, y); y += 10;
+
+        var arr = S.reservas.filter(function(r){return r.fechaEntrada===today && r.estado!=='Cancelada'}).length;
+        var dep = S.reservas.filter(function(r){return r.fechaSalida===today && r.estado!=='Cancelada'}).length;
+        var todayC = S.cobros.filter(function(c){return c.fecha===today});
+        var rev = todayC.reduce(function(s,c){return s+c.monto},0);
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(11);
+        doc.text('Check-ins: ' + arr, margin, y); y += 6;
+        doc.text('Check-outs: ' + dep, margin, y); y += 6;
+        doc.text('Ingresos del día: $' + rev.toLocaleString(), margin, y); y += 6;
+        doc.text('Transacciones: ' + todayC.length, margin, y); y += 10;
+
+        if (todayC.length > 0) {
+          doc.setFont('helvetica', 'bold');
+          doc.text('Detalle:', margin, y); y += 7;
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(9);
+          todayC.forEach(function(c) {
+            var res = S.reservas.find(function(r){return r.id===c.reservaId});
+            doc.text(c.hora + ' | ' + (res?res.huesped:'N/A') + ' | ' + c.concepto + ' | $' + c.monto, margin, y);
+            y += 5;
+          });
+        }
+      }
+
+      // Footer
+      y += 10;
+      doc.setFontSize(8);
+      doc.setTextColor(150);
+      doc.text('Generado por ' + HOTEL_NAME + ' PMS — ' + now(), margin, y);
+
+      doc.save('reporte_' + type + '_' + normDate(new Date()) + '.pdf');
+      toast('PDF descargado');
     }
 
     function updateUserBadge() {
@@ -3004,7 +3649,7 @@
 
       var h='<div class="receipt-overlay" id="receiptOverlay" onclick="if(event.target===this)closeReceipt()">';
       h+='<div class="receipt-box">';
-      h+='<div class="receipt-header"><div class="receipt-hotel">🏨 Hotel Casa Regina</div><div class="receipt-sub">Recibo de hospedaje</div></div>';
+      h+='<div class="receipt-header"><img src="'+LOGO+'" style="width:60px;height:60px;border-radius:10px;object-fit:cover;margin-bottom:8px" alt="Logo"><div class="receipt-hotel">Casa Regina</div><div style="font-size:10px;color:#888;margin-bottom:4px">Hotel Boutique</div><div class="receipt-sub">Recibo de hospedaje</div></div>';
       h+='<div class="receipt-div"></div>';
       h+='<div class="receipt-row"><span class="receipt-label">Huésped</span><span class="receipt-value">'+res.huesped+'</span></div>';
       h+='<div class="receipt-row"><span class="receipt-label">Habitación</span><span class="receipt-value">'+res.habitacionNum+' ('+(room?room.tipo:'')+')</span></div>';
@@ -3242,7 +3887,7 @@
       h += '<div class="receipt-box">';
 
       // Header
-      h += '<div class="receipt-header"><div class="receipt-hotel">🏨 Hotel Casa Regina</div><div class="receipt-sub">Confirmación de Reservación</div></div>';
+      h += '<div class="receipt-header"><img src="'+LOGO+'" style="width:60px;height:60px;border-radius:10px;object-fit:cover;margin-bottom:8px" alt="Logo"><div class="receipt-hotel">Casa Regina</div><div style="font-size:10px;color:#888;margin-bottom:4px">Hotel Boutique</div><div class="receipt-sub">Confirmación de Reservación</div></div>';
       h += '<div class="receipt-div"></div>';
 
       // Reservation details
@@ -3894,6 +4539,323 @@
         render();
         openClientDetail(nombre);
       }, 'Guardando contacto...');
+    }
+
+    // ============ CONFIG TABS ============
+    if (!S.configTab) S.configTab = 'terminos';
+
+    function renderConfig() {
+      var pills = [
+        { id: 'terminos', label: '📜 Términos' },
+        { id: 'usuarios', label: '👤 Usuarios' },
+        { id: 'tarifas', label: '💲 Tarifas' },
+        { id: 'app', label: '📱 App' }
+      ];
+      var ph = pills.map(function(p) {
+        return '<div class="pill ' + (S.configTab === p.id ? 'active' : '') + '" onclick="S.configTab=\'' + p.id + '\';renderConfig()">' + p.label + '</div>';
+      }).join('');
+      document.getElementById('configPills').innerHTML = ph;
+
+      if (S.configTab === 'terminos') {
+        renderTermsConfig();
+      } else if (S.configTab === 'usuarios') {
+        renderUsersConfig();
+      } else if (S.configTab === 'tarifas') {
+        renderTarifasConfig();
+      } else if (S.configTab === 'app') {
+        renderAppConfig();
+      }
+    }
+
+    function renderAppConfig() {
+      var isInstalled = isPWA();
+      var h = '<div style="margin-bottom:16px">';
+      h += '<div class="section-title">Configuración de la App</div>';
+      h += '</div>';
+
+      // Theme section
+      var currentTheme = getTheme();
+      h += '<div style="background:var(--surface2);border-radius:var(--radius);padding:16px;margin-bottom:12px">';
+      h += '<div style="font-weight:700;font-size:14px;margin-bottom:10px">🎨 Tema</div>';
+      h += '<div style="display:flex;gap:8px">';
+      h += '<button class="form-button' + (currentTheme === 'dark' ? '' : ' secondary') + '" onclick="localStorage.setItem(\'theme\',\'dark\');applyTheme(\'dark\');renderConfig()" style="flex:1;' + (currentTheme === 'dark' ? 'background:var(--accent);color:var(--bg)' : '') + '">🌙 Oscuro</button>';
+      h += '<button class="form-button' + (currentTheme === 'light' ? '' : ' secondary') + '" onclick="localStorage.setItem(\'theme\',\'light\');applyTheme(\'light\');renderConfig()" style="flex:1;' + (currentTheme === 'light' ? 'background:var(--accent);color:var(--bg)' : '') + '">☀️ Claro</button>';
+      h += '</div></div>';
+
+      // Install section
+      h += '<div style="background:var(--surface2);border-radius:var(--radius);padding:16px;margin-bottom:12px">';
+      h += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">';
+      h += '<div style="font-size:32px">📱</div>';
+      h += '<div><div style="font-weight:700;font-size:14px">Instalar como App</div>';
+      h += '<div style="font-size:11px;color:var(--text2)">Accede directo desde tu pantalla de inicio sin abrir el navegador</div></div></div>';
+      if (isInstalled) {
+        h += '<div style="background:rgba(107,191,123,.15);border-radius:10px;padding:10px;text-align:center;font-size:12px;color:var(--green);font-weight:600">✅ App instalada — Estás usando la versión de escritorio</div>';
+      } else {
+        h += '<button class="form-button" onclick="promptInstallPWA()" style="width:100%;background:var(--accent);color:var(--bg)">📲 Instalar App</button>';
+      }
+      h += '</div>';
+
+      // Connection info
+      h += '<div style="background:var(--surface2);border-radius:var(--radius);padding:16px;margin-bottom:12px">';
+      h += '<div style="font-weight:700;font-size:14px;margin-bottom:10px">🔗 Conexión</div>';
+      h += '<div class="breakdown-item"><div class="breakdown-label">Sheet ID</div><div class="breakdown-value" style="font-size:10px;max-width:150px;overflow:hidden;text-overflow:ellipsis">' + (S.sheetId ? S.sheetId.substr(0, 12) + '...' : 'No configurado') + '</div></div>';
+      h += '<div class="breakdown-item"><div class="breakdown-label">Estado</div><div class="breakdown-value" style="color:var(--green)">Conectado</div></div>';
+      h += '<div class="breakdown-item"><div class="breakdown-label">Habitaciones</div><div class="breakdown-value">' + S.rooms.length + '</div></div>';
+      h += '<div class="breakdown-item"><div class="breakdown-label">Reservas cargadas</div><div class="breakdown-value">' + S.reservas.length + '</div></div>';
+      h += '<div class="breakdown-item"><div class="breakdown-label">Usuarios</div><div class="breakdown-value">' + S.usuarios.length + '</div></div>';
+      h += '</div>';
+
+      // Session info
+      h += '<div style="background:var(--surface2);border-radius:var(--radius);padding:16px;margin-bottom:12px">';
+      h += '<div style="font-weight:700;font-size:14px;margin-bottom:10px">👤 Sesión Actual</div>';
+      h += '<div class="breakdown-item"><div class="breakdown-label">Usuario</div><div class="breakdown-value">' + (S.user ? S.user.nombre : '') + '</div></div>';
+      h += '<div class="breakdown-item"><div class="breakdown-label">Rol</div><div class="breakdown-value">' + (S.user ? (ROLES[S.user.rol] || S.user.rol) : '') + '</div></div>';
+      h += '<button class="form-button secondary" onclick="logout()" style="width:100%;margin-top:12px;border-color:var(--red);color:var(--red)">🚪 Cerrar Sesión</button>';
+      h += '</div>';
+
+      // Version
+      h += '<div style="text-align:center;margin-top:20px"><img src="' + LOGO + '" style="width:60px;height:60px;border-radius:12px;object-fit:cover;margin-bottom:8px;opacity:.7" alt="Logo"><div style="font-size:10px;color:var(--text2)">Casa Regina · Hotel Boutique<br>PMS v2.0 · Powered by Google Sheets</div></div>';
+
+      document.getElementById('configContent').innerHTML = h;
+    }
+
+    function renderTermsConfig() {
+      var terms = getTerms();
+      var h = '<div style="margin-bottom:16px">';
+      h += '<div class="section-title">Términos y Condiciones</div>';
+      h += '<div style="font-size:12px;color:var(--text2);margin-bottom:16px">Edita las políticas que aparecen en la confirmación de reservación.</div>';
+      h += '</div>';
+      h += '<div id="termsEditor"></div>';
+      h += '<div style="display:flex;gap:10px;margin-top:16px">';
+      h += '<button class="form-button" onclick="saveTerms()" style="flex:1">💾 Guardar Cambios</button>';
+      h += '</div>';
+      h += '<div style="display:flex;gap:10px;margin-top:10px">';
+      h += '<button class="form-button secondary" onclick="addNewTerm()" style="flex:1">➕ Agregar Política</button>';
+      h += '<button class="form-button secondary" onclick="resetTermsToDefault()" style="flex:1;border-color:var(--red);color:var(--red)">🔄 Restaurar Default</button>';
+      h += '</div>';
+      h += '<div style="margin-top:24px"><div class="section-title">Vista Previa</div>';
+      h += '<button class="form-button secondary" onclick="previewTerms()" style="width:100%">👁️ Ver cómo se ve en la confirmación</button></div>';
+      document.getElementById('configContent').innerHTML = h;
+      renderTermsEditor();
+    }
+
+    function renderUsersConfig() {
+      var h = '<div style="margin-bottom:16px">';
+      h += '<div class="section-title">Gestión de Usuarios</div>';
+      h += '<div style="font-size:12px;color:var(--text2);margin-bottom:16px">Administra quién tiene acceso al sistema y con qué permisos.</div>';
+      h += '</div>';
+
+      h += '<button class="form-button" onclick="openUserForm()" style="width:100%;margin-bottom:16px;background:var(--accent);color:var(--bg)">➕ Nuevo Usuario</button>';
+
+      if (!S.usuarios || S.usuarios.length === 0) {
+        h += '<div style="text-align:center;padding:20px;color:var(--text2)">Sin usuarios registrados</div>';
+      } else {
+        S.usuarios.forEach(function(u) {
+          var uid = u[0], login = u[1], nombre = u[3], rol = u[4];
+          var rolLabel = ROLES[rol] || rol;
+          var isCurrentUser = S.user && S.user.usuario === login;
+          var rolColor = rol === 'admin' ? 'var(--red)' : rol === 'recepcion' ? 'var(--accent)' : 'var(--yellow)';
+          h += '<div style="background:var(--surface2);border-radius:var(--radius);padding:14px;margin-bottom:8px;display:flex;align-items:center;gap:12px">';
+          h += '<div style="width:40px;height:40px;border-radius:50%;background:var(--surface3);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:var(--accent);flex-shrink:0">' + (nombre ? nombre.charAt(0).toUpperCase() : '?') + '</div>';
+          h += '<div style="flex:1;min-width:0">';
+          h += '<div style="font-size:14px;font-weight:700">' + escapeHtml(nombre || login) + (isCurrentUser ? ' <span style="font-size:10px;color:var(--text2)">(tú)</span>' : '') + '</div>';
+          h += '<div style="font-size:11px;color:var(--text2)">@' + escapeHtml(login) + ' · <span style="color:' + rolColor + ';font-weight:600">' + rolLabel + '</span></div>';
+          h += '</div>';
+          h += '<div style="display:flex;gap:6px">';
+          h += '<button onclick="openUserForm(\'' + uid + '\')" style="background:var(--surface3);border:none;color:var(--text);width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:14px" title="Editar">✏️</button>';
+          if (!isCurrentUser) {
+            h += '<button onclick="deleteUser(\'' + uid + '\',\'' + escapeAttr(nombre || login) + '\')" style="background:rgba(207,107,107,.15);border:none;color:var(--red);width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:14px" title="Eliminar">🗑️</button>';
+          }
+          h += '</div></div>';
+        });
+      }
+
+      document.getElementById('configContent').innerHTML = h;
+    }
+
+    function openUserForm(editId) {
+      var isEdit = !!editId;
+      document.getElementById('userFormTitle').textContent = isEdit ? '✏️ Editar Usuario' : '👤 Nuevo Usuario';
+      document.getElementById('userFormId').value = editId || '';
+
+      if (isEdit) {
+        var u = S.usuarios.find(function(x){return x[0]===editId});
+        if (u) {
+          document.getElementById('userFormUsuario').value = u[1];
+          document.getElementById('userFormPassword').value = u[2];
+          document.getElementById('userFormNombre').value = u[3];
+          document.getElementById('userFormRol').value = u[4];
+        }
+      } else {
+        document.getElementById('userFormUsuario').value = '';
+        document.getElementById('userFormPassword').value = '';
+        document.getElementById('userFormNombre').value = '';
+        document.getElementById('userFormRol').value = 'recepcion';
+      }
+      openModal('userFormModal');
+    }
+
+    async function saveUser(event) {
+      event.preventDefault();
+      var editId = document.getElementById('userFormId').value;
+      var usuario = document.getElementById('userFormUsuario').value.trim();
+      var password = document.getElementById('userFormPassword').value.trim();
+      var nombre = document.getElementById('userFormNombre').value.trim();
+      var rol = document.getElementById('userFormRol').value;
+
+      if (!usuario || !password || !nombre) {
+        toast('Completa todos los campos', true);
+        return;
+      }
+
+      // Check duplicate username (exclude self when editing)
+      var duplicate = S.usuarios.find(function(u) {
+        return u[1] === usuario && u[0] !== editId;
+      });
+      if (duplicate) {
+        toast('Ya existe un usuario con ese nombre de login', true);
+        return;
+      }
+
+      var isEdit = !!editId;
+
+      await busy(async function() {
+        var n = now();
+        var logRow = [normDate(new Date()), n.split(' ')[1], S.user.usuario, isEdit ? 'Editar usuario' : 'Crear usuario', nombre + ' (' + usuario + ') — ' + (ROLES[rol] || rol), 'info'];
+
+        if (isEdit) {
+          var row = [editId, usuario, password, nombre, rol];
+          await sheets.multi([
+            { type: 'updateById', sheet: '👤 Usuarios', id: editId, values: row },
+            { type: 'append', sheet: '📜 Bitácora', values: logRow }
+          ]);
+          // Update local
+          var idx = S.usuarios.findIndex(function(u){return u[0]===editId});
+          if (idx !== -1) S.usuarios[idx] = row;
+          // Update current session if editing self
+          if (S.user && S.user.usuario === usuario) {
+            S.user.nombre = nombre;
+            S.user.rol = rol;
+          }
+          toast('Usuario actualizado');
+        } else {
+          var newId = nextId('U', S.usuarios.map(function(u){return {id:u[0]}}));
+          var row = [newId, usuario, password, nombre, rol];
+          await sheets.multi([
+            { type: 'append', sheet: '👤 Usuarios', values: row },
+            { type: 'append', sheet: '📜 Bitácora', values: logRow }
+          ]);
+          S.usuarios.push(row);
+          toast('Usuario creado');
+        }
+
+        closeModal();
+        renderConfig();
+      }, isEdit ? 'Actualizando usuario...' : 'Creando usuario...');
+    }
+
+    async function deleteUser(uid, displayName) {
+      if (!confirm('¿Eliminar al usuario "' + displayName + '"?\n\nEsta acción no se puede deshacer.')) return;
+
+      await busy(async function() {
+        var n = now();
+        var logRow = [normDate(new Date()), n.split(' ')[1], S.user.usuario, 'Eliminar usuario', displayName, 'warning'];
+        // Remove from Sheet by updating with blank (or use a status field)
+        // Since we don't have a delete operation, we overwrite with DELETED marker
+        var u = S.usuarios.find(function(x){return x[0]===uid});
+        if (u) {
+          var row = [uid, '__DELETED__', '', displayName + ' (eliminado)', ''];
+          await sheets.multi([
+            { type: 'updateById', sheet: '👤 Usuarios', id: uid, values: row },
+            { type: 'append', sheet: '📜 Bitácora', values: logRow }
+          ]);
+          S.usuarios = S.usuarios.filter(function(x){return x[0]!==uid});
+        }
+        toast('Usuario eliminado');
+        renderConfig();
+      }, 'Eliminando usuario...');
+    }
+
+    // ============ TARIFAS CONFIG ============
+    function renderTarifasConfig() {
+      var h = '<div style="margin-bottom:16px">';
+      h += '<div class="section-title">Tarifas por Habitación</div>';
+      h += '<div style="font-size:12px;color:var(--text2);margin-bottom:16px">Edita el tipo y tarifa base por noche de cada habitación. Los cambios se guardan directamente en Google Sheets.</div>';
+      h += '</div>';
+
+      if (!S.rooms || S.rooms.length === 0) {
+        h += '<div style="text-align:center;padding:20px;color:var(--text2)">Sin habitaciones cargadas</div>';
+        document.getElementById('configContent').innerHTML = h;
+        return;
+      }
+
+      S.rooms.forEach(function(room) {
+        var statusColor = room.estado === 'Disponible' ? 'var(--green)' : room.estado === 'Ocupada' ? 'var(--blue)' : room.estado === 'Limpieza' ? 'var(--yellow)' : 'var(--text2)';
+        h += '<div style="background:var(--surface2);border-radius:var(--radius);padding:14px;margin-bottom:10px;border-left:4px solid ' + statusColor + '">';
+        h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">';
+        h += '<div style="font-size:20px;font-weight:800;font-family:Space Mono,monospace;color:var(--accent);width:40px">' + room.numero + '</div>';
+        h += '<div style="flex:1;font-size:12px;color:var(--text2)">' + room.estado + '</div>';
+        h += '</div>';
+        h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
+        h += '<div class="form-group" style="margin-bottom:0"><label class="form-label">Tipo</label>';
+        h += '<select class="form-input tarifa-tipo" data-roomid="' + room.id + '">';
+        var tipos = ['Sencilla', 'Doble', 'Suite', 'Junior Suite', 'King', 'Queen', 'Twin', 'Familiar', 'Penthouse'];
+        tipos.forEach(function(t) {
+          h += '<option value="' + t + '"' + (room.tipo === t ? ' selected' : '') + '>' + t + '</option>';
+        });
+        h += '</select></div>';
+        h += '<div class="form-group" style="margin-bottom:0"><label class="form-label">Tarifa / Noche</label>';
+        h += '<input type="number" class="form-input tarifa-precio" data-roomid="' + room.id + '" value="' + room.tarifa + '" min="0" step="50" style="font-family:Space Mono,monospace"></div>';
+        h += '</div>';
+        h += '<div class="form-group" style="margin-bottom:0;margin-top:8px"><label class="form-label">Notas</label>';
+        h += '<input type="text" class="form-input tarifa-notas" data-roomid="' + room.id + '" value="' + escapeAttr(room.notas || '') + '" placeholder="Ej: Vista al mar, balcón..."></div>';
+        h += '</div>';
+      });
+
+      h += '<button class="form-button" onclick="saveTarifas()" style="width:100%;margin-top:16px;background:var(--accent);color:var(--bg)">💾 Guardar Cambios de Tarifas</button>';
+
+      document.getElementById('configContent').innerHTML = h;
+    }
+
+    async function saveTarifas() {
+      var tipos = document.querySelectorAll('.tarifa-tipo');
+      var precios = document.querySelectorAll('.tarifa-precio');
+      var notasEls = document.querySelectorAll('.tarifa-notas');
+
+      var operations = [];
+      var changes = [];
+
+      tipos.forEach(function(sel, i) {
+        var roomId = sel.getAttribute('data-roomid');
+        var newTipo = sel.value;
+        var newTarifa = parseFloat(precios[i].value) || 0;
+        var newNotas = notasEls[i].value.trim();
+        var room = S.rooms.find(function(r){return r.id === roomId});
+
+        if (room && (room.tipo !== newTipo || room.tarifa !== newTarifa || (room.notas || '') !== newNotas)) {
+          var row = [room.id, room.numero, newTipo, newTarifa, room.estado, newNotas];
+          operations.push({ type: 'updateById', sheet: '🏨 Habitaciones', id: room.id, values: row });
+          changes.push('Hab.' + room.numero + ': ' + newTipo + ' $' + newTarifa);
+          // Update local
+          room.tipo = newTipo;
+          room.tarifa = newTarifa;
+          room.notas = newNotas;
+        }
+      });
+
+      if (operations.length === 0) {
+        toast('Sin cambios que guardar');
+        return;
+      }
+
+      await busy(async function() {
+        var n = now();
+        var logRow = [normDate(new Date()), n.split(' ')[1], S.user.usuario, 'Actualizar tarifas', changes.join(', '), 'info'];
+        operations.push({ type: 'append', sheet: '📜 Bitácora', values: logRow });
+        await sheets.multi(operations);
+        toast(operations.length - 1 + ' habitación(es) actualizada(s)');
+        render();
+      }, 'Guardando tarifas...');
     }
 
     // ============ TERMS & CONDITIONS CONFIG ============
@@ -5266,8 +6228,142 @@
       }, 'Actualizando estado...');
     }
 
+    // ============ THEME ============
+    function getTheme() {
+      return localStorage.getItem('theme') || 'dark';
+    }
+
+    function applyTheme(theme) {
+      document.documentElement.setAttribute('data-theme', theme);
+      var icon = document.getElementById('themeToggle');
+      if (icon) icon.textContent = theme === 'dark' ? '🌙' : '☀️';
+      // Update meta theme-color for mobile browsers
+      var meta = document.querySelector('meta[name="theme-color"]');
+      if (meta) meta.content = theme === 'dark' ? '#0f1410' : '#f5f5f0';
+    }
+
+    function toggleTheme() {
+      var current = getTheme();
+      var next = current === 'dark' ? 'light' : 'dark';
+      localStorage.setItem('theme', next);
+      applyTheme(next);
+    }
+
+    // Apply saved theme immediately
+    applyTheme(getTheme());
+
+    // ============ PWA ============
+    function registerPWA() {
+      // Generate manifest as blob URL
+      var manifest = {
+        name: 'Hotel Casa Regina PMS',
+        short_name: 'Casa Regina',
+        description: 'Sistema de Gestión Hotelera',
+        start_url: location.href.split('?')[0],
+        display: 'standalone',
+        orientation: 'portrait',
+        background_color: '#0f1410',
+        theme_color: '#0f1410',
+        icons: [
+          { src: 'data:image/jpeg;base64,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', sizes: '192x192', type: 'image/jpeg' },
+          { src: 'data:image/jpeg;base64,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', sizes: '512x512', type: 'image/jpeg' }
+        ]
+      };
+      var blob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
+      var manifestUrl = URL.createObjectURL(blob);
+      var link = document.createElement('link');
+      link.rel = 'manifest';
+      link.href = manifestUrl;
+      document.head.appendChild(link);
+
+      // Register service worker for offline caching
+      if ('serviceWorker' in navigator) {
+        var swCode = `
+          var CACHE_NAME = 'casa-regina-pms-v1';
+          var PRECACHE = [self.location.href.replace(/sw\\.js$/, '')];
+
+          self.addEventListener('install', function(e) {
+            e.waitUntil(
+              caches.open(CACHE_NAME).then(function(cache) {
+                return cache.addAll(PRECACHE);
+              }).then(function() { return self.skipWaiting(); })
+            );
+          });
+
+          self.addEventListener('activate', function(e) {
+            e.waitUntil(
+              caches.keys().then(function(names) {
+                return Promise.all(
+                  names.filter(function(n) { return n !== CACHE_NAME; })
+                    .map(function(n) { return caches.delete(n); })
+                );
+              }).then(function() { return self.clients.claim(); })
+            );
+          });
+
+          self.addEventListener('fetch', function(e) {
+            // Network first for API calls, cache first for the app itself
+            if (e.request.url.includes('googleapis.com') || e.request.url.includes('script.google.com')) {
+              e.respondWith(
+                fetch(e.request).catch(function() {
+                  return caches.match(e.request);
+                })
+              );
+            } else {
+              e.respondWith(
+                caches.match(e.request).then(function(cached) {
+                  var fetchPromise = fetch(e.request).then(function(response) {
+                    if (response.ok) {
+                      var clone = response.clone();
+                      caches.open(CACHE_NAME).then(function(cache) { cache.put(e.request, clone); });
+                    }
+                    return response;
+                  }).catch(function() { return cached; });
+                  return cached || fetchPromise;
+                })
+              );
+            }
+          });
+        `;
+        var swBlob = new Blob([swCode], { type: 'application/javascript' });
+        var swUrl = URL.createObjectURL(swBlob);
+        navigator.serviceWorker.register(swUrl, { scope: location.pathname })
+          .then(function(reg) { console.log('SW registered:', reg.scope); })
+          .catch(function(err) { console.log('SW registration skipped:', err.message); });
+      }
+    }
+
+    // Detect standalone mode (installed PWA)
+    function isPWA() {
+      return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    }
+
+    // Install prompt
+    var deferredInstallPrompt = null;
+    window.addEventListener('beforeinstallprompt', function(e) {
+      e.preventDefault();
+      deferredInstallPrompt = e;
+    });
+
+    function promptInstallPWA() {
+      if (deferredInstallPrompt) {
+        deferredInstallPrompt.prompt();
+        deferredInstallPrompt.userChoice.then(function(result) {
+          deferredInstallPrompt = null;
+          if (result.outcome === 'accepted') toast('App instalada');
+        });
+      } else if (/iPhone|iPad/.test(navigator.userAgent)) {
+        toast('Toca el botón Compartir ↗ y luego "Agregar a Inicio"');
+      } else {
+        toast('Abre el menú del navegador y selecciona "Instalar app"');
+      }
+    }
+
     // ============ INIT ============
-    window.addEventListener('load', init);
+    window.addEventListener('load', function() {
+      registerPWA();
+      init();
+    });
   </script>
 </body>
 </html>
