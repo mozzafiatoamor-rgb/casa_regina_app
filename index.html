@@ -1705,8 +1705,8 @@
   </div>
 
   <!-- Guest Registration Screen -->
-  <div class="login-screen" id="guestScreen" style="padding:20px;">
-    <div style="width:100%;max-width:400px;" id="guestFormContainer"></div>
+  <div class="login-screen" id="guestScreen" style="padding:0;justify-content:flex-start;overflow-y:auto;-webkit-overflow-scrolling:touch;height:100vh;">
+    <div style="width:100%;max-width:420px;padding:60px 20px 40px;" id="guestFormContainer"></div>
   </div>
 
   <!-- Main App -->
@@ -2564,11 +2564,12 @@
       var setupLogoEl = document.getElementById('setupLogo');
       if (setupLogoEl) setupLogoEl.src = LOGO;
 
-      // Check for guest registration mode
+      // Check for guest modes
       var urlParams = new URLSearchParams(window.location.search);
       var guestRegId = urlParams.get('registro');
+      var guestBooking = urlParams.has('reservar');
       var guestCfg = urlParams.get('cfg');
-      if (guestRegId && guestCfg) {
+      if ((guestRegId || guestBooking) && guestCfg) {
         try {
           var cfg = JSON.parse(atob(guestCfg));
           S.sheetId = cfg.s;
@@ -2578,6 +2579,10 @@
       }
       if (guestRegId && S.sheetId && S.apiKey) {
         showGuestMode(guestRegId);
+        return;
+      }
+      if (guestBooking && S.sheetId && S.apiKey) {
+        showBookingMode();
         return;
       }
 
@@ -2619,7 +2624,7 @@
           if (reservas[i][0] === resId) { found = reservas[i]; break; }
         }
         if (!found) {
-          container.innerHTML = '<div style="text-align:center;padding:40px 0;"><img src="' + LOGO + '" style="width:100px;height:100px;border-radius:16px;object-fit:cover;margin-bottom:16px;"><h2 style="margin:0 0 8px;">' + HOTEL_NAME + '</h2><div style="font-size:14px;color:var(--red);margin-top:20px;">❌ Reserva no encontrada</div><div style="font-size:12px;color:var(--text2);margin-top:8px;">El enlace puede haber expirado o ser incorrecto.</div></div>';
+          container.innerHTML = '<div style="text-align:center;padding:40px 0;"><img src="' + LOGO + '" style="width:120px;height:120px;border-radius:20px;object-fit:cover;margin-bottom:16px;box-shadow:0 4px 20px rgba(0,0,0,0.15);"><h2 style="margin:0 0 8px;">' + HOTEL_NAME + '</h2><div style="font-size:14px;color:var(--red);margin-top:20px;">❌ Reserva no encontrada</div><div style="font-size:12px;color:var(--text2);margin-top:8px;">El enlace puede haber expirado o ser incorrecto.</div></div>';
           return;
         }
         _guestRes = {
@@ -2639,9 +2644,9 @@
       var r = _guestRes;
       var h = '';
       h += '<div style="text-align:center;margin-bottom:20px;">';
-      h += '<img src="' + LOGO + '" style="width:90px;height:90px;border-radius:16px;object-fit:cover;margin-bottom:12px;">';
-      h += '<h2 style="margin:0 0 2px;font-size:18px;">' + HOTEL_NAME + '</h2>';
-      h += '<div style="font-size:12px;color:var(--text2);">Hotel Boutique</div>';
+      h += '<img src="' + LOGO + '" style="width:120px;height:120px;border-radius:20px;object-fit:cover;margin-bottom:14px;box-shadow:0 4px 20px rgba(0,0,0,0.15);">';
+      h += '<h2 style="margin:0 0 4px;font-size:20px;">' + HOTEL_NAME + '</h2>';
+      h += '<div style="font-size:13px;color:var(--text2);">Hotel Boutique</div>';
       h += '</div>';
 
       h += '<div style="background:var(--surface3);padding:14px;border-radius:var(--radius);margin-bottom:16px;">';
@@ -2728,9 +2733,9 @@
     function showGuestConfirmation(nombre, telefono, res) {
       var h = '';
       h += '<div style="text-align:center;margin-bottom:20px;">';
-      h += '<img src="' + LOGO + '" style="width:80px;height:80px;border-radius:16px;object-fit:cover;margin-bottom:12px;">';
+      h += '<img src="' + LOGO + '" style="width:110px;height:110px;border-radius:20px;object-fit:cover;margin-bottom:14px;box-shadow:0 4px 20px rgba(0,0,0,0.15);">';
       h += '<div style="font-size:48px;margin-bottom:8px;">✅</div>';
-      h += '<h2 style="margin:0 0 6px;font-size:18px;">¡Gracias, ' + nombre + '!</h2>';
+      h += '<h2 style="margin:0 0 6px;font-size:20px;">¡Gracias, ' + nombre + '!</h2>';
       h += '<div style="font-size:13px;color:var(--text2);">Tu pre-registro ha sido enviado con éxito.</div>';
       h += '</div>';
 
@@ -2800,6 +2805,321 @@
       h += '</div>';
       document.getElementById('taskDetailContent').innerHTML = h;
       document.getElementById('taskDetailModal').querySelector('.modal-title').textContent = '📱 Pre-registro';
+      document.getElementById('taskDetailActions').innerHTML = '';
+      openModal('taskDetailModal');
+    }
+
+    // ============ PUBLIC BOOKING MODE ============
+    var _bookingRooms = [];
+    var _bookingReservas = [];
+    var _bookingSelected = null;
+
+    async function showBookingMode() {
+      document.getElementById('setupScreen').classList.remove('active');
+      document.getElementById('loginScreen').classList.remove('active');
+      document.getElementById('appContainer').classList.add('hidden');
+      document.getElementById('guestScreen').classList.add('active');
+
+      var container = document.getElementById('guestFormContainer');
+      container.innerHTML = '<div style="text-align:center;padding:40px 0;"><div style="font-size:28px;margin-bottom:8px;">⏳</div><div style="color:var(--text2);">Cargando disponibilidad...</div></div>';
+
+      try {
+        var results = await Promise.all([
+          sheets.read('🏨 Habitaciones', 'A2:F20'),
+          sheets.read('📋 Reservas', 'A2:P5000')
+        ]);
+        _bookingRooms = results[0].map(function(r) {
+          return { id: r[0], numero: r[1], tipo: r[2], tarifa: parseFloat(r[3]) || 0, estado: r[4], notas: r[5] || '' };
+        }).filter(function(r) { return r.estado !== 'Fuera de servicio'; });
+        _bookingReservas = results[1].filter(function(r) {
+          return r[11] !== 'Cancelada' && r[11] !== 'Completada' && r[11] !== '__DELETED__';
+        }).map(function(r) {
+          return { habitacionNum: r[1], fechaEntrada: r[5], fechaSalida: r[6], estado: r[11] };
+        });
+        renderBookingDatePicker();
+      } catch(e) {
+        console.error('Booking mode error:', e);
+        container.innerHTML = '<div style="text-align:center;padding:40px 0;"><div style="font-size:28px;margin-bottom:8px;">⚠️</div><div style="color:var(--red);">Error al cargar disponibilidad.</div><div style="font-size:11px;color:var(--text2);margin-top:8px;">' + (e.message || '') + '</div></div>';
+      }
+    }
+
+    function renderBookingDatePicker() {
+      var tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      var minDate = normDate(new Date());
+      var minCheckout = normDate(tomorrow);
+
+      var h = '';
+      h += '<div style="text-align:center;margin-bottom:24px;">';
+      h += '<img src="' + LOGO + '" style="width:120px;height:120px;border-radius:20px;object-fit:cover;margin-bottom:14px;box-shadow:0 4px 20px rgba(0,0,0,0.15);">';
+      h += '<h2 style="margin:0 0 4px;font-size:20px;">' + HOTEL_NAME + '</h2>';
+      h += '<div style="font-size:13px;color:var(--text2);">Hotel Boutique</div>';
+      h += '</div>';
+
+      h += '<div style="background:var(--surface3);padding:16px;border-radius:var(--radius);margin-bottom:16px;">';
+      h += '<div style="font-size:11px;color:var(--text2);margin-bottom:10px;">ELIGE TUS FECHAS</div>';
+
+      h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">';
+      h += '<div><label style="font-size:12px;color:var(--text2);display:block;margin-bottom:4px;">Entrada</label>';
+      h += '<input type="date" id="b_checkin" class="login-input" min="' + minDate + '" value="' + minDate + '" onchange="updateBookingCheckout()" style="padding:10px;"></div>';
+      h += '<div><label style="font-size:12px;color:var(--text2);display:block;margin-bottom:4px;">Salida</label>';
+      h += '<input type="date" id="b_checkout" class="login-input" min="' + minCheckout + '" value="' + minCheckout + '" style="padding:10px;"></div>';
+      h += '</div>';
+
+      h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">';
+      h += '<div><label style="font-size:12px;color:var(--text2);display:block;margin-bottom:4px;">Adultos</label>';
+      h += '<select id="b_adultos" class="login-input" style="padding:10px;"><option>1</option><option selected>2</option><option>3</option><option>4</option></select></div>';
+      h += '<div><label style="font-size:12px;color:var(--text2);display:block;margin-bottom:4px;">Niños</label>';
+      h += '<select id="b_ninos" class="login-input" style="padding:10px;"><option selected>0</option><option>1</option><option>2</option><option>3</option></select></div>';
+      h += '</div>';
+
+      h += '<button class="login-button" onclick="searchAvailableRooms()">🔍 Ver Habitaciones Disponibles</button>';
+      h += '</div>';
+
+      h += '<div id="bookingRoomsContainer"></div>';
+
+      document.getElementById('guestFormContainer').innerHTML = h;
+    }
+
+    function updateBookingCheckout() {
+      var checkin = document.getElementById('b_checkin').value;
+      if (checkin) {
+        var next = new Date(checkin + 'T12:00:00');
+        next.setDate(next.getDate() + 1);
+        var minOut = normDate(next);
+        var outEl = document.getElementById('b_checkout');
+        outEl.min = minOut;
+        if (outEl.value <= checkin) outEl.value = minOut;
+      }
+    }
+
+    function searchAvailableRooms() {
+      var checkin = document.getElementById('b_checkin').value;
+      var checkout = document.getElementById('b_checkout').value;
+      if (!checkin || !checkout || checkout <= checkin) {
+        alert('Selecciona fechas válidas');
+        return;
+      }
+
+      var nights = daysUntil(checkin, checkout);
+      var available = _bookingRooms.filter(function(room) {
+        var hasConflict = _bookingReservas.some(function(res) {
+          return res.habitacionNum === room.numero && res.fechaEntrada < checkout && res.fechaSalida > checkin;
+        });
+        return !hasConflict;
+      });
+
+      var container = document.getElementById('bookingRoomsContainer');
+      var h = '';
+
+      if (available.length === 0) {
+        h += '<div style="background:var(--surface3);padding:20px;border-radius:var(--radius);text-align:center;">';
+        h += '<div style="font-size:28px;margin-bottom:8px;">😔</div>';
+        h += '<div style="font-size:14px;font-weight:600;">Sin disponibilidad</div>';
+        h += '<div style="font-size:12px;color:var(--text2);margin-top:4px;">No hay habitaciones disponibles en esas fechas. Prueba con otras fechas.</div>';
+        h += '</div>';
+      } else {
+        h += '<div style="font-size:11px;color:var(--text2);margin-bottom:10px;">' + available.length + ' habitación(es) disponible(s) · ' + nights + ' noche(s)</div>';
+        available.forEach(function(room) {
+          var total = room.tarifa * nights;
+          h += '<div onclick="selectBookingRoom(\'' + room.numero + '\')" style="background:var(--surface3);padding:14px;border-radius:var(--radius);margin-bottom:10px;cursor:pointer;border:2px solid transparent;transition:border-color 0.2s;" id="bookRoom_' + room.numero + '">';
+          h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">';
+          h += '<div><span style="font-weight:700;font-size:15px;">Hab. ' + room.numero + '</span> <span style="font-size:12px;color:var(--text2);">· ' + room.tipo + '</span></div>';
+          h += '<div style="text-align:right;"><div style="font-family:Space Mono,monospace;font-weight:800;font-size:16px;color:var(--accent);">$' + room.tarifa + '</div><div style="font-size:10px;color:var(--text2);">por noche</div></div>';
+          h += '</div>';
+          h += '<div style="display:flex;justify-content:space-between;align-items:center;">';
+          h += '<div style="font-size:11px;color:var(--text2);">' + (room.notas || room.tipo) + '</div>';
+          h += '<div style="font-family:Space Mono,monospace;font-weight:700;font-size:13px;color:var(--green);">Total: $' + total + '</div>';
+          h += '</div>';
+          h += '</div>';
+        });
+      }
+
+      container.innerHTML = h;
+    }
+
+    function selectBookingRoom(roomNum) {
+      _bookingSelected = roomNum;
+      // Highlight selected
+      _bookingRooms.forEach(function(r) {
+        var el = document.getElementById('bookRoom_' + r.numero);
+        if (el) el.style.borderColor = r.numero === roomNum ? 'var(--accent)' : 'transparent';
+      });
+
+      // Remove existing form if any
+      var existing = document.getElementById('bookingGuestForm');
+      if (existing) existing.remove();
+
+      var checkin = document.getElementById('b_checkin').value;
+      var checkout = document.getElementById('b_checkout').value;
+      var nights = daysUntil(checkin, checkout);
+      var room = _bookingRooms.find(function(r) { return r.numero === roomNum; });
+      var total = room.tarifa * nights;
+
+      var h = '<div id="bookingGuestForm" style="margin-top:16px;">';
+      h += '<div style="background:var(--accent);color:white;padding:12px;border-radius:var(--radius);margin-bottom:14px;text-align:center;">';
+      h += '<div style="font-size:12px;opacity:0.9;">Seleccionaste</div>';
+      h += '<div style="font-weight:800;font-size:16px;">Hab. ' + roomNum + ' · ' + room.tipo + '</div>';
+      h += '<div style="font-size:13px;margin-top:2px;">' + formatDate(checkin) + ' → ' + formatDate(checkout) + ' · ' + nights + ' noche(s) · <strong>$' + total + '</strong></div>';
+      h += '</div>';
+
+      h += '<div style="background:var(--surface3);padding:14px;border-radius:var(--radius);">';
+      h += '<div style="font-size:11px;color:var(--text2);margin-bottom:10px;">TUS DATOS</div>';
+      h += '<form onsubmit="submitBooking(event)">';
+
+      h += '<label class="form-label" style="font-size:12px;">Nombre completo *</label>';
+      h += '<input type="text" id="bk_nombre" class="login-input" required style="margin-bottom:10px;">';
+
+      h += '<label class="form-label" style="font-size:12px;">Teléfono (WhatsApp) *</label>';
+      h += '<input type="tel" id="bk_telefono" class="login-input" required style="margin-bottom:10px;">';
+
+      h += '<label class="form-label" style="font-size:12px;">Email</label>';
+      h += '<input type="email" id="bk_email" class="login-input" style="margin-bottom:10px;">';
+
+      h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">';
+      h += '<div><label class="form-label" style="font-size:12px;">Tipo de ID</label>';
+      h += '<select id="bk_tipoId" class="login-input" style="padding:10px;"><option value="INE">INE</option><option value="Pasaporte">Pasaporte</option><option value="Licencia">Licencia</option><option value="Otro">Otro</option></select></div>';
+      h += '<div><label class="form-label" style="font-size:12px;">Número de ID</label>';
+      h += '<input type="text" id="bk_numId" class="login-input"></div>';
+      h += '</div>';
+
+      h += '<label class="form-label" style="font-size:12px;">Nacionalidad</label>';
+      h += '<input type="text" id="bk_nacionalidad" class="login-input" placeholder="Ej: Mexicana" style="margin-bottom:10px;">';
+
+      h += '<label class="form-label" style="font-size:12px;">Observaciones / Peticiones especiales</label>';
+      h += '<textarea id="bk_observaciones" class="login-input" rows="2" placeholder="Hora de llegada, alergias, etc." style="margin-bottom:16px;resize:vertical;"></textarea>';
+
+      h += '<button type="submit" class="login-button" id="bookingSubmitBtn">Solicitar Reserva</button>';
+      h += '<div style="font-size:10px;color:var(--text2);text-align:center;margin-top:8px;">Tu reserva quedará pendiente de confirmación por el hotel.</div>';
+      h += '</form>';
+      h += '</div></div>';
+
+      document.getElementById('bookingRoomsContainer').insertAdjacentHTML('beforeend', h);
+
+      // Scroll to form
+      document.getElementById('bookingGuestForm').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    async function submitBooking(event) {
+      event.preventDefault();
+      var btn = document.getElementById('bookingSubmitBtn');
+      btn.disabled = true;
+      btn.textContent = 'Enviando...';
+
+      var nombre = document.getElementById('bk_nombre').value.trim();
+      var telefono = document.getElementById('bk_telefono').value.trim();
+      var email = document.getElementById('bk_email').value.trim();
+      var tipoId = document.getElementById('bk_tipoId').value;
+      var numId = document.getElementById('bk_numId').value.trim();
+      var nacionalidad = document.getElementById('bk_nacionalidad').value.trim();
+      var observaciones = document.getElementById('bk_observaciones').value.trim();
+      var checkin = document.getElementById('b_checkin').value;
+      var checkout = document.getElementById('b_checkout').value;
+      var adultos = document.getElementById('b_adultos').value;
+      var ninos = document.getElementById('b_ninos').value;
+      var roomNum = _bookingSelected;
+      var room = _bookingRooms.find(function(r) { return r.numero === roomNum; });
+      var nights = daysUntil(checkin, checkout);
+      var total = room.tarifa * nights;
+      var resId = 'RES-' + Date.now();
+      var regId = 'REG-' + Date.now();
+      var today = normDate(new Date());
+      var ts = now();
+
+      try {
+        var resRow = [resId, roomNum, nombre, telefono, email, checkin, checkout, adultos, ninos, room.tarifa, total, 'Pendiente', observaciones, 'Web', ts];
+        var regRow = [regId, resId, nombre, roomNum, today, tipoId, numId, nacionalidad, '', '', observaciones, ts];
+        var logRow = [today, ts.split(' ')[1], 'Web', 'Reserva Web', nombre + ' Hab.' + roomNum + ' ' + formatDate(checkin) + '-' + formatDate(checkout), 'info'];
+
+        await fetch(S.scriptUrl, {
+          method: 'POST',
+          body: JSON.stringify({
+            action: 'multi',
+            operations: [
+              { type: 'append', sheet: '📋 Reservas', values: [resRow] },
+              { type: 'append', sheet: '📝 Registro', values: [regRow] },
+              { type: 'append', sheet: '📜 Bitácora', values: [logRow] }
+            ]
+          })
+        });
+
+        showBookingConfirmation(nombre, telefono, room, roomNum, checkin, checkout, nights, total, resId);
+      } catch(e) {
+        console.error('Booking submit error:', e);
+        btn.disabled = false;
+        btn.textContent = 'Solicitar Reserva';
+        alert('Error al enviar. Intenta de nuevo.');
+      }
+    }
+
+    function showBookingConfirmation(nombre, telefono, room, roomNum, checkin, checkout, nights, total, resId) {
+      var h = '';
+      h += '<div style="text-align:center;margin-bottom:20px;">';
+      h += '<img src="' + LOGO + '" style="width:110px;height:110px;border-radius:20px;object-fit:cover;margin-bottom:14px;box-shadow:0 4px 20px rgba(0,0,0,0.15);">';
+      h += '<div style="font-size:48px;margin-bottom:8px;">🎉</div>';
+      h += '<h2 style="margin:0 0 6px;font-size:20px;">¡Solicitud Enviada!</h2>';
+      h += '<div style="font-size:13px;color:var(--text2);">Te confirmaremos por WhatsApp en breve.</div>';
+      h += '</div>';
+
+      h += '<div style="background:var(--surface3);padding:14px;border-radius:var(--radius);margin-bottom:16px;">';
+      h += '<div style="font-size:11px;color:var(--text2);margin-bottom:6px;">RESUMEN DE TU SOLICITUD</div>';
+      h += '<div style="font-size:13px;margin-bottom:4px;">👤 <strong>' + nombre + '</strong></div>';
+      h += '<div style="font-size:13px;margin-bottom:4px;">🏨 Habitación <strong>' + roomNum + '</strong> · ' + room.tipo + '</div>';
+      h += '<div style="font-size:13px;margin-bottom:4px;">📅 ' + formatDate(checkin) + ' → ' + formatDate(checkout) + ' · ' + nights + ' noche(s)</div>';
+      h += '<div style="font-size:15px;font-weight:800;font-family:Space Mono,monospace;color:var(--accent);margin-top:8px;">Total: $' + total + '</div>';
+      h += '<div style="font-size:11px;color:var(--text2);margin-top:4px;">Ref: ' + resId + '</div>';
+      h += '</div>';
+
+      h += '<div style="background:var(--surface3);padding:14px;border-radius:var(--radius);margin-bottom:16px;text-align:center;">';
+      h += '<div style="font-size:12px;color:var(--text2);margin-bottom:8px;">¿Quieres guardar tu comprobante?</div>';
+
+      var waText = '🏨 *' + HOTEL_NAME + '* — Solicitud de Reserva\n\n';
+      waText += '👤 ' + nombre + '\n';
+      waText += '🛏️ Habitación ' + roomNum + ' · ' + room.tipo + '\n';
+      waText += '📅 ' + formatDate(checkin) + ' → ' + formatDate(checkout) + ' (' + nights + ' noches)\n';
+      waText += '💰 Total: $' + total + '\n';
+      waText += '📋 Ref: ' + resId + '\n\n';
+      waText += '⏳ Pendiente de confirmación por el hotel.\n';
+      waText += '¡Gracias por elegir ' + HOTEL_NAME + '! 🌟';
+
+      var cleanPhone = telefono.replace(/[^0-9]/g, '');
+      if (cleanPhone.length === 10) cleanPhone = '52' + cleanPhone;
+
+      h += '<a href="https://wa.me/' + cleanPhone + '?text=' + encodeURIComponent(waText) + '" target="_blank" style="display:block;background:#25D366;color:white;padding:12px 16px;border-radius:var(--radius);text-decoration:none;font-weight:700;font-size:14px;">📲 Enviarme por WhatsApp</a>';
+      h += '</div>';
+
+      h += '<div style="text-align:center;font-size:11px;color:var(--text2);margin-top:12px;">' + HOTEL_NAME + ' · Hotel Boutique</div>';
+
+      document.getElementById('guestFormContainer').innerHTML = h;
+      document.getElementById('guestFormContainer').scrollTop = 0;
+    }
+
+    function getBookingLink() {
+      var cfg = btoa(JSON.stringify({ s: S.sheetId, k: S.apiKey, u: S.scriptUrl }));
+      return window.location.origin + window.location.pathname + '?reservar&cfg=' + encodeURIComponent(cfg);
+    }
+
+    function copyBookingLink() {
+      var link = getBookingLink();
+      navigator.clipboard.writeText(link).then(function() {
+        toast('Link de reservas copiado');
+      });
+    }
+
+    function showBookingQR() {
+      var link = getBookingLink();
+      var qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=' + encodeURIComponent(link);
+      var h = '';
+      h += '<div style="text-align:center;">';
+      h += '<div style="font-size:14px;font-weight:700;margin-bottom:12px;">QR de Reservas Público</div>';
+      h += '<div style="font-size:12px;color:var(--text2);margin-bottom:12px;">Los huéspedes pueden escanear para reservar</div>';
+      h += '<img src="' + qrUrl + '" style="width:200px;height:200px;border-radius:8px;margin-bottom:12px;" alt="QR">';
+      h += '<div style="font-size:10px;color:var(--text2);word-break:break-all;margin-bottom:12px;">' + link + '</div>';
+      h += '<button class="form-button" onclick="copyBookingLink()">📋 Copiar Link</button>';
+      h += '<button class="form-button secondary" style="margin-top:8px;" onclick="closeModal()">Cerrar</button>';
+      h += '</div>';
+      document.getElementById('taskDetailContent').innerHTML = h;
+      document.getElementById('taskDetailModal').querySelector('.modal-title').textContent = '📱 Reservas Online';
       document.getElementById('taskDetailActions').innerHTML = '';
       openModal('taskDetailModal');
     }
@@ -5672,6 +5992,15 @@
       h += '<div class="breakdown-item"><div class="breakdown-label">Rol</div><div class="breakdown-value">' + (S.user ? (ROLES[S.user.rol] || S.user.rol) : '') + '</div></div>';
       h += '<button class="form-button secondary" onclick="logout()" style="width:100%;margin-top:12px;border-color:var(--red);color:var(--red)">🚪 Cerrar Sesión</button>';
       h += '</div>';
+
+      // Reservas Online
+      h += '<div style="background:var(--surface2);border-radius:var(--radius);padding:16px;margin-bottom:12px">';
+      h += '<div style="font-weight:700;font-size:14px;margin-bottom:4px">🌐 Reservas Online</div>';
+      h += '<div style="font-size:11px;color:var(--text2);margin-bottom:12px">Link público para que los huéspedes reserven directamente</div>';
+      h += '<div style="display:flex;gap:8px;">';
+      h += '<button class="form-button" onclick="copyBookingLink()" style="flex:1;">📋 Copiar Link</button>';
+      h += '<button class="form-button secondary" onclick="showBookingQR()" style="flex:1;">📱 Ver QR</button>';
+      h += '</div></div>';
 
       // Señalización / Signage PDFs
       h += '<div style="background:var(--surface2);border-radius:var(--radius);padding:16px;margin-bottom:12px">';
