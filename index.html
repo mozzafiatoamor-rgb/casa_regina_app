@@ -1868,6 +1868,19 @@
         </div>
       </div>
 
+      <!-- Inventario Tab -->
+      <div class="tab-content" id="tabInventario">
+        <div class="tab-scroll">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+            <div class="section-title" style="margin-bottom:0">Inventario</div>
+            <div id="inventarioLowCount" style="font-size:12px;color:var(--red);font-weight:700"></div>
+          </div>
+          <div class="tabs-pills" id="inventarioPills"></div>
+          <button class="form-button" onclick="openNewInventarioModal()" style="width:100%;margin-bottom:16px;">+ Agregar Producto</button>
+          <div id="inventarioList"></div>
+        </div>
+      </div>
+
       <!-- Config Tab -->
       <div class="tab-content" id="tabConfig">
         <div class="tab-scroll">
@@ -2248,6 +2261,28 @@
     </div>
   </div>
 
+  <!-- Template Preview Modal -->
+  <div class="modal" id="templatePreviewModal">
+    <div class="modal-header">
+      <div class="modal-title" id="templatePreviewTitle">Vista Previa</div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="templatePreviewContent"></div>
+    </div>
+  </div>
+
+  <!-- Checklist Check-in / Check-out Modal -->
+  <div class="modal" id="processChecklistModal">
+    <div class="modal-header">
+      <div class="modal-title" id="processChecklistTitle">Checklist</div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="processChecklistContent"></div>
+    </div>
+  </div>
+
   <!-- Working Overlay -->
   <div class="working-overlay" id="workingOverlay">
     <div class="working-spinner"></div>
@@ -2260,11 +2295,204 @@
     const LOGO_SMALL = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAB4AHgDASIAAhEBAxEB/8QAGwABAAIDAQEAAAAAAAAAAAAAAAUGAQIEAwf/xAA0EAACAgIBAgQDBgQHAAAAAAABAgADBBEFEiEGMUFhEyJRBxUjMnGBFHKh0RYzQlKCkcH/xAAWAQEBAQAAAAAAAAAAAAAAAAAAAQL/xAAXEQEBAQEAAAAAAAAAAAAAAAAAEQEx/9oADAMBAAIRAxEAPwD4FERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERARJ7J4mviRRi349mXyt1S2tjLsLQrDqUMF7s/TpiBoKCN7O9cdbYORj3C/DfHsCFqrsfqK9QHYMrb7Hy2CNe8URsREBERAREQEREBERAREQE3pZEvraxepAwLD6jfeaRA+ucByWHxH2+35/JZCVY2VZa+PksdIFuTdTb9BpgNzs+0PhsvPzOT5zA5arAxuIx1S+lbWUHJLna1hew6upW9yx16z5WvMG7ApweQx1yqaAVofqKW1KTvpDd9rsk6IIG+2tmXJcqnDTFyhbTVj/AqN+Mw+dqWrHz1XMDqwa6BrR6l+nYYk1pX/GtNNWbxlhqSnPv46q3kKkUL03nfcqPysU6GI+rGVmTfivh/ubn76a8h8vEu1fi5bd/4ip+6vv1PofcESEms4yREShERAREQETEQPSqqy5wlVb2Of9KKSf8AoTFlb1WGuxWR17FWGiP2kzzqtxVmNxuOWrRcWm6xlOja9la2Ek+oHUAPYe5nK2Xmc3k4OPk2Nb8FBSjEbYJ1Fjs+Z1s+fkBryEgjol3zrsCzxPxvIZ1orxuT41Q2SiEimzoan4mvM9LJs+vnrvIusZ/B+LxbyTKMnjGR2Y/MrhenoII/MpBXR9QQYork9Dda1K1NY5qQkqhY9IJ89Dykh4lwl47xRyeIgArqyrBX/J1Er/QiWtkvTlfDeVcOnilwMUZllq/gms9XWrehJUHQ8z6d4oqFPMZlWAMByl+GpLLTegdayfMrvuu/XRG/WcLHrcsFA330o0BLXXaKvBld2LlHFCcte1JbfUQKUKr29fId+3ec+ZRk4CeH8Xiw38Tk46ZX4Q+a217GCj30FUAfXf1gVqJaUNq+FKOvddw509Whrpb4a7/rNvFQW0W8tSorp5UV5LVqNKtoLraNfzhj+jCKKpEtHLVLZ4J47TKbOPynx30O4FiLYAf0ZbJV5QiIgYiIgTNvK4vJYGLRyVVq5OJWKasqjRL1j8qup1vp2QGBB1oHehOenNxsUWrj12/PUyfEYjqJI1+w7+nf3kdECYflsPJ4fj8HJxrS2ItyCxHA7OwZdDXo3V29er0mnIcuM/H+GUYMlVOOjEg/h1qR39ydfoBqcByrSvSejWtf5a/2nomdbXSKgtXSEZNmsb0ff1Mg6Oc5NOW5BMxa2RzRTXZ1MD1OlaoW/fp3+8k/8V9GRiaxfi4a4FeFl4tz/LkKu/p+U77qfNSAZCWZ9tqFLFrbZYkle+zr+w1NhyFwoWoLV0rWawegb0Tvz+sQWW6rjbODpw8G85eCMxss9V9dV6KyKvw3RvUdP512Dv08pGY3NJi5XE2ZVQus4qxWqNVgIZA/xBWT7MT3G/P2Ei3zrXfZWoDq6goQaB7en/ETduSuZrG+HSC/VvSf7hqIO377qbi1xHocN95HNZlYa0VA6QPr285gc2j8J91X0M9K54ykfq+ZVIIdP30p9ivvIxMm1FCjo0PLdan/AMnlEEtXy6fdXLYdtLOc26q5G6hqtkLdyPXYdhIiZiUIiIDUaiICIiAjURAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQP/2Q==';
     const HOTEL_NAME = 'Hotel Casa Regina';
     const ROOMS_COUNT = 9;
+
+    // Checklist estandarizado por tipo de tarea de limpieza
+    const CHECKLIST_TEMPLATES = {
+      'Limpieza Check-out': [
+        'Retirar sábanas y fundas usadas',
+        'Colocar ropa de cama limpia',
+        'Limpiar y desinfectar baño completo',
+        'Reponer toallas limpias',
+        'Reponer amenities (jabón, shampoo, papel)',
+        'Aspirar / barrer pisos',
+        'Limpiar superficies y muebles',
+        'Vaciar papeleras',
+        'Verificar luces, AC y control remoto',
+        'Revisar minibar / café / agua'
+      ],
+      'Limpieza Diaria': [
+        'Tender cama',
+        'Cambiar toallas usadas',
+        'Vaciar papeleras',
+        'Limpiar superficies',
+        'Barrer / trapear piso',
+        'Reacomodar amenities',
+        'Verificar luces y AC'
+      ],
+      'Limpieza Profunda': [
+        'Retirar toda la ropa de cama',
+        'Lavar cortinas / persianas',
+        'Limpiar ventanas por dentro',
+        'Desinfectar baño completo',
+        'Limpiar debajo de muebles',
+        'Aspirar colchón',
+        'Pulir pisos',
+        'Limpiar AC y filtros',
+        'Revisar estado de paredes',
+        'Reponer todos los suministros',
+        'Verificar funcionamiento general',
+        'Fotografiar habitación terminada'
+      ],
+      'Mantenimiento': [
+        'Revisar plomería (lavabo, regadera, WC)',
+        'Verificar sistema eléctrico',
+        'Probar aire acondicionado',
+        'Verificar cerraduras y llaves',
+        'Revisar estado de muebles',
+        'Verificar señalización',
+        'Documentar reparaciones necesarias'
+      ]
+    };
+
+    // Checklist para procesos de check-in y check-out
+    const CHECKIN_CHECKLIST = [
+      'Verificar identificación oficial del huésped',
+      'Confirmar datos de reserva (fechas, tarifa, habitación)',
+      'Confirmar anticipo / método de pago',
+      'Entregar llave de habitación',
+      'Informar contraseña de WiFi',
+      'Explicar horarios (desayuno, check-out, áreas comunes)',
+      'Informar políticas (no fumar, ruido, mascotas)',
+      'Registrar acompañantes (adultos y niños)'
+    ];
+
+    const CHECKOUT_CHECKLIST = [
+      'Revisar estado de la habitación',
+      'Verificar consumos extras / minibar',
+      'Confirmar pago total liquidado',
+      'Recoger llave de habitación',
+      'Preguntar sobre la estancia (feedback)',
+      'Ofrecer ayuda con equipaje / transporte'
+    ];
     const ROLES = {
       admin: 'Administrador',
       recepcion: 'Recepción',
       ama_llaves: 'Ama de Llaves'
     };
+
+    // Plantillas de mensajes por defecto
+    const DEFAULT_MSG_TEMPLATES = {
+      confirmacion: {
+        nombre: 'Confirmación de Reserva',
+        icon: '✅',
+        texto: '🏨 *Hotel Casa Regina*\n_Confirmación de Reservación_\n\nHola *{huesped}* 👋\n\nTu reservación ha sido confirmada:\n\n*No. Reservación:* {reservaId}\n*Habitación:* {habitacion} ({tipoHab})\n*Entrada:* {entrada} (3:00 PM)\n*Salida:* {salida} (12:00 PM)\n*Noches:* {noches}\n*Huéspedes:* {huespedes}\n─────────────\n*Tarifa/noche:* ${tarifa}\n*Total estancia:* ${total}\n{infoPago}\n─────────────\n\n_Gracias por elegirnos_ 🌿'
+      },
+      recordatorio: {
+        nombre: 'Recordatorio (1 día antes)',
+        icon: '🔔',
+        texto: '🏨 *Hotel Casa Regina*\n\nHola *{huesped}* 👋\n\n¡Te esperamos mañana!\n\n*Reservación:* {reservaId}\n*Habitación:* {habitacion} ({tipoHab})\n*Fecha de llegada:* {entrada}\n*Hora de check-in:* 3:00 PM\n\n📍 *Dirección:* [Tu dirección aquí]\n\n📋 *Recuerda traer:*\n• Identificación oficial\n• Comprobante de pago\n\n{infoPago}\n\n¿Tienes alguna duda? Escríbenos con confianza 😊\n\n_Hotel Casa Regina_ 🌿'
+      },
+      instrucciones: {
+        nombre: 'Instrucciones de Llegada',
+        icon: '📍',
+        texto: '🏨 *Hotel Casa Regina*\n_Instrucciones de llegada_\n\nHola *{huesped}* 👋\n\n¡Bienvenido(a)! Aquí tienes la info para tu llegada:\n\n📍 *Ubicación:* [Tu dirección aquí]\n🕐 *Check-in:* 3:00 PM a 9:00 PM\n🔑 *Check-out:* 12:00 PM\n\n📶 *WiFi:*\nRed: CasaRegina\nContraseña: [tu contraseña]\n\n🅿️ *Estacionamiento:* [info estacionamiento]\n\n📋 *Políticas:*\n• No fumar en habitaciones\n• Horario de silencio: 10 PM - 8 AM\n• Mascotas: consultar disponibilidad\n\nCualquier duda estamos para servirte 😊\n\n_Hotel Casa Regina_ 🌿'
+      },
+      despedida: {
+        nombre: 'Despedida + Reseña',
+        icon: '⭐',
+        texto: '🏨 *Hotel Casa Regina*\n\nHola *{huesped}* 👋\n\n¡Gracias por hospedarte con nosotros! Esperamos que tu estancia haya sido muy agradable.\n\nNos encantaría conocer tu opinión. Si tienes un momento, déjanos tu reseña aquí:\n⭐ [Tu link de Google Reviews]\n\n¡Tu feedback nos ayuda a mejorar! 🙏\n\nEsperamos verte pronto de nuevo 🌿\n\n_Hotel Casa Regina_'
+      }
+    };
+
+    // Obtener/guardar plantillas (localStorage)
+    function getMsgTemplates() {
+      try {
+        var saved = localStorage.getItem('msgTemplates');
+        if (saved) return JSON.parse(saved);
+      } catch(e) {}
+      return JSON.parse(JSON.stringify(DEFAULT_MSG_TEMPLATES));
+    }
+
+    function saveMsgTemplates(templates) {
+      localStorage.setItem('msgTemplates', JSON.stringify(templates));
+    }
+
+    function renderMsgTemplate(templateKey, resId) {
+      var templates = getMsgTemplates();
+      var tpl = templates[templateKey];
+      if (!tpl) return '';
+      var res = S.reservas.find(function(r) { return r.id === resId; });
+      if (!res) return tpl.texto;
+      var room = S.rooms.find(function(r) { return r.numero === res.habitacionNum; });
+      var nights = daysUntil(res.fechaEntrada, res.fechaSalida);
+      var payments = S.cobros.filter(function(c) { return c.reservaId === resId; });
+      var totalPaid = payments.reduce(function(s, c) { return s + c.monto; }, 0);
+      var balance = res.tarifaTotal - totalPaid;
+      var anticipo50 = Math.ceil(res.tarifaTotal * 0.5);
+
+      var infoPago = '';
+      if (totalPaid > 0) {
+        infoPago = '*Anticipo recibido:* $' + totalPaid + '\n*Saldo pendiente:* $' + balance;
+      } else {
+        infoPago = '*Anticipo requerido (50%):* $' + anticipo50;
+      }
+
+      var huespedes = res.adultos + ' adulto(s)';
+      if (parseInt(res.niños) > 0) huespedes += ', ' + res.niños + ' niño(s)';
+
+      var text = tpl.texto;
+      text = text.replace(/\{huesped\}/g, res.huesped || '');
+      text = text.replace(/\{reservaId\}/g, res.id || '');
+      text = text.replace(/\{habitacion\}/g, res.habitacionNum || '');
+      text = text.replace(/\{tipoHab\}/g, room ? room.tipo : '');
+      text = text.replace(/\{entrada\}/g, formatDate(res.fechaEntrada));
+      text = text.replace(/\{salida\}/g, formatDate(res.fechaSalida));
+      text = text.replace(/\{noches\}/g, nights);
+      text = text.replace(/\{tarifa\}/g, res.tarifa);
+      text = text.replace(/\{total\}/g, res.tarifaTotal);
+      text = text.replace(/\{infoPago\}/g, infoPago);
+      text = text.replace(/\{huespedes\}/g, huespedes);
+      text = text.replace(/\{telefono\}/g, res.telefono || '');
+      text = text.replace(/\{email\}/g, res.email || '');
+      return text;
+    }
+
+    function sendTemplateWhatsApp(templateKey, resId) {
+      var res = S.reservas.find(function(r) { return r.id === resId; });
+      var text = renderMsgTemplate(templateKey, resId);
+      var phone = (res.telefono || '').replace(/\D/g, '');
+      var url = 'https://wa.me/' + (phone ? phone : '') + '?text=' + encodeURIComponent(text);
+      window.open(url, '_blank');
+    }
+
+    function previewTemplate(templateKey, resId) {
+      var text = renderMsgTemplate(templateKey, resId);
+      var templates = getMsgTemplates();
+      var tpl = templates[templateKey];
+      var res = S.reservas.find(function(r) { return r.id === resId; });
+      var phone = (res.telefono || '').replace(/\D/g, '');
+
+      var h = '<div style="background:var(--surface3);padding:14px;border-radius:var(--radius);margin-bottom:14px;">';
+      h += '<div style="font-size:12px;color:var(--text2);margin-bottom:6px;">VISTA PREVIA</div>';
+      h += '<div style="white-space:pre-wrap;font-size:13px;line-height:1.6;">' + text.replace(/\*/g, '<b>').replace(/<b>([^<]*)<b>/g, '<b>$1</b>').replace(/_([^_]*)_/g, '<i>$1</i>') + '</div>';
+      h += '</div>';
+      h += '<div style="display:flex;flex-direction:column;gap:8px;">';
+      h += '<button class="form-button" onclick="sendTemplateWhatsApp(\'' + templateKey + '\',\'' + resId + '\')" style="background:#25D366">📱 Enviar por WhatsApp</button>';
+      h += '<button class="form-button secondary" onclick="copyTemplateText(\'' + templateKey + '\',\'' + resId + '\')">📋 Copiar Texto</button>';
+      h += '<button class="form-button secondary" onclick="closeModal()">Cerrar</button>';
+      h += '</div>';
+
+      document.getElementById('templatePreviewContent').innerHTML = h;
+      document.getElementById('templatePreviewTitle').textContent = tpl.icon + ' ' + tpl.nombre;
+      openModal('templatePreviewModal');
+    }
+
+    function copyTemplateText(templateKey, resId) {
+      var text = renderMsgTemplate(templateKey, resId);
+      // Remove WhatsApp formatting
+      text = text.replace(/\*/g, '').replace(/_/g, '');
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(text).then(function() { toast('Texto copiado'); });
+      } else {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        toast('Texto copiado');
+      }
+    }
 
     // ============ STATE ============
     let S = {
@@ -2521,14 +2749,15 @@
     // ============ DATA LOADING ============
     async function loadData() {
       await busy(async () => {
-        const [roomsData, reservasData, housekeepingData, bitacoraData, usuariosData, cobrosData, clientesData] = await Promise.all([
+        const [roomsData, reservasData, housekeepingData, bitacoraData, usuariosData, cobrosData, clientesData, inventarioData] = await Promise.all([
           sheets.read('🏨 Habitaciones', 'A2:F20'),
           sheets.read('📋 Reservas', 'A2:P5000'),
-          sheets.read('🧹 Housekeeping', 'A2:K5000'),
+          sheets.read('🧹 Housekeeping', 'A2:L5000'),
           sheets.read('📜 Bitácora', 'A2:F5000'),
           sheets.read('👤 Usuarios', 'A2:E50'),
           sheets.read('💰 Cobros', 'A2:I5000'),
-          sheets.read('👥 Clientes', 'A2:I5000').catch(function() { return []; })
+          sheets.read('👥 Clientes', 'A2:I5000').catch(function() { return []; }),
+          sheets.read('📦 Inventario', 'A2:H500').catch(function() { return []; })
         ]);
 
         S.usuarios = usuariosData;
@@ -2571,7 +2800,8 @@
           notas: h[7] || '',
           horaInicio: h[8] || '',
           horaFin: h[9] || '',
-          verificado: h[10] || ''
+          verificado: h[10] || '',
+          checklist: h[11] || ''
         }));
 
         S.bitacora = bitacoraData.map(b => ({
@@ -2595,6 +2825,15 @@
           visitas: parseInt(c[7]) || 0, totalGastado: parseFloat(c[8]) || 0
         }));
 
+        S.inventario = inventarioData.filter(function(i) { return i[1] !== '__DELETED__'; }).map(function(i) {
+          return {
+            id: i[0], categoria: i[1] || '', producto: i[2] || '',
+            stock: parseInt(i[3]) || 0, minimo: parseInt(i[4]) || 0,
+            unidad: i[5] || 'pzas', notas: i[6] || '',
+            ultimaActualizacion: i[7] || ''
+          };
+        });
+
         // Sync: add clients from reservations that aren't in the Sheet yet
         await syncClientesFromReservas();
 
@@ -2611,6 +2850,7 @@
       if (S.roomsView === 'calendar') renderCalendar();
       renderReservas();
       renderHousekeeping();
+      renderInventario();
       renderReports();
       renderCobros();
       renderClientes();
@@ -2727,7 +2967,18 @@
           '<div class="item-meta">Hab. ' + maintNums + ' — Fuera de servicio</div></div>');
       }
 
-      // 7. Upcoming reservations tomorrow (informational)
+      // 7. Low inventory stock
+      if (S.inventario) {
+        var lowStock = S.inventario.filter(function(i) { return i.stock <= i.minimo && i.minimo > 0; });
+        if (lowStock.length > 0) {
+          var lowNames = lowStock.slice(0, 3).map(function(i) { return i.producto + ' (' + i.stock + '/' + i.minimo + ')'; }).join(', ');
+          alertItems.push('<div class="item" style="border-left-color:var(--yellow);cursor:pointer" onclick="switchTab(\'inventario\')">' +
+            '<div class="item-title">📦 ' + lowStock.length + ' producto(s) con stock bajo</div>' +
+            '<div class="item-meta">' + lowNames + (lowStock.length > 3 ? '...' : '') + '</div></div>');
+        }
+      }
+
+      // 8. Upcoming reservations tomorrow (informational)
       var tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate()+1);
       var tomorrowStr = normDate(tomorrow);
       var arrivTomorrow = S.reservas.filter(function(r){return r.fechaEntrada===tomorrowStr && r.estado==='Confirmada'});
@@ -3077,6 +3328,17 @@
       const listHtml = filtered.length > 0
         ? filtered.map(t => {
             const priorityClass = t.prioridad.toLowerCase();
+            var prog = getChecklistProgress(t);
+            var progHtml = '';
+            if (prog) {
+              var pct = Math.round((prog.done / prog.total) * 100);
+              progHtml = '<div style="margin-top:6px;">' +
+                '<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text2);margin-bottom:2px;">' +
+                '<span>Checklist</span><span>' + prog.done + '/' + prog.total + '</span></div>' +
+                '<div style="background:var(--surface3);border-radius:4px;height:4px;overflow:hidden;">' +
+                '<div style="height:100%;background:' + (pct === 100 ? 'var(--green)' : 'var(--accent)') + ';width:' + pct + '%;border-radius:4px;"></div>' +
+                '</div></div>';
+            }
             return `
               <div class="task-card" onclick="openTaskDetailModal('${t.id}')">
                 <div class="task-header">
@@ -3088,12 +3350,296 @@
                   <div>${t.estado}</div>
                   <div>${t.asignadoA}</div>
                 </div>
+                ${progHtml}
               </div>
             `;
           }).join('')
         : '<div class="empty-state"><div class="empty-icon">✓</div><div class="empty-title">Sin tareas</div></div>';
 
       document.getElementById('tasksList').innerHTML = listHtml;
+    }
+
+    // ============ INVENTARIO ============
+    if (!S.filterInventario) S.filterInventario = 'todos';
+
+    const INV_CATEGORIAS = ['Blancos', 'Amenities', 'Limpieza', 'Café y Bebidas', 'Mantenimiento', 'Otros'];
+
+    function renderInventario() {
+      if (!S.inventario) return;
+
+      var pills = [
+        { id: 'todos', label: 'Todos' },
+        { id: 'bajo', label: '⚠️ Stock Bajo' }
+      ];
+      INV_CATEGORIAS.forEach(function(c) {
+        pills.push({ id: c, label: c });
+      });
+
+      var ph = pills.map(function(p) {
+        return '<div class="pill ' + (S.filterInventario === p.id ? 'active' : '') + '" onclick="filterInventarioTab(\'' + p.id + '\')">' + p.label + '</div>';
+      }).join('');
+      document.getElementById('inventarioPills').innerHTML = ph;
+
+      var filtered = S.inventario;
+      if (S.filterInventario === 'bajo') {
+        filtered = filtered.filter(function(i) { return i.stock <= i.minimo; });
+      } else if (S.filterInventario !== 'todos') {
+        filtered = filtered.filter(function(i) { return i.categoria === S.filterInventario; });
+      }
+
+      var lowCount = S.inventario.filter(function(i) { return i.stock <= i.minimo && i.minimo > 0; }).length;
+      document.getElementById('inventarioLowCount').textContent = lowCount > 0 ? '⚠️ ' + lowCount + ' bajo mínimo' : '';
+
+      if (filtered.length === 0) {
+        document.getElementById('inventarioList').innerHTML = '<div class="empty-state"><div class="empty-icon">📦</div><div class="empty-title">Sin productos</div><div class="empty-subtitle">Agrega productos al inventario</div></div>';
+        return;
+      }
+
+      var h = '';
+      filtered.forEach(function(item) {
+        var isLow = item.stock <= item.minimo && item.minimo > 0;
+        var pct = item.minimo > 0 ? Math.min(Math.round((item.stock / (item.minimo * 2)) * 100), 100) : 100;
+        var barColor = isLow ? 'var(--red)' : (pct < 60 ? 'var(--yellow)' : 'var(--green)');
+
+        h += '<div class="task-card" onclick="openInventarioDetail(\'' + item.id + '\')" style="' + (isLow ? 'border-left:3px solid var(--red);' : '') + '">';
+        h += '<div class="task-header">';
+        h += '<div class="task-room" style="font-size:13px;">' + item.producto + '</div>';
+        h += '<div style="font-size:18px;font-weight:800;font-family:Space Mono,monospace;color:' + (isLow ? 'var(--red)' : 'var(--text)') + '">' + item.stock + '<span style="font-size:11px;font-weight:400;color:var(--text2)"> ' + item.unidad + '</span></div>';
+        h += '</div>';
+        h += '<div class="task-meta" style="margin-top:4px;">';
+        h += '<div>' + item.categoria + '</div>';
+        h += '<div>Mín: ' + item.minimo + '</div>';
+        h += '</div>';
+        h += '<div style="margin-top:6px;background:var(--surface3);border-radius:4px;height:4px;overflow:hidden;">';
+        h += '<div style="height:100%;background:' + barColor + ';width:' + pct + '%;border-radius:4px;"></div>';
+        h += '</div>';
+        if (isLow) {
+          h += '<div style="font-size:10px;color:var(--red);font-weight:600;margin-top:4px;">⚠️ Reponer — faltan ' + (item.minimo - item.stock) + ' ' + item.unidad + '</div>';
+        }
+        h += '</div>';
+      });
+
+      document.getElementById('inventarioList').innerHTML = h;
+    }
+
+    function filterInventarioTab(tab) {
+      S.filterInventario = tab;
+      renderInventario();
+    }
+
+    function openInventarioDetail(itemId) {
+      var item = S.inventario.find(function(i) { return i.id === itemId; });
+      if (!item) return;
+
+      var isLow = item.stock <= item.minimo && item.minimo > 0;
+
+      var h = '';
+      h += '<div style="background:var(--surface3);padding:12px;border-radius:var(--radius);margin-bottom:12px;">';
+      h += '<div style="font-size:12px;color:var(--text2);margin-bottom:4px;">PRODUCTO</div>';
+      h += '<div style="font-size:18px;font-weight:700;">' + item.producto + '</div>';
+      h += '<div style="font-size:12px;color:var(--text2);margin-top:4px;">' + item.categoria + '</div>';
+      h += '</div>';
+
+      h += '<div style="background:var(--surface3);padding:12px;border-radius:var(--radius);margin-bottom:12px;">';
+      h += '<div style="font-size:12px;color:var(--text2);margin-bottom:4px;">STOCK ACTUAL</div>';
+      h += '<div style="font-size:28px;font-weight:800;font-family:Space Mono,monospace;color:' + (isLow ? 'var(--red)' : 'var(--accent)') + '">' + item.stock + ' <span style="font-size:14px;font-weight:400;color:var(--text2)">' + item.unidad + '</span></div>';
+      h += '<div style="font-size:12px;color:var(--text2);margin-top:4px;">Mínimo: ' + item.minimo + ' ' + item.unidad + '</div>';
+      if (isLow) h += '<div style="font-size:12px;color:var(--red);font-weight:600;margin-top:4px;">⚠️ Stock bajo mínimo</div>';
+      h += '</div>';
+
+      h += '<div style="background:var(--surface3);padding:12px;border-radius:var(--radius);margin-bottom:12px;">';
+      h += '<div style="font-size:12px;color:var(--text2);margin-bottom:8px;">AJUSTAR STOCK</div>';
+      h += '<div style="display:flex;gap:8px;align-items:center;justify-content:center;">';
+      h += '<button onclick="adjustStock(\'' + itemId + '\',-5)" style="background:var(--red);color:#fff;border:none;border-radius:8px;width:40px;height:40px;font-size:14px;font-weight:700;cursor:pointer;">-5</button>';
+      h += '<button onclick="adjustStock(\'' + itemId + '\',-1)" style="background:var(--red);color:#fff;border:none;border-radius:8px;width:40px;height:40px;font-size:16px;font-weight:700;cursor:pointer;">-</button>';
+      h += '<span id="invStockDisplay" style="font-size:24px;font-weight:800;font-family:Space Mono,monospace;min-width:50px;text-align:center;">' + item.stock + '</span>';
+      h += '<button onclick="adjustStock(\'' + itemId + '\',1)" style="background:var(--green);color:#fff;border:none;border-radius:8px;width:40px;height:40px;font-size:16px;font-weight:700;cursor:pointer;">+</button>';
+      h += '<button onclick="adjustStock(\'' + itemId + '\',5)" style="background:var(--green);color:#fff;border:none;border-radius:8px;width:40px;height:40px;font-size:14px;font-weight:700;cursor:pointer;">+5</button>';
+      h += '</div>';
+      h += '</div>';
+
+      if (item.notas) {
+        h += '<div style="background:var(--surface3);padding:12px;border-radius:var(--radius);margin-bottom:12px;">';
+        h += '<div style="font-size:12px;color:var(--text2);margin-bottom:4px;">NOTAS</div>';
+        h += '<div style="font-size:13px;">' + item.notas + '</div>';
+        h += '</div>';
+      }
+
+      if (item.ultimaActualizacion) {
+        h += '<div style="font-size:11px;color:var(--text2);text-align:center;">Última actualización: ' + item.ultimaActualizacion + '</div>';
+      }
+
+      h += '<div style="display:flex;gap:8px;margin-top:14px;">';
+      h += '<button class="form-button secondary" onclick="openEditInventarioModal(\'' + itemId + '\')" style="flex:1;">✏️ Editar</button>';
+      h += '<button class="form-button secondary" onclick="deleteInventarioItem(\'' + itemId + '\')" style="flex:1;border-color:var(--red);color:var(--red);">🗑️ Eliminar</button>';
+      h += '</div>';
+
+      document.getElementById('taskDetailContent').innerHTML = h;
+      document.getElementById('taskDetailModal').querySelector('.modal-title').textContent = '📦 Detalle de Producto';
+      openModal('taskDetailModal');
+    }
+
+    async function adjustStock(itemId, delta) {
+      var idx = S.inventario.findIndex(function(i) { return i.id === itemId; });
+      if (idx < 0) return;
+      var item = S.inventario[idx];
+      var newStock = Math.max(0, item.stock + delta);
+      item.stock = newStock;
+      item.ultimaActualizacion = now();
+
+      var display = document.getElementById('invStockDisplay');
+      if (display) display.textContent = newStock;
+
+      var row = [item.id, item.categoria, item.producto, newStock, item.minimo, item.unidad, item.notas, item.ultimaActualizacion];
+      await sheets.multi([
+        { type: 'updateById', sheet: '📦 Inventario', id: item.id, values: row }
+      ]);
+      renderInventario();
+    }
+
+    function openNewInventarioModal() {
+      var h = '<form onsubmit="saveNewInventario(event)">';
+      h += '<div class="form-group"><label class="form-label">Categoría</label>';
+      h += '<select id="invCategoria" class="form-select" required>';
+      h += '<option value="">Seleccionar</option>';
+      INV_CATEGORIAS.forEach(function(c) {
+        h += '<option value="' + c + '">' + c + '</option>';
+      });
+      h += '</select></div>';
+      h += '<div class="form-group"><label class="form-label">Producto</label>';
+      h += '<input type="text" id="invProducto" class="form-input" placeholder="Ej: Toallas de baño" required /></div>';
+      h += '<div class="form-group"><label class="form-label">Stock Actual</label>';
+      h += '<input type="number" id="invStock" class="form-input" min="0" value="0" required /></div>';
+      h += '<div class="form-group"><label class="form-label">Mínimo Requerido</label>';
+      h += '<input type="number" id="invMinimo" class="form-input" min="0" value="0" required /></div>';
+      h += '<div class="form-group"><label class="form-label">Unidad</label>';
+      h += '<select id="invUnidad" class="form-select">';
+      ['pzas', 'paquetes', 'litros', 'kilos', 'cajas', 'rollos', 'juegos', 'botellas'].forEach(function(u) {
+        h += '<option value="' + u + '">' + u + '</option>';
+      });
+      h += '</select></div>';
+      h += '<div class="form-group"><label class="form-label">Notas</label>';
+      h += '<textarea id="invNotas" class="form-textarea" placeholder="Proveedor, marca, etc."></textarea></div>';
+      h += '<button type="submit" class="form-button">Agregar Producto</button>';
+      h += '</form>';
+
+      document.getElementById('taskDetailContent').innerHTML = h;
+      document.getElementById('taskDetailModal').querySelector('.modal-title').textContent = '📦 Nuevo Producto';
+      document.getElementById('taskDetailActions').innerHTML = '';
+      openModal('taskDetailModal');
+    }
+
+    async function saveNewInventario(event) {
+      event.preventDefault();
+      var cat = document.getElementById('invCategoria').value;
+      var prod = document.getElementById('invProducto').value;
+      var stock = parseInt(document.getElementById('invStock').value) || 0;
+      var min = parseInt(document.getElementById('invMinimo').value) || 0;
+      var unidad = document.getElementById('invUnidad').value;
+      var notas = document.getElementById('invNotas').value;
+
+      if (!cat || !prod) { toast('Completa los campos obligatorios', true); return; }
+
+      await busy(async function() {
+        var id = nextId('INV', S.inventario);
+        var ts = now();
+        var row = [id, cat, prod, stock, min, unidad, notas, ts];
+        var logRow = [normDate(new Date()), ts.split(' ')[1], S.user.usuario, 'Inventario', 'Agregó: ' + prod + ' (' + stock + ' ' + unidad + ')', 'info'];
+
+        await sheets.multi([
+          { type: 'append', sheet: '📦 Inventario', values: row },
+          { type: 'append', sheet: '📜 Bitácora', values: logRow }
+        ]);
+
+        S.inventario.push({ id: id, categoria: cat, producto: prod, stock: stock, minimo: min, unidad: unidad, notas: notas, ultimaActualizacion: ts });
+        toast('Producto agregado');
+        closeModal();
+        render();
+      }, 'Guardando...');
+    }
+
+    function openEditInventarioModal(itemId) {
+      var item = S.inventario.find(function(i) { return i.id === itemId; });
+      if (!item) return;
+      closeModal();
+
+      setTimeout(function() {
+        var h = '<form onsubmit="updateInventario(event,\'' + itemId + '\')">';
+        h += '<div class="form-group"><label class="form-label">Categoría</label>';
+        h += '<select id="invCategoria" class="form-select" required>';
+        INV_CATEGORIAS.forEach(function(c) {
+          h += '<option value="' + c + '"' + (item.categoria === c ? ' selected' : '') + '>' + c + '</option>';
+        });
+        h += '</select></div>';
+        h += '<div class="form-group"><label class="form-label">Producto</label>';
+        h += '<input type="text" id="invProducto" class="form-input" value="' + item.producto + '" required /></div>';
+        h += '<div class="form-group"><label class="form-label">Stock Actual</label>';
+        h += '<input type="number" id="invStock" class="form-input" min="0" value="' + item.stock + '" required /></div>';
+        h += '<div class="form-group"><label class="form-label">Mínimo Requerido</label>';
+        h += '<input type="number" id="invMinimo" class="form-input" min="0" value="' + item.minimo + '" required /></div>';
+        h += '<div class="form-group"><label class="form-label">Unidad</label>';
+        h += '<select id="invUnidad" class="form-select">';
+        ['pzas', 'paquetes', 'litros', 'kilos', 'cajas', 'rollos', 'juegos', 'botellas'].forEach(function(u) {
+          h += '<option value="' + u + '"' + (item.unidad === u ? ' selected' : '') + '>' + u + '</option>';
+        });
+        h += '</select></div>';
+        h += '<div class="form-group"><label class="form-label">Notas</label>';
+        h += '<textarea id="invNotas" class="form-textarea">' + item.notas + '</textarea></div>';
+        h += '<button type="submit" class="form-button">Guardar Cambios</button>';
+        h += '</form>';
+
+        document.getElementById('taskDetailContent').innerHTML = h;
+        document.getElementById('taskDetailModal').querySelector('.modal-title').textContent = '✏️ Editar Producto';
+        document.getElementById('taskDetailActions').innerHTML = '';
+        openModal('taskDetailModal');
+      }, 350);
+    }
+
+    async function updateInventario(event, itemId) {
+      event.preventDefault();
+      var idx = S.inventario.findIndex(function(i) { return i.id === itemId; });
+      if (idx < 0) return;
+
+      var cat = document.getElementById('invCategoria').value;
+      var prod = document.getElementById('invProducto').value;
+      var stock = parseInt(document.getElementById('invStock').value) || 0;
+      var min = parseInt(document.getElementById('invMinimo').value) || 0;
+      var unidad = document.getElementById('invUnidad').value;
+      var notas = document.getElementById('invNotas').value;
+      var ts = now();
+
+      await busy(async function() {
+        var row = [itemId, cat, prod, stock, min, unidad, notas, ts];
+        await sheets.multi([
+          { type: 'updateById', sheet: '📦 Inventario', id: itemId, values: row }
+        ]);
+
+        S.inventario[idx] = { id: itemId, categoria: cat, producto: prod, stock: stock, minimo: min, unidad: unidad, notas: notas, ultimaActualizacion: ts };
+        toast('Producto actualizado');
+        closeModal();
+        render();
+      }, 'Guardando...');
+    }
+
+    async function deleteInventarioItem(itemId) {
+      if (!confirm('¿Eliminar este producto del inventario?')) return;
+      var idx = S.inventario.findIndex(function(i) { return i.id === itemId; });
+      if (idx < 0) return;
+      var item = S.inventario[idx];
+
+      await busy(async function() {
+        var row = [item.id, '__DELETED__', item.producto, 0, 0, item.unidad, '', now()];
+        var logRow = [normDate(new Date()), now().split(' ')[1], S.user.usuario, 'Inventario', 'Eliminó: ' + item.producto, 'warning'];
+        await sheets.multi([
+          { type: 'updateById', sheet: '📦 Inventario', id: item.id, values: row },
+          { type: 'append', sheet: '📜 Bitácora', values: logRow }
+        ]);
+
+        S.inventario.splice(idx, 1);
+        toast('Producto eliminado');
+        closeModal();
+        render();
+      }, 'Eliminando...');
     }
 
     // ============ REPORTS STATE ============
@@ -4547,6 +5093,7 @@
     function renderConfig() {
       var pills = [
         { id: 'terminos', label: '📜 Términos' },
+        { id: 'mensajes', label: '💬 Mensajes' },
         { id: 'usuarios', label: '👤 Usuarios' },
         { id: 'tarifas', label: '💲 Tarifas' },
         { id: 'app', label: '📱 App' }
@@ -4558,6 +5105,8 @@
 
       if (S.configTab === 'terminos') {
         renderTermsConfig();
+      } else if (S.configTab === 'mensajes') {
+        renderMensajesConfig();
       } else if (S.configTab === 'usuarios') {
         renderUsersConfig();
       } else if (S.configTab === 'tarifas') {
@@ -4565,6 +5114,71 @@
       } else if (S.configTab === 'app') {
         renderAppConfig();
       }
+    }
+
+    function renderMensajesConfig() {
+      var templates = getMsgTemplates();
+      var keys = Object.keys(templates);
+
+      var h = '<div style="margin-bottom:16px">';
+      h += '<div class="section-title">Plantillas de Mensajes</div>';
+      h += '<div style="font-size:12px;color:var(--text2);margin-bottom:16px">Edita las plantillas que se envían por WhatsApp a los huéspedes. Usa variables entre llaves: {huesped}, {habitacion}, {entrada}, {salida}, {noches}, {tarifa}, {total}, {infoPago}, {huespedes}, {reservaId}, {tipoHab}</div>';
+      h += '</div>';
+
+      keys.forEach(function(key) {
+        var tpl = templates[key];
+        h += '<div style="background:var(--surface3);padding:14px;border-radius:var(--radius);margin-bottom:12px;">';
+        h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">';
+        h += '<div style="font-weight:700;font-size:14px;">' + tpl.icon + ' ' + tpl.nombre + '</div>';
+        h += '<button class="form-button secondary" onclick="toggleEditTemplate(\'' + key + '\')" style="padding:4px 12px;font-size:11px;" id="editBtn_' + key + '">Editar</button>';
+        h += '</div>';
+        h += '<div id="tplView_' + key + '">';
+        h += '<div style="white-space:pre-wrap;font-size:11px;color:var(--text2);line-height:1.5;max-height:120px;overflow:hidden;">' + tpl.texto.substring(0, 200) + (tpl.texto.length > 200 ? '...' : '') + '</div>';
+        h += '</div>';
+        h += '<div id="tplEdit_' + key + '" style="display:none;">';
+        h += '<textarea id="tplTextarea_' + key + '" class="form-textarea" style="min-height:180px;font-size:12px;font-family:monospace;line-height:1.5;" >' + tpl.texto.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</textarea>';
+        h += '<div style="display:flex;gap:8px;margin-top:8px;">';
+        h += '<button class="form-button" onclick="saveTemplate(\'' + key + '\')" style="flex:1;padding:8px;">Guardar</button>';
+        h += '<button class="form-button secondary" onclick="resetTemplate(\'' + key + '\')" style="padding:8px;font-size:11px;">Restaurar</button>';
+        h += '</div>';
+        h += '</div>';
+        h += '</div>';
+      });
+
+      document.getElementById('configContent').innerHTML = h;
+    }
+
+    function toggleEditTemplate(key) {
+      var view = document.getElementById('tplView_' + key);
+      var edit = document.getElementById('tplEdit_' + key);
+      var btn = document.getElementById('editBtn_' + key);
+      if (edit.style.display === 'none') {
+        view.style.display = 'none';
+        edit.style.display = 'block';
+        btn.textContent = 'Cancelar';
+      } else {
+        view.style.display = 'block';
+        edit.style.display = 'none';
+        btn.textContent = 'Editar';
+      }
+    }
+
+    function saveTemplate(key) {
+      var templates = getMsgTemplates();
+      var textarea = document.getElementById('tplTextarea_' + key);
+      templates[key].texto = textarea.value;
+      saveMsgTemplates(templates);
+      toast('Plantilla guardada');
+      renderMensajesConfig();
+    }
+
+    function resetTemplate(key) {
+      if (!confirm('¿Restaurar esta plantilla al texto original?')) return;
+      var templates = getMsgTemplates();
+      templates[key].texto = DEFAULT_MSG_TEMPLATES[key].texto;
+      saveMsgTemplates(templates);
+      toast('Plantilla restaurada');
+      renderMensajesConfig();
     }
 
     function renderAppConfig() {
@@ -4613,10 +5227,262 @@
       h += '<button class="form-button secondary" onclick="logout()" style="width:100%;margin-top:12px;border-color:var(--red);color:var(--red)">🚪 Cerrar Sesión</button>';
       h += '</div>';
 
+      // Señalización / Signage PDFs
+      h += '<div style="background:var(--surface2);border-radius:var(--radius);padding:16px;margin-bottom:12px">';
+      h += '<div style="font-weight:700;font-size:14px;margin-bottom:4px">🪧 Señalización e Impresos</div>';
+      h += '<div style="font-size:11px;color:var(--text2);margin-bottom:12px">Genera PDFs listos para imprimir con el logo del hotel</div>';
+      h += '<div style="display:flex;flex-direction:column;gap:8px;">';
+      h += '<button class="form-button secondary" onclick="generateWelcomeCards()" style="text-align:left;padding:12px;">🏨 Tarjetas de Bienvenida<br><span style="font-size:10px;color:var(--text2);font-weight:400">WiFi, horarios y reglas — Una por habitación</span></button>';
+      h += '<button class="form-button secondary" onclick="generateDoorSigns()" style="text-align:left;padding:12px;">🚪 Letreros de Habitación<br><span style="font-size:10px;color:var(--text2);font-weight:400">Número y tipo — Para puerta de cada habitación</span></button>';
+      h += '<button class="form-button secondary" onclick="generateReglamento()" style="text-align:left;padding:12px;">📜 Reglamento de Huéspedes<br><span style="font-size:10px;color:var(--text2);font-weight:400">Políticas completas del hotel para imprimir</span></button>';
+      h += '</div></div>';
+
       // Version
       h += '<div style="text-align:center;margin-top:20px"><img src="' + LOGO + '" style="width:60px;height:60px;border-radius:12px;object-fit:cover;margin-bottom:8px;opacity:.7" alt="Logo"><div style="font-size:10px;color:var(--text2)">Casa Regina · Hotel Boutique<br>PMS v2.0 · Powered by Google Sheets</div></div>';
 
       document.getElementById('configContent').innerHTML = h;
+    }
+
+    // --- Señalización PDF generators ---
+    function generateWelcomeCards() {
+      var { jsPDF } = window.jspdf;
+      // A5 landscape: 210 x 148 mm — 2 cards per A4 page
+      var doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+      var cardW = 190, cardH = 130;
+      var marginX = 10;
+
+      var terms = getTerms();
+      var templates = getMsgTemplates();
+
+      S.rooms.forEach(function(room, idx) {
+        if (idx > 0 && idx % 2 === 0) doc.addPage();
+        var yBase = (idx % 2 === 0) ? 10 : 150;
+
+        // Card border
+        doc.setDrawColor(180);
+        doc.setLineWidth(0.3);
+        doc.roundedRect(marginX, yBase, cardW, cardH, 3, 3);
+
+        // Logo
+        try { doc.addImage(LOGO, 'JPEG', marginX + 8, yBase + 6, 22, 22); } catch(e) {}
+
+        // Header
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(18);
+        doc.setTextColor(40);
+        doc.text(HOTEL_NAME, marginX + 35, yBase + 15);
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(120);
+        doc.text('Hotel Boutique', marginX + 35, yBase + 21);
+
+        // Room info
+        doc.setFontSize(13);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(107, 138, 74);
+        doc.text('Habitación ' + room.numero + ' — ' + room.tipo, marginX + 35, yBase + 28);
+
+        // Divider
+        doc.setDrawColor(200);
+        doc.line(marginX + 8, yBase + 32, marginX + cardW - 8, yBase + 32);
+
+        var y = yBase + 40;
+        doc.setTextColor(60);
+        doc.setFontSize(9);
+
+        // Welcome
+        doc.setFont('helvetica', 'bold');
+        doc.text('¡Bienvenido(a) a Casa Regina!', marginX + 8, y); y += 7;
+        doc.setFont('helvetica', 'normal');
+
+        // WiFi
+        doc.setFont('helvetica', 'bold');
+        doc.text('WiFi:', marginX + 8, y);
+        doc.setFont('helvetica', 'normal');
+        doc.text('Red: CasaRegina  |  Contraseña: [ver recepción]', marginX + 25, y); y += 6;
+
+        // Horarios
+        doc.setFont('helvetica', 'bold');
+        doc.text('Check-in:', marginX + 8, y);
+        doc.setFont('helvetica', 'normal');
+        doc.text('3:00 PM', marginX + 32, y);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Check-out:', marginX + 60, y);
+        doc.setFont('helvetica', 'normal');
+        doc.text('12:00 PM', marginX + 88, y); y += 8;
+
+        // Rules (from terms)
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8);
+        doc.text('Políticas:', marginX + 8, y); y += 5;
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7.5);
+        terms.forEach(function(term) {
+          if (y > yBase + cardH - 15) return;
+          var line = '• ' + term.title + ': ' + term.text.substring(0, 80) + (term.text.length > 80 ? '...' : '');
+          doc.text(line, marginX + 10, y); y += 4;
+        });
+
+        // Footer
+        doc.setFontSize(7);
+        doc.setTextColor(150);
+        doc.text('Cualquier duda, contacte a recepción. ¡Que disfrute su estancia!', marginX + cardW / 2, yBase + cardH - 6, { align: 'center' });
+      });
+
+      doc.save('CasaRegina_Bienvenida.pdf');
+      toast('PDF de tarjetas generado');
+    }
+
+    function generateDoorSigns() {
+      var { jsPDF } = window.jspdf;
+      // A5 format per sign — 2 per A4 page
+      var doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+
+      S.rooms.forEach(function(room, idx) {
+        if (idx > 0 && idx % 2 === 0) doc.addPage();
+        var yBase = (idx % 2 === 0) ? 15 : 160;
+        var centerX = 105;
+
+        // Sign border with rounded corners
+        doc.setDrawColor(107, 138, 74);
+        doc.setLineWidth(1);
+        doc.roundedRect(30, yBase, 150, 120, 5, 5);
+
+        // Inner border
+        doc.setLineWidth(0.3);
+        doc.roundedRect(34, yBase + 4, 142, 112, 3, 3);
+
+        // Logo
+        try { doc.addImage(LOGO, 'JPEG', centerX - 12, yBase + 12, 24, 24); } catch(e) {}
+
+        // Hotel name
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        doc.setTextColor(120);
+        doc.text(HOTEL_NAME, centerX, yBase + 44, { align: 'center' });
+
+        // Room number — BIG
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(60);
+        doc.setTextColor(40);
+        doc.text(String(room.numero), centerX, yBase + 80, { align: 'center' });
+
+        // Room type
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(14);
+        doc.setTextColor(107, 138, 74);
+        doc.text(room.tipo, centerX, yBase + 92, { align: 'center' });
+
+        // Decorative line
+        doc.setDrawColor(107, 138, 74);
+        doc.setLineWidth(0.5);
+        doc.line(centerX - 25, yBase + 97, centerX + 25, yBase + 97);
+
+        // Leaf emoji simulation
+        doc.setFontSize(12);
+        doc.setTextColor(107, 138, 74);
+        doc.text('Casa Regina', centerX, yBase + 108, { align: 'center' });
+      });
+
+      doc.save('CasaRegina_Letreros.pdf');
+      toast('PDF de letreros generado');
+    }
+
+    function generateReglamento() {
+      var { jsPDF } = window.jspdf;
+      var doc = new jsPDF({ unit: 'mm', format: 'a4' });
+      var margin = 20;
+      var pageW = 210;
+      var contentW = pageW - margin * 2;
+      var y = 20;
+
+      // Logo and header
+      try { doc.addImage(LOGO, 'JPEG', margin, y, 22, 22); } catch(e) {}
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(20);
+      doc.setTextColor(40);
+      doc.text(HOTEL_NAME, margin + 28, y + 10);
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(120);
+      doc.text('Hotel Boutique', margin + 28, y + 17);
+      y += 30;
+
+      // Title
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(16);
+      doc.setTextColor(107, 138, 74);
+      doc.text('Reglamento de Huéspedes', pageW / 2, y, { align: 'center' });
+      y += 5;
+      doc.setDrawColor(107, 138, 74);
+      doc.setLineWidth(0.5);
+      doc.line(margin, y, pageW - margin, y);
+      y += 10;
+
+      // Horarios section
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(12);
+      doc.setTextColor(40);
+      doc.text('Horarios', margin, y); y += 7;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.setTextColor(60);
+      doc.text('Check-in: 3:00 PM  |  Check-out: 12:00 PM', margin + 4, y); y += 5;
+      doc.text('El late check-out está sujeto a disponibilidad y puede generar cargo adicional.', margin + 4, y); y += 10;
+
+      // Terms from app
+      var terms = getTerms();
+      terms.forEach(function(term, i) {
+        if (y > 260) { doc.addPage(); y = 20; }
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(12);
+        doc.setTextColor(40);
+        doc.text((i + 1) + '. ' + term.title, margin, y); y += 7;
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        doc.setTextColor(60);
+
+        // Word wrap the text
+        var lines = doc.splitTextToSize(term.text, contentW - 4);
+        lines.forEach(function(line) {
+          if (y > 270) { doc.addPage(); y = 20; }
+          doc.text(line, margin + 4, y); y += 5;
+        });
+        y += 5;
+      });
+
+      // General rules
+      if (y > 230) { doc.addPage(); y = 20; }
+      doc.setDrawColor(200);
+      doc.line(margin, y, pageW - margin, y); y += 8;
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(12);
+      doc.setTextColor(40);
+      doc.text('Información General', margin, y); y += 7;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.setTextColor(60);
+
+      var generalRules = [
+        'WiFi disponible en todas las áreas del hotel.',
+        'Para cualquier solicitud o emergencia, contacte a recepción.',
+        'Agradecemos su preferencia y le deseamos una estancia agradable.'
+      ];
+      generalRules.forEach(function(rule) {
+        doc.text('• ' + rule, margin + 4, y); y += 6;
+      });
+
+      // Footer
+      y += 10;
+      doc.setFontSize(8);
+      doc.setTextColor(150);
+      doc.text(HOTEL_NAME + ' · Hotel Boutique · Documento generado: ' + now(), pageW / 2, y, { align: 'center' });
+
+      doc.save('CasaRegina_Reglamento.pdf');
+      toast('PDF de reglamento generado');
     }
 
     function renderTermsConfig() {
@@ -5179,6 +6045,21 @@
 
       document.getElementById('reservaModalContent').innerHTML = content;
 
+      // Add message template quick-send buttons
+      if (res.estado !== 'Cancelada') {
+        var msgSection = '<div style="background:var(--surface3);padding:12px;border-radius:var(--radius);margin-bottom:12px;">';
+        msgSection += '<div style="font-size:12px;color:var(--text2);margin-bottom:8px;">ENVIAR MENSAJE</div>';
+        msgSection += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">';
+        var templates = getMsgTemplates();
+        var tplKeys = Object.keys(templates);
+        tplKeys.forEach(function(key) {
+          var tpl = templates[key];
+          msgSection += '<button onclick="closeModal();previewTemplate(\'' + key + '\',\'' + resId + '\')" style="background:var(--surface2);border:1px solid var(--surface3);border-radius:8px;padding:8px 6px;font-size:11px;cursor:pointer;color:var(--text);text-align:center;">' + tpl.icon + ' ' + tpl.nombre.split(' ')[0] + '</button>';
+        });
+        msgSection += '</div></div>';
+        document.getElementById('reservaModalContent').insertAdjacentHTML('beforeend', msgSection);
+      }
+
       // Add action buttons based on estado
       var payments = S.cobros.filter(function(c){return c.reservaId===resId});
       var totalPaid = payments.reduce(function(s,c){return s+c.monto},0);
@@ -5572,17 +6453,16 @@
       h += '<div style="font-size:13px;font-weight:600;color:#333;margin-bottom:12px">¿Enviar confirmación al huésped?</div>';
 
       h += '<div class="receipt-btns">';
-      h += '<button onclick="closeReceipt();showReservaConfirmation(\'' + resId + '\')" style="background:#8baa6a;border:none;color:#fff;font-weight:700">📄 Ver Confirmación</button>';
+      h += '<button onclick="closeReceipt();previewTemplate(\'confirmacion\',\'' + resId + '\')" style="background:#25D366;border:none;color:#fff;font-weight:700">✅ Confirmación WhatsApp</button>';
       h += '</div>';
 
       h += '<div class="receipt-btns" style="margin-top:8px">';
-      h += '<button onclick="closeReceipt();shareReservaWhatsApp(\'' + resId + '\')" style="background:#25D366;border:none;color:#fff">📱 WhatsApp</button>';
-      h += '<button onclick="closeReceipt();shareReservaEmail(\'' + resId + '\')" style="background:#4285f4;border:none;color:#fff">✉️ Email</button>';
-      h += '</div>';
-
-      h += '<div class="receipt-btns" style="margin-top:8px">';
-      h += '<button onclick="closeReceipt();generateReservaConfirmPDF(\'' + resId + '\',\'share\')" style="background:#333;border:1px solid #555;color:#fff">📱 PDF WhatsApp</button>';
+      h += '<button onclick="closeReceipt();showReservaConfirmation(\'' + resId + '\')" style="background:#8baa6a;border:none;color:#fff">📄 Ver Confirmación</button>';
       h += '<button onclick="closeReceipt();generateReservaConfirmPDF(\'' + resId + '\',\'download\')" style="background:#666;border:none;color:#fff">📄 Descargar PDF</button>';
+      h += '</div>';
+
+      h += '<div class="receipt-btns" style="margin-top:8px">';
+      h += '<button onclick="closeReceipt();previewTemplate(\'instrucciones\',\'' + resId + '\')" style="background:#2980b9;border:none;color:#fff">📍 Instrucciones de Llegada</button>';
       h += '</div>';
 
       h += '<div class="receipt-btns" style="margin-top:12px">';
@@ -5657,7 +6537,8 @@
         return;
       }
 
-      await doCheckin(res, room);
+      // Show check-in checklist before proceeding
+      showProcessChecklist('checkin', res, room);
     }
 
     function showCheckinBlocked(res, totalPaid, minRequired) {
@@ -5690,6 +6571,101 @@
 
       document.getElementById('checkinBlockedContent').innerHTML = html;
       openModal('checkinBlockedModal');
+    }
+
+    // --- Process Checklist (check-in / check-out) ---
+    var _processChecklistState = { checked: [], type: '', resId: '', roomNum: '' };
+
+    function showProcessChecklist(type, res, room, roomNum) {
+      var items = type === 'checkin' ? CHECKIN_CHECKLIST : CHECKOUT_CHECKLIST;
+      var title = type === 'checkin' ? '✅ Checklist de Check-in' : '📋 Checklist de Check-out';
+      var guestName = res ? res.huesped : '';
+      var habNum = roomNum || (res ? res.habitacionNum : '');
+
+      _processChecklistState = {
+        checked: new Array(items.length).fill(false),
+        type: type,
+        resId: res ? res.id : '',
+        roomNum: habNum,
+        res: res,
+        room: room
+      };
+
+      document.getElementById('processChecklistTitle').textContent = title;
+
+      var h = '';
+      h += '<div style="background:var(--surface3);padding:12px;border-radius:var(--radius);margin-bottom:14px;">';
+      h += '<div style="font-weight:700;font-size:15px;">' + guestName + '</div>';
+      h += '<div style="font-size:12px;color:var(--text2);margin-top:2px;">Habitación ' + habNum + '</div>';
+      h += '</div>';
+
+      h += '<div style="margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;">';
+      h += '<div style="font-size:12px;color:var(--text2);">VERIFICAR CADA PUNTO</div>';
+      h += '<div id="pcl_progress_text" style="font-size:12px;font-weight:700;color:var(--accent);">0/' + items.length + '</div>';
+      h += '</div>';
+      h += '<div style="background:var(--surface2);border-radius:6px;height:6px;margin-bottom:14px;overflow:hidden;">';
+      h += '<div id="pcl_progress_fill" style="height:100%;background:var(--accent);border-radius:6px;transition:width .3s;width:0%;"></div>';
+      h += '</div>';
+
+      for (var i = 0; i < items.length; i++) {
+        h += '<label style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--surface2);cursor:pointer;" onclick="toggleProcessChecklist(' + i + ')">';
+        h += '<input type="checkbox" id="pcl_' + i + '" style="margin-top:2px;accent-color:var(--accent);pointer-events:none;" />';
+        h += '<span id="pcl_label_' + i + '" style="font-size:13px;">' + items[i] + '</span>';
+        h += '</label>';
+      }
+
+      h += '<div style="margin-top:16px;">';
+      h += '<button id="processChecklistConfirmBtn" class="form-button" onclick="confirmProcessChecklist()" disabled style="opacity:0.4;">';
+      h += type === 'checkin' ? '🔑 Confirmar Check-in' : '👋 Confirmar Check-out';
+      h += '</button>';
+      h += '<div id="pcl_hint" style="font-size:11px;color:var(--text2);text-align:center;margin-top:6px;">Completa todos los puntos para continuar</div>';
+      h += '</div>';
+
+      document.getElementById('processChecklistContent').innerHTML = h;
+      openModal('processChecklistModal');
+    }
+
+    function toggleProcessChecklist(idx) {
+      var st = _processChecklistState;
+      st.checked[idx] = !st.checked[idx];
+
+      var cb = document.getElementById('pcl_' + idx);
+      if (cb) cb.checked = st.checked[idx];
+      var label = document.getElementById('pcl_label_' + idx);
+      if (label) {
+        label.style.textDecoration = st.checked[idx] ? 'line-through' : 'none';
+        label.style.opacity = st.checked[idx] ? '0.5' : '1';
+      }
+
+      var items = st.type === 'checkin' ? CHECKIN_CHECKLIST : CHECKOUT_CHECKLIST;
+      var done = st.checked.filter(function(v) { return v; }).length;
+      var pct = Math.round((done / items.length) * 100);
+
+      var bar = document.getElementById('pcl_progress_fill');
+      var txt = document.getElementById('pcl_progress_text');
+      if (bar) bar.style.width = pct + '%';
+      if (txt) txt.textContent = done + '/' + items.length;
+
+      var btn = document.getElementById('processChecklistConfirmBtn');
+      var hint = document.getElementById('pcl_hint');
+      var allDone = done === items.length;
+      if (btn) {
+        btn.disabled = !allDone;
+        btn.style.opacity = allDone ? '1' : '0.4';
+      }
+      if (hint) hint.style.display = allDone ? 'none' : 'block';
+    }
+
+    async function confirmProcessChecklist() {
+      var st = _processChecklistState;
+      closeModal();
+      if (st.type === 'checkin') {
+        var res = st.res || S.reservas.find(function(r) { return r.id === st.resId; });
+        var room = st.room || S.rooms.find(function(r) { return r.numero === res.habitacionNum; });
+        await doCheckin(res, room);
+      } else {
+        await doCheckout(st.roomNum);
+      }
     }
 
     async function doCheckin(res, room) {
@@ -5729,7 +6705,8 @@
           return;
         }
       }
-      await doCheckout(roomNum);
+      // Show check-out checklist before proceeding
+      showProcessChecklist('checkout', res, null, roomNum);
     }
 
     function showCheckoutBlocked(res, balance, totalPaid, roomNum) {
@@ -5767,7 +6744,7 @@
         var res = S.reservas.find(r => r.habitacionNum === roomNum && r.estado === 'Check-in');
         var room = S.rooms.find(r => r.numero === roomNum);
         var taskId = nextId('HK', S.housekeeping);
-        var hkRow = [taskId, normDate(new Date()), roomNum, 'Limpieza Check-out', 'Alta', 'Pendiente', '', '', '', '', ''];
+        var hkRow = [taskId, normDate(new Date()), roomNum, 'Limpieza Check-out', 'Alta', 'Pendiente', '', '', '', '', '', ''];
         // Check if there's a pending balance for the log
         var checkoutBalance = 0;
         if (res) {
@@ -5800,7 +6777,7 @@
 
         S.housekeeping.push({
           id: taskId, fecha: normDate(new Date()), habitacionNum: roomNum, tarea: 'Limpieza Check-out',
-          prioridad: 'Alta', estado: 'Pendiente', asignadoA: '', notas: '', horaInicio: '', horaFin: '', verificado: ''
+          prioridad: 'Alta', estado: 'Pendiente', asignadoA: '', notas: '', horaInicio: '', horaFin: '', verificado: '', checklist: ''
         });
 
         toast('Check-out completado');
@@ -5857,7 +6834,7 @@
       await busy(async () => {
         var n = now();
         const id = nextId('HK', S.housekeeping);
-        const row = [id, normDate(new Date()), roomNum, taskType, priority, 'Pendiente', assignee, notas, '', '', ''];
+        const row = [id, normDate(new Date()), roomNum, taskType, priority, 'Pendiente', assignee, notas, '', '', '', ''];
         var logRow = [normDate(new Date()), n.split(' ')[1], S.user.usuario, 'Nueva Tarea', taskType + ' en Hab. ' + roomNum, 'info'];
 
         await sheets.multi([
@@ -5867,7 +6844,7 @@
 
         S.housekeeping.push({
           id, fecha: normDate(new Date()), habitacionNum: roomNum, tarea: taskType,
-          prioridad: priority, estado: 'Pendiente', asignadoA: assignee, notas, horaInicio: '', horaFin: '', verificado: ''
+          prioridad: priority, estado: 'Pendiente', asignadoA: assignee, notas, horaInicio: '', horaFin: '', verificado: '', checklist: ''
         });
 
         toast('Tarea creada');
@@ -5876,41 +6853,137 @@
       }, 'Guardando tarea...');
     }
 
+    // --- Checklist helpers ---
+    function getChecklistTemplate(taskType) {
+      return CHECKLIST_TEMPLATES[taskType] || [];
+    }
+
+    function parseChecklist(checklistStr, templateLen) {
+      if (!checklistStr || !templateLen) return new Array(templateLen).fill(false);
+      var parts = checklistStr.split(',');
+      var arr = [];
+      for (var i = 0; i < templateLen; i++) {
+        arr.push(parts[i] === '1');
+      }
+      return arr;
+    }
+
+    function serializeChecklist(arr) {
+      return arr.map(function(v) { return v ? '1' : '0'; }).join(',');
+    }
+
+    function getChecklistProgress(task) {
+      var template = getChecklistTemplate(task.tarea);
+      if (!template.length) return null;
+      var checked = parseChecklist(task.checklist, template.length);
+      var done = checked.filter(function(v) { return v; }).length;
+      return { done: done, total: template.length };
+    }
+
+    async function toggleChecklistItem(taskId, idx) {
+      var taskIdx = S.housekeeping.findIndex(function(t) { return t.id === taskId; });
+      var task = S.housekeeping[taskIdx];
+      var template = getChecklistTemplate(task.tarea);
+      var checked = parseChecklist(task.checklist, template.length);
+      checked[idx] = !checked[idx];
+      var newChecklist = serializeChecklist(checked);
+      task.checklist = newChecklist;
+
+      // Update the checkbox visually without closing modal
+      var cb = document.getElementById('cl_' + idx);
+      if (cb) cb.checked = checked[idx];
+      var label = document.getElementById('cl_label_' + idx);
+      if (label) label.style.textDecoration = checked[idx] ? 'line-through' : 'none';
+      if (label) label.style.opacity = checked[idx] ? '0.5' : '1';
+
+      // Update progress bar
+      var done = checked.filter(function(v) { return v; }).length;
+      var pct = Math.round((done / template.length) * 100);
+      var progBar = document.getElementById('cl_progress_fill');
+      var progText = document.getElementById('cl_progress_text');
+      if (progBar) progBar.style.width = pct + '%';
+      if (progText) progText.textContent = done + '/' + template.length;
+
+      // Update complete button state
+      var completeBtn = document.getElementById('completeTaskBtn');
+      if (completeBtn) {
+        var allDone = done === template.length;
+        completeBtn.disabled = !allDone;
+        completeBtn.style.opacity = allDone ? '1' : '0.4';
+      }
+
+      // Save to sheet in background
+      var taskRow = [task.id, task.fecha, task.habitacionNum, task.tarea, task.prioridad, task.estado, task.asignadoA, task.notas, task.horaInicio || '', task.horaFin || '', task.verificado || '', newChecklist];
+      sheets.multi([{ type: 'updateById', sheet: '🧹 Housekeeping', id: task.id, values: taskRow }]).catch(function() {});
+    }
+
     function openTaskDetailModal(taskId) {
       const task = S.housekeeping.find(t => t.id === taskId);
+      var template = getChecklistTemplate(task.tarea);
+      var checked = parseChecklist(task.checklist, template.length);
+      var progress = getChecklistProgress(task);
 
-      const content = `
-        <div style="margin-bottom: 16px;">
-          <div style="background: var(--surface3); padding: 12px; border-radius: var(--radius); margin-bottom: 12px;">
-            <div style="font-size: 12px; color: var(--text2); margin-bottom: 4px;">HABITACIÓN</div>
-            <div style="font-size: 20px; font-weight: 700;">Hab. ${task.habitacionNum}</div>
-          </div>
-          <div style="background: var(--surface3); padding: 12px; border-radius: var(--radius); margin-bottom: 12px;">
-            <div style="font-size: 12px; color: var(--text2); margin-bottom: 4px;">TAREA</div>
-            <div style="font-weight: 700; margin-bottom: 8px;">${task.tarea}</div>
-            <div style="font-size: 12px; color: var(--text2);">Prioridad: ${task.prioridad}</div>
-            <div style="font-size: 12px; color: var(--text2);">Asignado a: ${task.asignadoA}</div>
-          </div>
-          <div style="background: var(--surface3); padding: 12px; border-radius: var(--radius);">
-            <div style="font-size: 12px; color: var(--text2); margin-bottom: 4px;">ESTADO</div>
-            <div style="font-weight: 700; margin-bottom: 8px;">${task.estado}</div>
-            ${task.notas ? `<div style="font-size: 11px; color: var(--text2);">Notas: ${task.notas}</div>` : ''}
-          </div>
-        </div>
-      `;
+      var content = '';
+      content += '<div style="margin-bottom: 16px;">';
+      content += '<div style="background: var(--surface3); padding: 12px; border-radius: var(--radius); margin-bottom: 12px;">';
+      content += '<div style="font-size: 12px; color: var(--text2); margin-bottom: 4px;">HABITACIÓN</div>';
+      content += '<div style="font-size: 20px; font-weight: 700;">Hab. ' + task.habitacionNum + '</div>';
+      content += '</div>';
+      content += '<div style="background: var(--surface3); padding: 12px; border-radius: var(--radius); margin-bottom: 12px;">';
+      content += '<div style="font-size: 12px; color: var(--text2); margin-bottom: 4px;">TAREA</div>';
+      content += '<div style="font-weight: 700; margin-bottom: 8px;">' + task.tarea + '</div>';
+      content += '<div style="font-size: 12px; color: var(--text2);">Prioridad: ' + task.prioridad + '</div>';
+      content += '<div style="font-size: 12px; color: var(--text2);">Asignado a: ' + task.asignadoA + '</div>';
+      content += '</div>';
+      content += '<div style="background: var(--surface3); padding: 12px; border-radius: var(--radius); margin-bottom: 12px;">';
+      content += '<div style="font-size: 12px; color: var(--text2); margin-bottom: 4px;">ESTADO</div>';
+      content += '<div style="font-weight: 700; margin-bottom: 8px;">' + task.estado + '</div>';
+      if (task.notas) content += '<div style="font-size: 11px; color: var(--text2);">Notas: ' + task.notas + '</div>';
+      content += '</div>';
+
+      // Checklist section
+      if (template.length > 0) {
+        var pct = progress ? Math.round((progress.done / progress.total) * 100) : 0;
+        content += '<div style="background: var(--surface3); padding: 12px; border-radius: var(--radius);">';
+        content += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">';
+        content += '<div style="font-size: 12px; color: var(--text2);">CHECKLIST DE LIMPIEZA</div>';
+        content += '<div id="cl_progress_text" style="font-size: 12px; font-weight: 700; color: var(--accent);">' + (progress ? progress.done : 0) + '/' + (progress ? progress.total : template.length) + '</div>';
+        content += '</div>';
+        content += '<div style="background:var(--surface2);border-radius:6px;height:6px;margin-bottom:12px;overflow:hidden;">';
+        content += '<div id="cl_progress_fill" style="height:100%;background:var(--accent);border-radius:6px;transition:width .3s;width:' + pct + '%;"></div>';
+        content += '</div>';
+        var canEdit = (task.estado === 'En Progreso');
+        for (var i = 0; i < template.length; i++) {
+          var isDone = checked[i];
+          content += '<label style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--surface2);cursor:' + (canEdit ? 'pointer' : 'default') + ';" onclick="' + (canEdit ? "toggleChecklistItem('" + taskId + "'," + i + ")" : '') + '">';
+          content += '<input type="checkbox" id="cl_' + i + '" ' + (isDone ? 'checked' : '') + ' ' + (canEdit ? '' : 'disabled') + ' style="margin-top:2px;accent-color:var(--accent);pointer-events:none;" />';
+          content += '<span id="cl_label_' + i + '" style="font-size:13px;' + (isDone ? 'text-decoration:line-through;opacity:0.5;' : '') + '">' + template[i] + '</span>';
+          content += '</label>';
+        }
+        if (!canEdit && task.estado === 'Pendiente') {
+          content += '<div style="font-size:11px;color:var(--text2);text-align:center;margin-top:8px;">Inicia la tarea para usar el checklist</div>';
+        }
+        content += '</div>';
+      }
+
+      content += '</div>';
 
       document.getElementById('taskDetailContent').innerHTML = content;
 
       const actions = [];
       if (task.estado === 'Pendiente') {
-        actions.push(`<button class="form-button" onclick="startTask('${taskId}')">Iniciar</button>`);
+        actions.push('<button class="form-button" onclick="startTask(\'' + taskId + '\')">▶ Iniciar Tarea</button>');
       } else if (task.estado === 'En Progreso') {
-        actions.push(`<button class="form-button" onclick="completeTask('${taskId}')">Completar</button>`);
+        var allDone = progress && progress.done === progress.total;
+        actions.push('<button id="completeTaskBtn" class="form-button" onclick="completeTask(\'' + taskId + '\')" ' + (template.length > 0 && !allDone ? 'disabled style="opacity:0.4"' : '') + '>✅ Completar</button>');
+        if (template.length > 0 && !allDone) {
+          actions.push('<div style="font-size:11px;color:var(--text2);text-align:center;">Completa todos los ítems del checklist para finalizar</div>');
+        }
       }
 
       if (S.user.rol === 'admin' || S.user.rol === 'recepcion') {
         if (task.estado === 'Completada') {
-          actions.push(`<button class="form-button secondary" onclick="verifyTask('${taskId}')">Verificar</button>`);
+          actions.push('<button class="form-button secondary" onclick="verifyTask(\'' + taskId + '\')">🔍 Verificar</button>');
         }
       }
 
@@ -5923,7 +6996,7 @@
         var taskIdx = S.housekeeping.findIndex(t => t.id === taskId);
         var task = S.housekeeping[taskIdx];
         var n = now();
-        var taskRow = [task.id, task.fecha, task.habitacionNum, task.tarea, task.prioridad, 'En Progreso', task.asignadoA, task.notas, n, '', ''];
+        var taskRow = [task.id, task.fecha, task.habitacionNum, task.tarea, task.prioridad, 'En Progreso', task.asignadoA, task.notas, n, '', '', task.checklist || ''];
         var logRow = [normDate(new Date()), n.split(' ')[1], S.user.usuario, 'Tarea Iniciada', 'Hab. ' + task.habitacionNum + ' - ' + task.tarea, 'info'];
         await sheets.multi([
           { type: 'updateById', sheet: '🧹 Housekeeping', id: task.id, values: taskRow },
@@ -5938,11 +7011,20 @@
     }
 
     async function completeTask(taskId) {
+      // Validate checklist is complete
+      var taskCheck = S.housekeeping.find(t => t.id === taskId);
+      if (taskCheck) {
+        var prog = getChecklistProgress(taskCheck);
+        if (prog && prog.done < prog.total) {
+          toast('Completa todos los ítems del checklist (' + prog.done + '/' + prog.total + ')', true);
+          return;
+        }
+      }
       await busy(async () => {
         var taskIdx = S.housekeeping.findIndex(t => t.id === taskId);
         var task = S.housekeeping[taskIdx];
         var n = now();
-        var taskRow = [task.id, task.fecha, task.habitacionNum, task.tarea, task.prioridad, 'Completada', task.asignadoA, task.notas, task.horaInicio, n, ''];
+        var taskRow = [task.id, task.fecha, task.habitacionNum, task.tarea, task.prioridad, 'Completada', task.asignadoA, task.notas, task.horaInicio, n, '', task.checklist || ''];
         var logRow = [normDate(new Date()), n.split(' ')[1], S.user.usuario, 'Tarea Completada', 'Hab. ' + task.habitacionNum + ' - ' + task.tarea + ' → Hab. Disponible', 'info'];
 
         // Find the room and set it to Disponible
@@ -5979,7 +7061,7 @@
         var taskIdx = S.housekeeping.findIndex(t => t.id === taskId);
         var task = S.housekeeping[taskIdx];
         var n = now();
-        var taskRow = [task.id, task.fecha, task.habitacionNum, task.tarea, task.prioridad, task.estado, task.asignadoA, task.notas, task.horaInicio, task.horaFin, 'Si'];
+        var taskRow = [task.id, task.fecha, task.habitacionNum, task.tarea, task.prioridad, task.estado, task.asignadoA, task.notas, task.horaInicio, task.horaFin, 'Si', task.checklist || ''];
         var logRow = [normDate(new Date()), n.split(' ')[1], S.user.usuario, 'Tarea Verificada', 'Hab. ' + task.habitacionNum + ' - ' + task.tarea, 'info'];
         await sheets.multi([
           { type: 'updateById', sheet: '🧹 Housekeeping', id: task.id, values: taskRow },
@@ -6036,6 +7118,7 @@
       { id: 'cobros', icon: '💰', label: 'Cobros' },
       { id: 'clientes', icon: '👥', label: 'Clientes' },
       { id: 'housekeeping', icon: '🧹', label: 'Limpieza' },
+      { id: 'inventario', icon: '📦', label: 'Inventario' },
       { id: 'reports', icon: '📊', label: 'Reportes' }
     ];
 
