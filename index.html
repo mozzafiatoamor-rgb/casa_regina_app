@@ -3031,17 +3031,11 @@
         var regRow = [regId, resId, nombre, roomNum, today, tipoId, numId, nacionalidad, '', '', observaciones, ts];
         var logRow = [today, ts.split(' ')[1], 'Web', 'Reserva Web', nombre + ' Hab.' + roomNum + ' ' + formatDate(checkin) + '-' + formatDate(checkout), 'info'];
 
-        await fetch(S.scriptUrl, {
-          method: 'POST',
-          body: JSON.stringify({
-            action: 'multi',
-            operations: [
-              { type: 'append', sheet: '📋 Reservas', values: [resRow] },
-              { type: 'append', sheet: '📝 Registro', values: [regRow] },
-              { type: 'append', sheet: '📜 Bitácora', values: [logRow] }
-            ]
-          })
-        });
+        await sheets.multi([
+          { type: 'append', sheet: '📋 Reservas', values: resRow },
+          { type: 'append', sheet: '📝 Registro', values: regRow },
+          { type: 'append', sheet: '📜 Bitácora', values: logRow }
+        ]);
 
         showBookingConfirmation(nombre, telefono, room, roomNum, checkin, checkout, nights, total, resId);
       } catch(e) {
@@ -3822,7 +3816,7 @@
 
       // Apply filter based on selected pill
       if (S.filterReservas === 'activas') {
-        allFiltered = allFiltered.filter(r => r.estado === 'Check-in' || r.estado === 'Confirmada');
+        allFiltered = allFiltered.filter(r => r.estado === 'Check-in' || r.estado === 'Confirmada' || r.estado === 'Pendiente');
       } else if (S.filterReservas === 'proximas') {
         allFiltered = allFiltered.filter(r => (r.estado === 'Confirmada' || r.estado === 'Pendiente') && r.fechaEntrada >= today);
       } else if (S.filterReservas === 'historial') {
@@ -7101,6 +7095,9 @@
       if (res.estado !== 'Cancelada') {
         buttons += '<button class="form-button" onclick="closeModal();showReservaConfirmation(\'' + resId + '\')" style="background:var(--blue)">📄 Confirmación de Reserva</button>';
       }
+      if (res.estado === 'Pendiente') {
+        buttons += '<button class="form-button" onclick="confirmarReserva(\'' + resId + '\')" style="background:var(--green);color:white;">✅ Confirmar Reserva</button>';
+      }
       if (res.estado === 'Confirmada' || res.estado === 'Pendiente') {
         buttons += '<button class="form-button secondary" onclick="cancelReserva(\'' + resId + '\')">Cancelar Reserva</button>';
         if (balance > 0) {
@@ -7129,6 +7126,26 @@
       }
 
       openModal('reservaModal');
+    }
+
+    // ============ CONFIRM RESERVA ============
+    async function confirmarReserva(resId) {
+      var res = S.reservas.find(r => r.id === resId);
+      if (!res) return;
+      await busy(async () => {
+        var resRow = [res.id, res.habitacionNum, res.huesped, res.telefono, res.email, res.fechaEntrada, res.fechaSalida, res.adultos, res.niños, res.tarifa, res.tarifaTotal, 'Confirmada', res.notas, res.creadoPor, res.fechaCreacion];
+        var n = now();
+        var logRow = [normDate(new Date()), n.split(' ')[1], S.user.usuario, 'Reserva Confirmada', res.huesped + ' Hab. ' + res.habitacionNum, 'info'];
+        await sheets.multi([
+          { type: 'updateById', sheet: '📋 Reservas', id: res.id, values: resRow },
+          { type: 'append', sheet: '📜 Bitácora', values: logRow }
+        ]);
+        var resIdx = S.reservas.findIndex(r => r.id === resId);
+        S.reservas[resIdx].estado = 'Confirmada';
+        toast('Reserva confirmada ✅');
+        closeModal();
+        render();
+      });
     }
 
     // ============ CANCEL RESERVA ============
