@@ -1704,6 +1704,11 @@
     </div>
   </div>
 
+  <!-- Guest Registration Screen -->
+  <div class="login-screen" id="guestScreen" style="padding:20px;">
+    <div style="width:100%;max-width:400px;" id="guestFormContainer"></div>
+  </div>
+
   <!-- Main App -->
   <div style="flex: 1; display: flex; flex-direction: column;" id="appContainer" class="hidden">
     <!-- Header -->
@@ -1782,6 +1787,11 @@
             <div>
               <div class="section-title">Salidas Hoy</div>
               <div class="items-list" id="departurestoday"></div>
+            </div>
+
+            <div>
+              <div class="section-title">Rutina del Día</div>
+              <div id="dailyRoutine"></div>
             </div>
 
             <div>
@@ -2370,6 +2380,32 @@
       ama_llaves: 'Ama de Llaves'
     };
 
+    const DEFAULT_DAILY_ROUTINE = [
+      { hora: '07:00', tarea: 'Apertura de recepción', icon: '🔑', rol: 'recepcion' },
+      { hora: '07:30', tarea: 'Revisión de llegadas y salidas del día', icon: '📋', rol: 'recepcion' },
+      { hora: '08:00', tarea: 'Inicio de limpieza de habitaciones', icon: '🧹', rol: 'ama_llaves' },
+      { hora: '08:30', tarea: 'Revisión de inventario / suministros', icon: '📦', rol: 'ama_llaves' },
+      { hora: '12:00', tarea: 'Check-outs pendientes', icon: '👋', rol: 'recepcion' },
+      { hora: '13:00', tarea: 'Verificación de habitaciones limpiadas', icon: '✅', rol: 'recepcion' },
+      { hora: '15:00', tarea: 'Inicio de check-ins', icon: '🔑', rol: 'recepcion' },
+      { hora: '18:00', tarea: 'Revisión de reservas de mañana', icon: '📅', rol: 'recepcion' },
+      { hora: '20:00', tarea: 'Ronda de seguridad / áreas comunes', icon: '🔒', rol: 'recepcion' },
+      { hora: '21:00', tarea: 'Corte de caja diario', icon: '💰', rol: 'admin' },
+      { hora: '22:00', tarea: 'Cierre de recepción', icon: '🌙', rol: 'recepcion' }
+    ];
+
+    function getDailyRoutine() {
+      try {
+        var saved = localStorage.getItem('dailyRoutine');
+        if (saved) return JSON.parse(saved);
+      } catch(e) {}
+      return JSON.parse(JSON.stringify(DEFAULT_DAILY_ROUTINE));
+    }
+
+    function saveDailyRoutine(routine) {
+      localStorage.setItem('dailyRoutine', JSON.stringify(routine));
+    }
+
     // Plantillas de mensajes por defecto
     const DEFAULT_MSG_TEMPLATES = {
       confirmacion: {
@@ -2527,6 +2563,15 @@
       if (loginLogoEl) loginLogoEl.src = LOGO;
       var setupLogoEl = document.getElementById('setupLogo');
       if (setupLogoEl) setupLogoEl.src = LOGO;
+
+      // Check for guest registration mode
+      var urlParams = new URLSearchParams(window.location.search);
+      var guestRegId = urlParams.get('registro');
+      if (guestRegId && S.sheetId && S.apiKey) {
+        showGuestMode(guestRegId);
+        return;
+      }
+
       if (S.sheetId && S.apiKey) {
         // Check if user is logged in
         const storedUser = localStorage.getItem('user');
@@ -2540,6 +2585,212 @@
       } else {
         showSetup();
       }
+    }
+
+    // ============ GUEST REGISTRATION MODE ============
+    var _guestResId = null;
+    var _guestRes = null;
+
+    async function showGuestMode(resId) {
+      _guestResId = resId;
+      // Hide all screens
+      document.getElementById('setupScreen').classList.remove('active');
+      document.getElementById('loginScreen').classList.remove('active');
+      document.getElementById('appContainer').classList.add('hidden');
+      // Show guest screen
+      document.getElementById('guestScreen').classList.add('active');
+
+      var container = document.getElementById('guestFormContainer');
+      container.innerHTML = '<div style="text-align:center;padding:40px 0;"><div style="font-size:28px;margin-bottom:8px;">⏳</div><div style="color:var(--text2);">Cargando tu reserva...</div></div>';
+
+      try {
+        var reservas = await sheets.read('📋 Reservas', 'A2:P5000');
+        var found = null;
+        for (var i = 0; i < reservas.length; i++) {
+          if (reservas[i][0] === resId) { found = reservas[i]; break; }
+        }
+        if (!found) {
+          container.innerHTML = '<div style="text-align:center;padding:40px 0;"><img src="' + LOGO + '" style="width:100px;height:100px;border-radius:16px;object-fit:cover;margin-bottom:16px;"><h2 style="margin:0 0 8px;">' + HOTEL_NAME + '</h2><div style="font-size:14px;color:var(--red);margin-top:20px;">❌ Reserva no encontrada</div><div style="font-size:12px;color:var(--text2);margin-top:8px;">El enlace puede haber expirado o ser incorrecto.</div></div>';
+          return;
+        }
+        _guestRes = {
+          id: found[0], habitacionNum: found[1], huesped: found[2],
+          telefono: found[3], email: found[4],
+          fechaEntrada: found[5], fechaSalida: found[6],
+          adultos: found[7], niños: found[8]
+        };
+        renderGuestForm();
+      } catch(e) {
+        container.innerHTML = '<div style="text-align:center;padding:40px 0;"><div style="font-size:28px;margin-bottom:8px;">⚠️</div><div style="color:var(--red);">Error al cargar. Intenta de nuevo.</div></div>';
+      }
+    }
+
+    function renderGuestForm() {
+      var r = _guestRes;
+      var h = '';
+      h += '<div style="text-align:center;margin-bottom:20px;">';
+      h += '<img src="' + LOGO + '" style="width:90px;height:90px;border-radius:16px;object-fit:cover;margin-bottom:12px;">';
+      h += '<h2 style="margin:0 0 2px;font-size:18px;">' + HOTEL_NAME + '</h2>';
+      h += '<div style="font-size:12px;color:var(--text2);">Hotel Boutique</div>';
+      h += '</div>';
+
+      h += '<div style="background:var(--surface3);padding:14px;border-radius:var(--radius);margin-bottom:16px;">';
+      h += '<div style="font-size:11px;color:var(--text2);margin-bottom:6px;">TU RESERVA</div>';
+      h += '<div style="font-weight:700;margin-bottom:4px;">¡Hola, ' + r.huesped + '!</div>';
+      h += '<div style="font-size:12px;color:var(--text2);">Hab. ' + r.habitacionNum + ' · ' + formatDate(r.fechaEntrada) + ' → ' + formatDate(r.fechaSalida) + '</div>';
+      h += '<div style="font-size:12px;color:var(--text2);">' + r.adultos + ' adulto(s)' + (r.niños && r.niños !== '0' ? ', ' + r.niños + ' niño(s)' : '') + '</div>';
+      h += '</div>';
+
+      h += '<div style="background:var(--surface3);padding:14px;border-radius:var(--radius);margin-bottom:16px;">';
+      h += '<div style="font-size:11px;color:var(--text2);margin-bottom:10px;">PRE-REGISTRO DE HUÉSPED</div>';
+      h += '<div style="font-size:12px;color:var(--text2);margin-bottom:12px;">Completa tus datos para agilizar tu check-in.</div>';
+      h += '<form id="guestRegForm" onsubmit="submitGuestForm(event)">';
+
+      h += '<label class="form-label" style="font-size:12px;">Nombre completo</label>';
+      h += '<input type="text" id="g_nombre" class="login-input" value="' + r.huesped + '" required style="margin-bottom:10px;">';
+
+      h += '<label class="form-label" style="font-size:12px;">Teléfono</label>';
+      h += '<input type="tel" id="g_telefono" class="login-input" value="' + (r.telefono || '') + '" required style="margin-bottom:10px;">';
+
+      h += '<label class="form-label" style="font-size:12px;">Email</label>';
+      h += '<input type="email" id="g_email" class="login-input" value="' + (r.email || '') + '" style="margin-bottom:10px;">';
+
+      h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">';
+      h += '<div><label class="form-label" style="font-size:12px;">Tipo de ID</label>';
+      h += '<select id="g_tipoId" class="login-input" style="padding:10px;"><option value="INE">INE</option><option value="Pasaporte">Pasaporte</option><option value="Licencia">Licencia</option><option value="Otro">Otro</option></select></div>';
+      h += '<div><label class="form-label" style="font-size:12px;">Número de ID</label>';
+      h += '<input type="text" id="g_numId" class="login-input" required></div>';
+      h += '</div>';
+
+      h += '<label class="form-label" style="font-size:12px;">Nacionalidad</label>';
+      h += '<input type="text" id="g_nacionalidad" class="login-input" placeholder="Ej: Mexicana" required style="margin-bottom:10px;">';
+
+      h += '<label class="form-label" style="font-size:12px;">Procedencia (ciudad/estado)</label>';
+      h += '<input type="text" id="g_procedencia" class="login-input" placeholder="Ej: CDMX" style="margin-bottom:10px;">';
+
+      h += '<label class="form-label" style="font-size:12px;">Motivo de viaje</label>';
+      h += '<select id="g_motivo" class="login-input" style="padding:10px;margin-bottom:10px;"><option value="Vacaciones">Vacaciones</option><option value="Negocios">Negocios</option><option value="Evento">Evento</option><option value="Otro">Otro</option></select>';
+
+      h += '<label class="form-label" style="font-size:12px;">Observaciones / Peticiones especiales</label>';
+      h += '<textarea id="g_observaciones" class="login-input" rows="2" placeholder="Alergias, hora de llegada, etc." style="margin-bottom:16px;resize:vertical;"></textarea>';
+
+      h += '<button type="submit" class="login-button" id="guestSubmitBtn">Enviar Pre-registro</button>';
+      h += '</form>';
+      h += '</div>';
+
+      document.getElementById('guestFormContainer').innerHTML = h;
+    }
+
+    async function submitGuestForm(event) {
+      event.preventDefault();
+      var btn = document.getElementById('guestSubmitBtn');
+      btn.disabled = true;
+      btn.textContent = 'Enviando...';
+
+      var nombre = document.getElementById('g_nombre').value.trim();
+      var telefono = document.getElementById('g_telefono').value.trim();
+      var email = document.getElementById('g_email').value.trim();
+      var tipoId = document.getElementById('g_tipoId').value;
+      var numId = document.getElementById('g_numId').value.trim();
+      var nacionalidad = document.getElementById('g_nacionalidad').value.trim();
+      var procedencia = document.getElementById('g_procedencia').value.trim();
+      var motivo = document.getElementById('g_motivo').value;
+      var observaciones = document.getElementById('g_observaciones').value.trim();
+      var r = _guestRes;
+      var today = normDate(new Date());
+      var ts = now();
+      var regId = 'REG-' + Date.now();
+
+      try {
+        var regRow = [regId, r.id, nombre, r.habitacionNum, today, tipoId, numId, nacionalidad, procedencia, motivo, observaciones, ts];
+        await fetch(S.scriptUrl, {
+          method: 'POST',
+          body: JSON.stringify({ sheet: '📝 Registro', values: [regRow] })
+        });
+        showGuestConfirmation(nombre, telefono, r);
+      } catch(e) {
+        btn.disabled = false;
+        btn.textContent = 'Enviar Pre-registro';
+        alert('Error al enviar. Intenta de nuevo.');
+      }
+    }
+
+    function showGuestConfirmation(nombre, telefono, res) {
+      var h = '';
+      h += '<div style="text-align:center;margin-bottom:20px;">';
+      h += '<img src="' + LOGO + '" style="width:80px;height:80px;border-radius:16px;object-fit:cover;margin-bottom:12px;">';
+      h += '<div style="font-size:48px;margin-bottom:8px;">✅</div>';
+      h += '<h2 style="margin:0 0 6px;font-size:18px;">¡Gracias, ' + nombre + '!</h2>';
+      h += '<div style="font-size:13px;color:var(--text2);">Tu pre-registro ha sido enviado con éxito.</div>';
+      h += '</div>';
+
+      h += '<div style="background:var(--surface3);padding:14px;border-radius:var(--radius);margin-bottom:16px;">';
+      h += '<div style="font-size:11px;color:var(--text2);margin-bottom:6px;">RESUMEN DE TU ESTADÍA</div>';
+      h += '<div style="font-size:13px;margin-bottom:4px;">🏨 Habitación <strong>' + res.habitacionNum + '</strong></div>';
+      h += '<div style="font-size:13px;margin-bottom:4px;">📅 ' + formatDate(res.fechaEntrada) + ' → ' + formatDate(res.fechaSalida) + '</div>';
+      h += '<div style="font-size:13px;">👤 ' + res.adultos + ' adulto(s)' + (res.niños && res.niños !== '0' ? ', ' + res.niños + ' niño(s)' : '') + '</div>';
+      h += '</div>';
+
+      h += '<div style="background:var(--surface3);padding:14px;border-radius:var(--radius);margin-bottom:16px;text-align:center;">';
+      h += '<div style="font-size:12px;color:var(--text2);margin-bottom:8px;">¿Quieres guardar tu comprobante?</div>';
+
+      // WhatsApp self-send
+      var waText = '🏨 *' + HOTEL_NAME + '* — Pre-registro confirmado\n\n';
+      waText += '👤 ' + nombre + '\n';
+      waText += '🛏️ Habitación ' + res.habitacionNum + '\n';
+      waText += '📅 ' + formatDate(res.fechaEntrada) + ' → ' + formatDate(res.fechaSalida) + '\n';
+      waText += '👥 ' + res.adultos + ' adulto(s)' + (res.niños && res.niños !== '0' ? ', ' + res.niños + ' niño(s)' : '') + '\n\n';
+      waText += '✅ Pre-registro completado.\n';
+      waText += '¡Te esperamos! 🌟';
+
+      var cleanPhone = telefono.replace(/[^0-9]/g, '');
+      if (cleanPhone.length === 10) cleanPhone = '52' + cleanPhone;
+
+      h += '<a href="https://wa.me/' + cleanPhone + '?text=' + encodeURIComponent(waText) + '" target="_blank" style="display:block;background:#25D366;color:white;padding:12px 16px;border-radius:var(--radius);text-decoration:none;font-weight:700;font-size:14px;margin-bottom:8px;">📲 Enviarme por WhatsApp</a>';
+      h += '</div>';
+
+      h += '<div style="text-align:center;font-size:11px;color:var(--text2);margin-top:12px;">' + HOTEL_NAME + ' · Hotel Boutique</div>';
+
+      document.getElementById('guestFormContainer').innerHTML = h;
+    }
+
+    function getGuestRegistrationLink(resId) {
+      return window.location.origin + window.location.pathname + '?registro=' + resId;
+    }
+
+    function copyGuestLink(resId) {
+      var link = getGuestRegistrationLink(resId);
+      navigator.clipboard.writeText(link).then(function() {
+        toast('Link copiado al portapapeles');
+      });
+    }
+
+    function shareGuestLinkWhatsApp(resId) {
+      var res = S.reservas.find(function(r) { return r.id === resId; });
+      var link = getGuestRegistrationLink(resId);
+      var text = '¡Hola ' + res.huesped + '! 🏨\n\nPara agilizar tu check-in en *' + HOTEL_NAME + '*, por favor completa tu pre-registro en este enlace:\n\n' + link + '\n\n¡Te esperamos! 🌟';
+      var phone = (res.telefono || '').replace(/[^0-9]/g, '');
+      if (phone.length === 10) phone = '52' + phone;
+      window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(text), '_blank');
+    }
+
+    function showGuestQR(resId) {
+      var link = getGuestRegistrationLink(resId);
+      var qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(link);
+      var res = S.reservas.find(function(r) { return r.id === resId; });
+      var h = '';
+      h += '<div style="text-align:center;">';
+      h += '<div style="font-size:14px;font-weight:700;margin-bottom:12px;">QR de Pre-registro</div>';
+      h += '<div style="font-size:12px;color:var(--text2);margin-bottom:12px;">' + res.huesped + ' · Hab. ' + res.habitacionNum + '</div>';
+      h += '<img src="' + qrUrl + '" style="width:200px;height:200px;border-radius:8px;margin-bottom:12px;" alt="QR">';
+      h += '<div style="font-size:10px;color:var(--text2);word-break:break-all;margin-bottom:12px;">' + link + '</div>';
+      h += '<button class="form-button" onclick="copyGuestLink(\'' + resId + '\')">📋 Copiar Link</button>';
+      h += '<button class="form-button secondary" style="margin-top:8px;" onclick="closeModal()">Cerrar</button>';
+      h += '</div>';
+      document.getElementById('taskDetailContent').innerHTML = h;
+      document.getElementById('taskDetailModal').querySelector('.modal-title').textContent = '📱 Pre-registro';
+      document.getElementById('taskDetailActions').innerHTML = '';
+      openModal('taskDetailModal');
     }
 
     // ============ SETUP FLOW ============
@@ -2588,12 +2839,14 @@
       document.getElementById('setupScreen').classList.remove('active');
       document.getElementById('loginScreen').classList.add('active');
       document.getElementById('appContainer').classList.add('hidden');
+      document.getElementById('guestScreen').classList.remove('active');
     }
 
     function showApp() {
       document.getElementById('setupScreen').classList.remove('active');
       document.getElementById('loginScreen').classList.remove('active');
       document.getElementById('appContainer').classList.remove('hidden');
+      document.getElementById('guestScreen').classList.remove('active');
       // Add config tab for admin and recepcion roles
       if (S.user && (S.user.rol === 'admin' || S.user.rol === 'recepcion')) {
         NAV_TABS = NAV_TABS_BASE.concat([{ id: 'config', icon: '⚙️', label: 'Ajustes' }]);
@@ -2898,6 +3151,32 @@
           `).join('')
         : '<div style="text-align: center; padding: 20px; color: var(--text2);">Sin salidas pendientes hoy</div>';
       document.getElementById('departurestoday').innerHTML = departuresHtml;
+
+      // Daily Routine Timeline
+      var routine = getDailyRoutine();
+      var nowHHMM = new Date().toTimeString().substring(0, 5);
+      var routineHtml = '<div style="position:relative;padding-left:20px;">';
+      routine.forEach(function(item, i) {
+        var isPast = item.hora < nowHHMM;
+        var isCurrent = item.hora <= nowHHMM && (i === routine.length - 1 || routine[i + 1].hora > nowHHMM);
+        var opacity = isPast && !isCurrent ? '0.45' : '1';
+        var dotColor = isCurrent ? 'var(--accent)' : (isPast ? 'var(--green)' : 'var(--surface3)');
+        var dotSize = isCurrent ? '12px' : '8px';
+        var dotOffset = isCurrent ? '-6px' : '-4px';
+
+        routineHtml += '<div style="display:flex;align-items:flex-start;gap:10px;padding:6px 0;opacity:' + opacity + ';position:relative;">';
+        // Timeline dot
+        routineHtml += '<div style="position:absolute;left:-20px;top:10px;width:' + dotSize + ';height:' + dotSize + ';border-radius:50%;background:' + dotColor + ';margin-left:' + dotOffset + ';' + (isCurrent ? 'box-shadow:0 0 6px var(--accent);' : '') + '"></div>';
+        // Line
+        if (i < routine.length - 1) {
+          routineHtml += '<div style="position:absolute;left:-20px;top:22px;width:2px;height:calc(100% - 6px);background:var(--surface3);margin-left:-1px;"></div>';
+        }
+        routineHtml += '<div style="font-family:Space Mono,monospace;font-size:11px;font-weight:700;color:' + (isCurrent ? 'var(--accent)' : 'var(--text2)') + ';min-width:38px;">' + item.hora + '</div>';
+        routineHtml += '<div style="font-size:12px;' + (isCurrent ? 'font-weight:700;color:var(--accent);' : '') + '">' + item.icon + ' ' + item.tarea + '</div>';
+        routineHtml += '</div>';
+      });
+      routineHtml += '</div>';
+      document.getElementById('dailyRoutine').innerHTML = routineHtml;
 
       // Alerts
       var alertItems = [];
@@ -4103,12 +4382,20 @@
         if(bal>0) totalPending += bal;
       });
 
+      // Payment method breakdown for today
+      var todayEfectivo = todayPay.filter(function(c){return c.metodoPago==='Efectivo'}).reduce(function(s,c){return s+c.monto},0);
+      var todayTransferencia = todayPay.filter(function(c){return c.metodoPago==='Transferencia'}).reduce(function(s,c){return s+c.monto},0);
+      var todayTarjeta = todayPay.filter(function(c){return c.metodoPago!=='Efectivo'&&c.metodoPago!=='Transferencia'}).reduce(function(s,c){return s+c.monto},0);
+
       document.getElementById('cobrosStats').innerHTML =
         '<div class="cobros-stats">'+
         '<div class="cobro-stat"><div class="cobro-stat-value" style="color:var(--green)">$'+todayTotal+'</div><div class="cobro-stat-label">Hoy</div></div>'+
         '<div class="cobro-stat"><div class="cobro-stat-value" style="color:var(--red)">$'+totalPending+'</div><div class="cobro-stat-label">Pendiente</div></div>'+
         '<div class="cobro-stat"><div class="cobro-stat-value" style="color:var(--accent)">$'+totalCollected+'</div><div class="cobro-stat-label">Recaudado</div></div>'+
-        '</div>';
+        '</div>'+
+        '<button class="form-button secondary" onclick="corteDeCaja()" style="width:100%;margin-bottom:12px;padding:10px;">💰 Corte de Caja del Día' +
+        (todayPay.length > 0 ? ' <span style=\\"font-size:10px;color:var(--text2);font-weight:400\\">(' + todayPay.length + ' movimientos · $' + todayTotal + ')</span>' : '') +
+        '</button>';
 
       var pills=[{id:'activas',label:'Hospedados'},{id:'pendientes',label:'Con Saldo'},{id:'proximas',label:'Próximas'},{id:'historial',label:'Historial'}];
       document.getElementById('cobrosPills').innerHTML = pills.map(function(p){
@@ -4176,6 +4463,148 @@
     }
 
     function filterCobrosTab(tab){S.filterCobros=tab;renderCobros()}
+
+    function corteDeCaja() {
+      var today = normDate(new Date());
+      var todayPay = S.cobros.filter(function(c) { return c.fecha === today; });
+      var todayTotal = todayPay.reduce(function(s, c) { return s + c.monto; }, 0);
+
+      // Breakdown by payment method
+      var methods = {};
+      todayPay.forEach(function(c) {
+        var m = c.metodoPago || 'Otro';
+        if (!methods[m]) methods[m] = { count: 0, total: 0 };
+        methods[m].count++;
+        methods[m].total += c.monto;
+      });
+
+      var h = '';
+      h += '<div style="text-align:center;margin-bottom:14px;">';
+      h += '<div style="font-size:42px;margin-bottom:6px;">💰</div>';
+      h += '<div style="font-size:18px;font-weight:800;">' + formatDate(today) + '</div>';
+      h += '<div style="font-size:12px;color:var(--text2);">Corte de caja del día</div>';
+      h += '</div>';
+
+      h += '<div style="background:var(--surface3);padding:14px;border-radius:var(--radius);margin-bottom:12px;">';
+      h += '<div style="display:flex;justify-content:space-between;margin-bottom:10px;">';
+      h += '<span style="font-size:14px;font-weight:700;">TOTAL DEL DÍA</span>';
+      h += '<span style="font-size:22px;font-weight:800;font-family:Space Mono,monospace;color:var(--green);">$' + todayTotal + '</span>';
+      h += '</div>';
+      h += '<div style="font-size:12px;color:var(--text2);">' + todayPay.length + ' transacciones</div>';
+      h += '</div>';
+
+      // Method breakdown
+      h += '<div style="background:var(--surface3);padding:14px;border-radius:var(--radius);margin-bottom:12px;">';
+      h += '<div style="font-size:12px;color:var(--text2);margin-bottom:8px;">DESGLOSE POR MÉTODO</div>';
+      Object.keys(methods).forEach(function(m) {
+        var d = methods[m];
+        h += '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--surface2);">';
+        h += '<div><span style="font-weight:600;">' + m + '</span> <span style="font-size:11px;color:var(--text2);">(' + d.count + ')</span></div>';
+        h += '<span style="font-family:Space Mono,monospace;font-weight:700;">$' + d.total + '</span>';
+        h += '</div>';
+      });
+      if (Object.keys(methods).length === 0) {
+        h += '<div style="text-align:center;padding:12px;color:var(--text2);font-size:13px;">Sin movimientos hoy</div>';
+      }
+      h += '</div>';
+
+      // Transaction detail
+      if (todayPay.length > 0) {
+        h += '<div style="background:var(--surface3);padding:14px;border-radius:var(--radius);margin-bottom:12px;">';
+        h += '<div style="font-size:12px;color:var(--text2);margin-bottom:8px;">DETALLE DE TRANSACCIONES</div>';
+        todayPay.forEach(function(c) {
+          var res = S.reservas.find(function(r) { return r.id === c.reservaId; });
+          h += '<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--surface2);font-size:12px;">';
+          h += '<div><span style="font-weight:600;">' + (res ? res.huesped : c.reservaId) + '</span><br>';
+          h += '<span style="color:var(--text2);font-size:10px;">' + c.hora + ' · ' + c.metodoPago + ' · ' + c.concepto + '</span></div>';
+          h += '<span style="font-family:Space Mono,monospace;font-weight:700;color:var(--green);">$' + c.monto + '</span>';
+          h += '</div>';
+        });
+        h += '</div>';
+      }
+
+      h += '<div style="display:flex;flex-direction:column;gap:8px;">';
+      h += '<button class="form-button" onclick="generateCortePDF()">📄 Exportar Corte en PDF</button>';
+      h += '<button class="form-button secondary" onclick="closeModal()">Cerrar</button>';
+      h += '</div>';
+
+      document.getElementById('taskDetailContent').innerHTML = h;
+      document.getElementById('taskDetailModal').querySelector('.modal-title').textContent = '💰 Corte de Caja';
+      document.getElementById('taskDetailActions').innerHTML = '';
+      openModal('taskDetailModal');
+    }
+
+    function generateCortePDF() {
+      var { jsPDF } = window.jspdf;
+      var doc = new jsPDF({ unit: 'mm', format: [80, 200] }); // Receipt format
+      var today = normDate(new Date());
+      var todayPay = S.cobros.filter(function(c) { return c.fecha === today; });
+      var todayTotal = todayPay.reduce(function(s, c) { return s + c.monto; }, 0);
+      var margin = 5, y = 8, w = 70;
+
+      // Header
+      try { doc.addImage(LOGO, 'JPEG', 28, y, 14, 14); } catch(e) {}
+      y += 16;
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(40);
+      doc.text(HOTEL_NAME, 40, y, { align: 'center' }); y += 4;
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(120);
+      doc.text('Hotel Boutique', 40, y, { align: 'center' }); y += 6;
+
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(0);
+      doc.text('CORTE DE CAJA', 40, y, { align: 'center' }); y += 4;
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
+      doc.text(formatDate(today) + ' · ' + now().split(' ')[1], 40, y, { align: 'center' }); y += 3;
+
+      doc.setDrawColor(0); doc.setLineWidth(0.3);
+      doc.line(margin, y, w + margin, y); y += 5;
+
+      // Method breakdown
+      var methods = {};
+      todayPay.forEach(function(c) {
+        var m = c.metodoPago || 'Otro';
+        if (!methods[m]) methods[m] = { count: 0, total: 0 };
+        methods[m].count++;
+        methods[m].total += c.monto;
+      });
+
+      doc.setFontSize(7);
+      Object.keys(methods).forEach(function(m) {
+        doc.setFont('helvetica', 'normal');
+        doc.text(m + ' (' + methods[m].count + ')', margin, y);
+        doc.setFont('helvetica', 'bold');
+        doc.text('$' + methods[m].total, w + margin, y, { align: 'right' });
+        y += 4;
+      });
+
+      doc.setLineWidth(0.5);
+      doc.line(margin, y, w + margin, y); y += 5;
+
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
+      doc.text('TOTAL', margin, y);
+      doc.text('$' + todayTotal, w + margin, y, { align: 'right' }); y += 4;
+
+      doc.line(margin, y, w + margin, y); y += 5;
+
+      // Transactions
+      doc.setFontSize(6); doc.setFont('helvetica', 'normal'); doc.setTextColor(80);
+      todayPay.forEach(function(c) {
+        var res = S.reservas.find(function(r) { return r.id === c.reservaId; });
+        doc.text(c.hora + ' ' + (res ? res.huesped : '').substring(0, 18), margin, y);
+        doc.text('$' + c.monto, w + margin, y, { align: 'right' });
+        y += 3;
+      });
+
+      y += 4;
+      doc.setFontSize(6); doc.setTextColor(150);
+      doc.text('Responsable: ' + (S.user ? S.user.nombre : ''), 40, y, { align: 'center' }); y += 3;
+      doc.text('Generado: ' + now(), 40, y, { align: 'center' });
+
+      doc.save('CasaRegina_Corte_' + today + '.pdf');
+      toast('PDF de corte generado');
+
+      // Log to bitácora
+      sheets.append('📜 Bitácora', [[today, now().split(' ')[1], S.user ? S.user.nombre : '', 'Corte de caja', 'Total: $' + todayTotal + ' (' + todayPay.length + ' transacciones)', 'cobros']]);
+    }
 
     function goToCobros(resId) {
       switchTab('cobros');
@@ -5094,6 +5523,8 @@
       var pills = [
         { id: 'terminos', label: '📜 Términos' },
         { id: 'mensajes', label: '💬 Mensajes' },
+        { id: 'rutina', label: '🕐 Rutina' },
+        { id: 'emergencia', label: '🆘 Emergencia' },
         { id: 'usuarios', label: '👤 Usuarios' },
         { id: 'tarifas', label: '💲 Tarifas' },
         { id: 'app', label: '📱 App' }
@@ -5107,6 +5538,10 @@
         renderTermsConfig();
       } else if (S.configTab === 'mensajes') {
         renderMensajesConfig();
+      } else if (S.configTab === 'rutina') {
+        renderRutinaConfig();
+      } else if (S.configTab === 'emergencia') {
+        renderEmergenciaConfig();
       } else if (S.configTab === 'usuarios') {
         renderUsersConfig();
       } else if (S.configTab === 'tarifas') {
@@ -5241,6 +5676,251 @@
       h += '<div style="text-align:center;margin-top:20px"><img src="' + LOGO + '" style="width:60px;height:60px;border-radius:12px;object-fit:cover;margin-bottom:8px;opacity:.7" alt="Logo"><div style="font-size:10px;color:var(--text2)">Casa Regina · Hotel Boutique<br>PMS v2.0 · Powered by Google Sheets</div></div>';
 
       document.getElementById('configContent').innerHTML = h;
+    }
+
+    // --- Emergencia / Imprevistos ---
+    const DEFAULT_EMERGENCY_CONTACTS = [
+      { nombre: 'Emergencias', telefono: '911', tipo: 'Emergencia' },
+      { nombre: 'Bomberos', telefono: '', tipo: 'Emergencia' },
+      { nombre: 'Cruz Roja', telefono: '', tipo: 'Emergencia' },
+      { nombre: 'Policía Municipal', telefono: '', tipo: 'Emergencia' },
+      { nombre: 'Dueño / Gerente', telefono: '', tipo: 'Hotel' },
+      { nombre: 'Plomero', telefono: '', tipo: 'Mantenimiento' },
+      { nombre: 'Electricista', telefono: '', tipo: 'Mantenimiento' },
+      { nombre: 'Cerrajero', telefono: '', tipo: 'Mantenimiento' },
+      { nombre: 'Médico / Clínica', telefono: '', tipo: 'Salud' },
+      { nombre: 'Farmacia', telefono: '', tipo: 'Salud' }
+    ];
+
+    function getEmergencyContacts() {
+      try {
+        var saved = localStorage.getItem('emergencyContacts');
+        if (saved) return JSON.parse(saved);
+      } catch(e) {}
+      return JSON.parse(JSON.stringify(DEFAULT_EMERGENCY_CONTACTS));
+    }
+
+    function saveEmergencyContacts(contacts) {
+      localStorage.setItem('emergencyContacts', JSON.stringify(contacts));
+    }
+
+    function renderEmergenciaConfig() {
+      var contacts = getEmergencyContacts();
+      var h = '<div style="margin-bottom:16px">';
+      h += '<div class="section-title">Contactos de Emergencia</div>';
+      h += '<div style="font-size:12px;color:var(--text2);margin-bottom:16px">Directorio de contactos para imprevistos. Llena los teléfonos y genera el PDF para tenerlo impreso en recepción.</div>';
+      h += '</div>';
+
+      var tipos = ['Emergencia', 'Hotel', 'Mantenimiento', 'Salud'];
+      tipos.forEach(function(tipo) {
+        var items = contacts.filter(function(c) { return c.tipo === tipo; });
+        if (items.length === 0) return;
+        var icon = tipo === 'Emergencia' ? '🚨' : tipo === 'Hotel' ? '🏨' : tipo === 'Mantenimiento' ? '🔧' : '🏥';
+        h += '<div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;margin-top:12px;">' + icon + ' ' + tipo.toUpperCase() + '</div>';
+        items.forEach(function(c) {
+          var idx = contacts.indexOf(c);
+          h += '<div style="background:var(--surface3);padding:8px 12px;border-radius:var(--radius);margin-bottom:4px;display:flex;align-items:center;gap:8px;">';
+          h += '<input type="text" value="' + c.nombre + '" onchange="updateEmergencyContact(' + idx + ',\'nombre\',this.value)" style="background:var(--surface2);border:1px solid var(--surface3);border-radius:6px;padding:4px 8px;font-size:12px;flex:1;color:var(--text);font-weight:600;" />';
+          h += '<input type="tel" value="' + (c.telefono || '') + '" onchange="updateEmergencyContact(' + idx + ',\'telefono\',this.value)" placeholder="Teléfono" style="background:var(--surface2);border:1px solid var(--surface3);border-radius:6px;padding:4px 8px;font-size:12px;width:120px;color:var(--text);font-family:Space Mono,monospace;" />';
+          if (c.telefono) {
+            h += '<a href="tel:' + c.telefono + '" style="font-size:18px;text-decoration:none;">📞</a>';
+          }
+          h += '<button onclick="removeEmergencyContact(' + idx + ')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px;">✕</button>';
+          h += '</div>';
+        });
+      });
+
+      h += '<div style="display:flex;gap:8px;margin-top:14px;">';
+      h += '<button class="form-button secondary" onclick="addEmergencyContact()" style="flex:1;">+ Agregar Contacto</button>';
+      h += '<button class="form-button secondary" onclick="resetEmergencyContacts()" style="padding:8px 12px;font-size:11px;">Restaurar</button>';
+      h += '</div>';
+
+      h += '<div style="margin-top:16px;">';
+      h += '<button class="form-button secondary" onclick="generateEmergencyPDF()" style="width:100%;text-align:left;padding:12px;">📄 Directorio de Emergencia PDF<br><span style="font-size:10px;color:var(--text2);font-weight:400">Para imprimir y tener en recepción</span></button>';
+      h += '</div>';
+
+      document.getElementById('configContent').innerHTML = h;
+    }
+
+    function updateEmergencyContact(idx, field, value) {
+      var contacts = getEmergencyContacts();
+      contacts[idx][field] = value;
+      saveEmergencyContacts(contacts);
+    }
+
+    function removeEmergencyContact(idx) {
+      var contacts = getEmergencyContacts();
+      contacts.splice(idx, 1);
+      saveEmergencyContacts(contacts);
+      renderEmergenciaConfig();
+    }
+
+    function addEmergencyContact() {
+      var contacts = getEmergencyContacts();
+      contacts.push({ nombre: 'Nuevo contacto', telefono: '', tipo: 'Mantenimiento' });
+      saveEmergencyContacts(contacts);
+      renderEmergenciaConfig();
+    }
+
+    function resetEmergencyContacts() {
+      if (!confirm('¿Restaurar contactos al listado predeterminado?')) return;
+      localStorage.removeItem('emergencyContacts');
+      toast('Contactos restaurados');
+      renderEmergenciaConfig();
+    }
+
+    function generateEmergencyPDF() {
+      var { jsPDF } = window.jspdf;
+      var doc = new jsPDF({ unit: 'mm', format: 'a4' });
+      var margin = 20, y = 20;
+
+      try { doc.addImage(LOGO, 'JPEG', margin, y, 20, 20); } catch(e) {}
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(18); doc.setTextColor(40);
+      doc.text(HOTEL_NAME, margin + 25, y + 9);
+      doc.setFontSize(10); doc.setFont('helvetica', 'normal'); doc.setTextColor(120);
+      doc.text('Hotel Boutique', margin + 25, y + 15);
+      y += 28;
+
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(16); doc.setTextColor(200, 0, 0);
+      doc.text('DIRECTORIO DE EMERGENCIA', 105, y, { align: 'center' }); y += 4;
+      doc.setDrawColor(200, 0, 0); doc.setLineWidth(0.5);
+      doc.line(margin, y, 210 - margin, y); y += 12;
+
+      var contacts = getEmergencyContacts();
+      var tipos = ['Emergencia', 'Hotel', 'Mantenimiento', 'Salud'];
+      tipos.forEach(function(tipo) {
+        var items = contacts.filter(function(c) { return c.tipo === tipo; });
+        if (items.length === 0) return;
+
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.setTextColor(107, 138, 74);
+        doc.text(tipo.toUpperCase(), margin, y); y += 7;
+
+        items.forEach(function(c) {
+          doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(40);
+          doc.text(c.nombre, margin + 5, y);
+          doc.setFont('helvetica', 'normal');
+          doc.text(c.telefono || '_______________', 130, y);
+          y += 7;
+        });
+        y += 5;
+        if (y > 260) { doc.addPage(); y = 20; }
+      });
+
+      y += 5;
+      doc.setDrawColor(200); doc.line(margin, y, 210 - margin, y); y += 10;
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(40);
+      doc.text('Protocolo General de Emergencia:', margin, y); y += 7;
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(60);
+      var protocol = [
+        '1. Mantener la calma y evaluar la situación.',
+        '2. Si hay peligro inmediato, evacuar el área y llamar al 911.',
+        '3. Notificar al gerente/dueño inmediatamente.',
+        '4. Si es un problema de mantenimiento, contactar al proveedor correspondiente.',
+        '5. Documentar el incidente en la bitácora del sistema.',
+        '6. Si involucra a un huésped, ofrecer asistencia y seguimiento.',
+        '7. Archivar evidencia fotográfica si es posible.'
+      ];
+      protocol.forEach(function(p) {
+        doc.text(p, margin + 5, y); y += 5;
+      });
+
+      y += 8;
+      doc.setFontSize(8); doc.setTextColor(150);
+      doc.text('Generado: ' + now() + '  |  ' + HOTEL_NAME, 105, y, { align: 'center' });
+      doc.save('CasaRegina_Emergencia.pdf');
+      toast('PDF de emergencia generado');
+    }
+
+    // --- Rutina Diaria Config ---
+    function renderRutinaConfig() {
+      var routine = getDailyRoutine();
+      var h = '<div style="margin-bottom:16px">';
+      h += '<div class="section-title">Rutina Diaria del Hotel</div>';
+      h += '<div style="font-size:12px;color:var(--text2);margin-bottom:16px">Define los horarios y tareas que aparecen como timeline en el Dashboard.</div>';
+      h += '</div>';
+
+      routine.forEach(function(item, i) {
+        h += '<div style="background:var(--surface3);padding:10px 12px;border-radius:var(--radius);margin-bottom:6px;display:flex;align-items:center;gap:10px;">';
+        h += '<input type="time" value="' + item.hora + '" onchange="updateRoutineItem(' + i + ',\'hora\',this.value)" style="background:var(--surface2);border:1px solid var(--surface3);border-radius:6px;padding:4px 6px;font-size:12px;font-family:Space Mono,monospace;color:var(--text);width:80px;" />';
+        h += '<div style="font-size:16px;">' + item.icon + '</div>';
+        h += '<input type="text" value="' + item.tarea + '" onchange="updateRoutineItem(' + i + ',\'tarea\',this.value)" style="background:var(--surface2);border:1px solid var(--surface3);border-radius:6px;padding:4px 8px;font-size:12px;flex:1;color:var(--text);" />';
+        h += '<button onclick="removeRoutineItem(' + i + ')" style="background:none;border:none;color:var(--red);font-size:16px;cursor:pointer;padding:4px;">✕</button>';
+        h += '</div>';
+      });
+
+      h += '<div style="display:flex;gap:8px;margin-top:12px;">';
+      h += '<button class="form-button secondary" onclick="addRoutineItem()" style="flex:1;">+ Agregar Actividad</button>';
+      h += '<button class="form-button secondary" onclick="resetRoutine()" style="padding:8px 12px;font-size:11px;">Restaurar</button>';
+      h += '</div>';
+
+      h += '<div style="margin-top:16px;">';
+      h += '<button class="form-button secondary" onclick="generateRutinaPDF()" style="width:100%;text-align:left;padding:12px;">📄 Exportar Rutina como PDF<br><span style="font-size:10px;color:var(--text2);font-weight:400">Para imprimir y pegar en recepción</span></button>';
+      h += '</div>';
+
+      document.getElementById('configContent').innerHTML = h;
+    }
+
+    function updateRoutineItem(idx, field, value) {
+      var routine = getDailyRoutine();
+      routine[idx][field] = value;
+      saveDailyRoutine(routine);
+    }
+
+    function removeRoutineItem(idx) {
+      var routine = getDailyRoutine();
+      routine.splice(idx, 1);
+      saveDailyRoutine(routine);
+      renderRutinaConfig();
+    }
+
+    function addRoutineItem() {
+      var routine = getDailyRoutine();
+      routine.push({ hora: '12:00', tarea: 'Nueva actividad', icon: '📌', rol: 'recepcion' });
+      routine.sort(function(a, b) { return a.hora.localeCompare(b.hora); });
+      saveDailyRoutine(routine);
+      renderRutinaConfig();
+    }
+
+    function resetRoutine() {
+      if (!confirm('¿Restaurar la rutina al horario predeterminado?')) return;
+      localStorage.removeItem('dailyRoutine');
+      toast('Rutina restaurada');
+      renderRutinaConfig();
+    }
+
+    function generateRutinaPDF() {
+      var { jsPDF } = window.jspdf;
+      var doc = new jsPDF({ unit: 'mm', format: 'a4' });
+      var margin = 20, y = 20;
+
+      try { doc.addImage(LOGO, 'JPEG', margin, y, 20, 20); } catch(e) {}
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(18); doc.setTextColor(40);
+      doc.text(HOTEL_NAME, margin + 25, y + 9);
+      doc.setFontSize(10); doc.setFont('helvetica', 'normal'); doc.setTextColor(120);
+      doc.text('Hotel Boutique', margin + 25, y + 15);
+      y += 28;
+
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(15); doc.setTextColor(107, 138, 74);
+      doc.text('Rutina Diaria de Operación', 105, y, { align: 'center' }); y += 4;
+      doc.setDrawColor(107, 138, 74); doc.setLineWidth(0.5);
+      doc.line(margin, y, 210 - margin, y); y += 12;
+
+      var routine = getDailyRoutine();
+      doc.setFontSize(11);
+      routine.forEach(function(item) {
+        doc.setFont('helvetica', 'bold'); doc.setTextColor(40);
+        doc.text(item.hora, margin + 5, y);
+        doc.setFont('helvetica', 'normal'); doc.setTextColor(60);
+        doc.text(item.icon + '  ' + item.tarea, margin + 25, y);
+        y += 8;
+        if (y > 270) { doc.addPage(); y = 20; }
+      });
+
+      y += 5;
+      doc.setFontSize(8); doc.setTextColor(150);
+      doc.text('Generado: ' + now() + '  |  ' + HOTEL_NAME, 105, y, { align: 'center' });
+      doc.save('CasaRegina_Rutina_Diaria.pdf');
+      toast('PDF de rutina generado');
     }
 
     // --- Señalización PDF generators ---
@@ -6060,6 +6740,18 @@
         document.getElementById('reservaModalContent').insertAdjacentHTML('beforeend', msgSection);
       }
 
+      // Pre-registration link/QR section
+      if (res.estado !== 'Cancelada' && res.estado !== 'Completada') {
+        var regSection = '<div style="background:var(--surface3);padding:12px;border-radius:var(--radius);margin-bottom:12px;">';
+        regSection += '<div style="font-size:12px;color:var(--text2);margin-bottom:8px;">PRE-REGISTRO HUÉSPED</div>';
+        regSection += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;">';
+        regSection += '<button onclick="shareGuestLinkWhatsApp(\'' + resId + '\')" style="background:#25D366;color:white;border:none;border-radius:8px;padding:8px 6px;font-size:11px;cursor:pointer;text-align:center;">📲 WhatsApp</button>';
+        regSection += '<button onclick="copyGuestLink(\'' + resId + '\')" style="background:var(--surface2);border:1px solid var(--surface3);border-radius:8px;padding:8px 6px;font-size:11px;cursor:pointer;color:var(--text);text-align:center;">📋 Copiar</button>';
+        regSection += '<button onclick="closeModal();setTimeout(function(){showGuestQR(\'' + resId + '\')},300)" style="background:var(--surface2);border:1px solid var(--surface3);border-radius:8px;padding:8px 6px;font-size:11px;cursor:pointer;color:var(--text);text-align:center;">📱 QR</button>';
+        regSection += '</div></div>';
+        document.getElementById('reservaModalContent').insertAdjacentHTML('beforeend', regSection);
+      }
+
       // Add action buttons based on estado
       var payments = S.cobros.filter(function(c){return c.reservaId===resId});
       var totalPaid = payments.reduce(function(s,c){return s+c.monto},0);
@@ -6662,10 +7354,118 @@
       if (st.type === 'checkin') {
         var res = st.res || S.reservas.find(function(r) { return r.id === st.resId; });
         var room = st.room || S.rooms.find(function(r) { return r.numero === res.habitacionNum; });
-        await doCheckin(res, room);
+        // Show guest registration form before completing check-in
+        showGuestRegistration(res, room);
       } else {
         await doCheckout(st.roomNum);
       }
+    }
+
+    // --- Guest Registration at Check-in ---
+    function showGuestRegistration(res, room) {
+      var h = '';
+      h += '<div style="background:var(--surface3);padding:12px;border-radius:var(--radius);margin-bottom:14px;">';
+      h += '<div style="font-weight:700;">' + res.huesped + '</div>';
+      h += '<div style="font-size:12px;color:var(--text2);">Hab. ' + res.habitacionNum + ' · ' + (room ? room.tipo : '') + '</div>';
+      h += '</div>';
+
+      h += '<div style="font-size:12px;color:var(--text2);margin-bottom:12px;">Datos de registro del huésped (requerido por ley). Puedes omitir campos opcionales.</div>';
+
+      h += '<form onsubmit="completeGuestRegistration(event)">';
+      h += '<input type="hidden" id="regResId" value="' + res.id + '" />';
+      h += '<input type="hidden" id="regRoomId" value="' + (room ? room.id : '') + '" />';
+
+      h += '<div class="form-group"><label class="form-label">Tipo de Identificación *</label>';
+      h += '<select id="regTipoID" class="form-select" required>';
+      h += '<option value="">Seleccionar</option>';
+      ['INE / IFE', 'Pasaporte', 'Licencia de Conducir', 'Cédula Profesional', 'Otro'].forEach(function(t) {
+        h += '<option value="' + t + '">' + t + '</option>';
+      });
+      h += '</select></div>';
+
+      h += '<div class="form-group"><label class="form-label">Número de Identificación *</label>';
+      h += '<input type="text" id="regNumID" class="form-input" placeholder="Número del documento" required /></div>';
+
+      h += '<div class="form-group"><label class="form-label">Nacionalidad *</label>';
+      h += '<select id="regNacionalidad" class="form-select" required>';
+      h += '<option value="">Seleccionar</option>';
+      ['Mexicana', 'Estadounidense', 'Canadiense', 'Colombiana', 'Argentina', 'Española', 'Brasileña', 'Otra'].forEach(function(n) {
+        h += '<option value="' + n + '">' + n + '</option>';
+      });
+      h += '</select></div>';
+
+      h += '<div class="form-group"><label class="form-label">Procedencia (Ciudad/Estado)</label>';
+      h += '<input type="text" id="regProcedencia" class="form-input" placeholder="Ej: CDMX, Guadalajara..." /></div>';
+
+      h += '<div class="form-group"><label class="form-label">Motivo de Viaje</label>';
+      h += '<select id="regMotivo" class="form-select">';
+      ['Turismo', 'Negocios', 'Familia', 'Evento', 'Otro'].forEach(function(m) {
+        h += '<option value="' + m + '">' + m + '</option>';
+      });
+      h += '</select></div>';
+
+      h += '<div class="form-group"><label class="form-label">Observaciones</label>';
+      h += '<textarea id="regObservaciones" class="form-textarea" placeholder="Notas adicionales..."></textarea></div>';
+
+      h += '<button type="submit" class="form-button" style="width:100%;">🔑 Completar Check-in</button>';
+      h += '<button type="button" class="form-button secondary" onclick="skipGuestRegistration(\'' + res.id + '\')" style="width:100%;margin-top:8px;">Omitir registro →</button>';
+      h += '</form>';
+
+      document.getElementById('processChecklistContent').innerHTML = h;
+      document.getElementById('processChecklistTitle').textContent = '📝 Registro de Huésped';
+      openModal('processChecklistModal');
+    }
+
+    async function completeGuestRegistration(event) {
+      event.preventDefault();
+      var resId = document.getElementById('regResId').value;
+      var res = S.reservas.find(function(r) { return r.id === resId; });
+      var roomId = document.getElementById('regRoomId').value;
+      var room = S.rooms.find(function(r) { return r.id === roomId; });
+
+      var regData = {
+        tipoID: document.getElementById('regTipoID').value,
+        numID: document.getElementById('regNumID').value,
+        nacionalidad: document.getElementById('regNacionalidad').value,
+        procedencia: document.getElementById('regProcedencia').value || '',
+        motivo: document.getElementById('regMotivo').value || 'Turismo',
+        observaciones: document.getElementById('regObservaciones').value || ''
+      };
+
+      closeModal();
+
+      // Save registration to sheet and do check-in
+      await busy(async function() {
+        var n = now();
+        var regId = 'REG' + Date.now().toString(36).toUpperCase();
+        var regRow = [regId, res.id, res.huesped, res.habitacionNum, normDate(new Date()), regData.tipoID, regData.numID, regData.nacionalidad, regData.procedencia, regData.motivo, regData.observaciones, n];
+
+        var resRow = [res.id, res.habitacionNum, res.huesped, res.telefono, res.email, res.fechaEntrada, res.fechaSalida, res.adultos, res.niños, res.tarifa, res.tarifaTotal, 'Check-in', res.notas, res.creadoPor, res.fechaCreacion];
+        var roomRow = [room.id, room.numero, room.tipo, room.tarifa, 'Ocupada', room.notas];
+        var logRow = [normDate(new Date()), n.split(' ')[1], S.user.usuario, 'Check-in', res.huesped + ' en Hab. ' + res.habitacionNum + ' (Registro completo)', 'info'];
+
+        await sheets.multi([
+          { type: 'updateById', sheet: '📋 Reservas', id: res.id, values: resRow },
+          { type: 'updateById', sheet: '🏨 Habitaciones', id: room.id, values: roomRow },
+          { type: 'append', sheet: '📜 Bitácora', values: logRow },
+          { type: 'append', sheet: '📝 Registro', values: regRow }
+        ]);
+
+        var resIdx = S.reservas.findIndex(function(r) { return r.id === res.id; });
+        S.reservas[resIdx].estado = 'Check-in';
+        var roomIdx = S.rooms.findIndex(function(r) { return r.numero === res.habitacionNum; });
+        S.rooms[roomIdx].estado = 'Ocupada';
+
+        toast('Check-in completado con registro');
+        render();
+      }, 'Procesando check-in...');
+    }
+
+    async function skipGuestRegistration(resId) {
+      var res = S.reservas.find(function(r) { return r.id === resId; });
+      var room = S.rooms.find(function(r) { return r.numero === res.habitacionNum; });
+      closeModal();
+      await doCheckin(res, room);
     }
 
     async function doCheckin(res, room) {
