@@ -2021,16 +2021,13 @@
             </label>
           </div>
           <div id="newResPaySection" style="display:none">
-            <div style="background:rgba(139,170,106,.1);border:1px solid var(--accent);border-radius:var(--radius);padding:10px;margin-bottom:12px;font-size:12px;color:var(--accent)">
-              💡 Se requiere mínimo el 50% de anticipo para confirmar la reserva y poder hacer check-in.
+            <div id="newResPayHint" style="background:rgba(139,170,106,.1);border:1px solid var(--accent);border-radius:var(--radius);padding:10px;margin-bottom:12px;font-size:12px;color:var(--accent)">
             </div>
             <div class="form-row">
               <div class="form-group">
                 <label class="form-label">Monto</label>
                 <input type="number" id="newResPayMonto" class="form-input" placeholder="0.00" step="0.01" min="0" />
-                <div style="display:flex;gap:6px;margin-top:6px">
-                  <button type="button" onclick="setPayPercent(50)" class="form-button secondary" style="flex:1;padding:6px;font-size:11px">50%</button>
-                  <button type="button" onclick="setPayPercent(100)" class="form-button secondary" style="flex:1;padding:6px;font-size:11px">100%</button>
+                <div id="payPercentBtns" style="display:flex;gap:6px;margin-top:6px">
                 </div>
               </div>
               <div class="form-group">
@@ -2319,7 +2316,8 @@
       whatsapp: '',
       reviewLink: '',
       checkin_hora: '15:00',
-      checkout_hora: '12:00'
+      checkout_hora: '12:00',
+      anticipo_pct: 50
     };
 
     function getHotelInfo() {
@@ -2351,6 +2349,14 @@
       h = h % 12 || 12;
       return h + ':' + m + ' ' + ampm;
     }
+
+    // Anticipo percentage from config (0-100), returns fraction
+    function getAnticipoPct() {
+      var hi = getHotelInfo();
+      var pct = hi.anticipo_pct != null ? hi.anticipo_pct : 50;
+      return pct;
+    }
+    function getAnticipoFraction() { return getAnticipoPct() / 100; }
 
     // Global accessor
     var HOTEL_NAME = getHotelInfo().nombre;
@@ -2503,13 +2509,16 @@
       var payments = S.cobros.filter(function(c) { return c.reservaId === resId; });
       var totalPaid = payments.reduce(function(s, c) { return s + c.monto; }, 0);
       var balance = res.tarifaTotal - totalPaid;
-      var anticipo50 = Math.ceil(res.tarifaTotal * 0.5);
+      var aPct = getAnticipoPct();
+      var anticipoMin = Math.ceil(res.tarifaTotal * getAnticipoFraction());
 
       var infoPago = '';
       if (totalPaid > 0) {
         infoPago = '*Anticipo recibido:* $' + totalPaid + '\n*Saldo pendiente:* $' + balance;
+      } else if (aPct > 0) {
+        infoPago = '*Anticipo requerido (' + aPct + '%):* $' + anticipoMin;
       } else {
-        infoPago = '*Anticipo requerido (50%):* $' + anticipo50;
+        infoPago = '*Total a pagar:* $' + res.tarifaTotal;
       }
 
       var huespedes = res.adultos + ' adulto(s)';
@@ -3613,10 +3622,11 @@
             action:'switchTab(\'cobros\')', actionLabel:'Ir a cobros', actionIcon:'💰' });
         }
       });
-      // Reservas confirmadas sin anticipo 50%
+      // Reservas confirmadas sin anticipo mínimo
+      var _taskAPct = getAnticipoPct();
       S.reservas.filter(function(r){ return (r.estado === 'Confirmada' || r.estado === 'Pendiente') && r.fechaEntrada >= today; }).forEach(function(r){
         var paid = S.cobros.filter(function(c){return c.reservaId===r.id}).reduce(function(s,c){return s+c.monto},0);
-        var minReq = Math.ceil(r.tarifaTotal * 0.5);
+        var minReq = Math.ceil(r.tarifaTotal * getAnticipoFraction());
         if (paid < minReq) {
           var falta = minReq - paid;
           var isToday = r.fechaEntrada === today;
@@ -3773,18 +3783,21 @@
         }
       });
 
-      // 3. Reservations confirmed for today without 50% deposit (can't check in)
-      var noDeposit = S.reservas.filter(function(r) { return r.fechaEntrada === today && r.estado === 'Confirmada'; });
-      noDeposit.forEach(function(r) {
-        var paid = S.cobros.filter(function(c){return c.reservaId===r.id}).reduce(function(s,c){return s+c.monto},0);
-        var minReq = Math.ceil(r.tarifaTotal * 0.5);
-        if (paid < minReq) {
-          var falta = minReq - paid;
-          alertItems.push('<div class="item" style="border-left-color:var(--yellow);cursor:pointer" onclick="switchTab(\'cobros\')">' +
-            '<div class="item-title">💰 ' + r.huesped + ' — Sin anticipo suficiente</div>' +
-            '<div class="item-meta">Hab. ' + r.habitacionNum + ' · Llega HOY · Faltan $' + falta.toLocaleString() + ' para check-in (50%)</div></div>');
-        }
-      });
+      // 3. Reservations confirmed for today without minimum deposit (can't check in)
+      var _daPct = getAnticipoPct();
+      if (_daPct > 0) {
+        var noDeposit = S.reservas.filter(function(r) { return r.fechaEntrada === today && r.estado === 'Confirmada'; });
+        noDeposit.forEach(function(r) {
+          var paid = S.cobros.filter(function(c){return c.reservaId===r.id}).reduce(function(s,c){return s+c.monto},0);
+          var minReq = Math.ceil(r.tarifaTotal * getAnticipoFraction());
+          if (paid < minReq) {
+            var falta = minReq - paid;
+            alertItems.push('<div class="item" style="border-left-color:var(--yellow);cursor:pointer" onclick="switchTab(\'cobros\')">' +
+              '<div class="item-title">💰 ' + r.huesped + ' — Sin anticipo suficiente</div>' +
+              '<div class="item-meta">Hab. ' + r.habitacionNum + ' · Llega HOY · Faltan $' + falta.toLocaleString() + ' para check-in (' + _daPct + '%)</div></div>');
+          }
+        });
+      }
 
       // 4. Rooms needing cleaning
       var needsCleaning = S.rooms.filter(function(r){return r.estado==='Limpieza'});
@@ -5536,7 +5549,8 @@
       var nights = daysUntil(res.fechaEntrada, res.fechaSalida);
       var payments = S.cobros.filter(function(c){return c.reservaId===resId});
       var totalPaid = payments.reduce(function(s,c){return s+c.monto},0);
-      var anticipo50 = Math.ceil(res.tarifaTotal * 0.5);
+      var _aPct = getAnticipoPct();
+      var anticipoMin = Math.ceil(res.tarifaTotal * getAnticipoFraction());
       var balance = res.tarifaTotal - totalPaid;
       var hi = getHotelInfo();
 
@@ -5575,7 +5589,7 @@
         h += '<div class="receipt-row"><span class="receipt-label">Saldo pendiente</span><span class="receipt-value" style="color:' + (balance > 0 ? '#ef4444' : '#22c55e') + '">$' + balance + '</span></div>';
       } else {
         h += '<div class="receipt-div"></div>';
-        h += '<div class="receipt-row"><span class="receipt-label" style="color:#ef4444;font-weight:600">Anticipo requerido (50%)</span><span class="receipt-value" style="color:#ef4444;font-weight:700">$' + anticipo50 + '</span></div>';
+        if (_aPct > 0) h += '<div class="receipt-row"><span class="receipt-label" style="color:#ef4444;font-weight:600">Anticipo requerido (' + _aPct + '%)</span><span class="receipt-value" style="color:#ef4444;font-weight:700">$' + anticipoMin + '</span></div>';
       }
 
       // Terms and conditions (dynamic from config)
@@ -5617,7 +5631,8 @@
       var payments = S.cobros.filter(function(c){return c.reservaId===resId});
       var totalPaid = payments.reduce(function(s,c){return s+c.monto},0);
       var balance = res.tarifaTotal - totalPaid;
-      var anticipo50 = Math.ceil(res.tarifaTotal * 0.5);
+      var _aPct = getAnticipoPct();
+      var anticipoMin = Math.ceil(res.tarifaTotal * getAnticipoFraction());
       var hi = getHotelInfo();
 
       var t = '🏨 *' + hi.nombre + '*\n';
@@ -5636,7 +5651,7 @@
         t += '*Anticipo recibido:* $' + totalPaid + '\n';
         t += '*Saldo pendiente:* $' + balance + '\n';
       } else {
-        t += '*Anticipo requerido (50%):* $' + anticipo50 + '\n';
+        if (_aPct > 0) t += '*Anticipo requerido (' + _aPct + '%):* $' + anticipoMin + '\n';
       }
       t += '─────────────\n';
       if (hi.direccion) t += '\n📍 *Dirección:* ' + hi.direccion + '\n';
@@ -5656,7 +5671,8 @@
       var payments = S.cobros.filter(function(c){return c.reservaId===resId});
       var totalPaid = payments.reduce(function(s,c){return s+c.monto},0);
       var balance = res.tarifaTotal - totalPaid;
-      var anticipo50 = Math.ceil(res.tarifaTotal * 0.5);
+      var _aPct = getAnticipoPct();
+      var anticipoMin = Math.ceil(res.tarifaTotal * getAnticipoFraction());
 
       var pageW = 164;
       var { jsPDF } = window.jspdf;
@@ -5737,7 +5753,7 @@
           row('Saldo pendiente','$'+balance,balance>0?239:34,balance>0?68:197,balance>0?68:94,true);
         } else {
           dash();
-          row('Anticipo requerido (50%)','$'+anticipo50,239,68,68,true);
+          if(_aPct>0)row('Anticipo requerido ('+_aPct+'%)','$'+anticipoMin,239,68,68,true);
         }
 
         // Address
@@ -6389,6 +6405,11 @@
       h += '<div><label class="form-label" style="font-size:12px;">Hora Check-in</label><input type="time" id="hi_checkin_hora" class="login-input" value="' + hi.checkin_hora + '" style="padding:10px;"></div>';
       h += '<div><label class="form-label" style="font-size:12px;">Hora Check-out</label><input type="time" id="hi_checkout_hora" class="login-input" value="' + hi.checkout_hora + '" style="padding:10px;"></div>';
       h += '</div>';
+      h += '<label class="form-label" style="font-size:12px;">Anticipo mínimo requerido (%)</label>';
+      h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">';
+      h += '<input type="number" id="hi_anticipo_pct" class="login-input" value="' + (hi.anticipo_pct != null ? hi.anticipo_pct : 50) + '" min="0" max="100" step="5" style="width:80px;padding:10px;text-align:center;">';
+      h += '<span style="font-size:12px;color:var(--text2);">% — Pon 0 para desactivar, 100 para pago completo</span>';
+      h += '</div>';
       h += '<label class="form-label" style="font-size:12px;">Link de Reseñas (Google, TripAdvisor)</label>';
       h += '<input type="url" id="hi_reviewLink" class="login-input" value="' + hi.reviewLink + '" placeholder="https://g.page/r/..." style="margin-bottom:10px;">';
       h += '<button class="form-button" onclick="saveHotelInfoFromForm()" style="width:100%;">Guardar Datos del Hotel</button>';
@@ -6430,7 +6451,8 @@
         email: document.getElementById('hi_email').value.trim(),
         checkin_hora: document.getElementById('hi_checkin_hora').value,
         checkout_hora: document.getElementById('hi_checkout_hora').value,
-        reviewLink: document.getElementById('hi_reviewLink').value.trim()
+        reviewLink: document.getElementById('hi_reviewLink').value.trim(),
+        anticipo_pct: parseInt(document.getElementById('hi_anticipo_pct').value) || 0
       };
       saveHotelInfo(info);
       HOTEL_NAME = info.nombre;
@@ -7167,7 +7189,7 @@
 
     // ============ TERMS & CONDITIONS CONFIG ============
     var DEFAULT_TERMS = [
-      { title: 'Anticipo y garantía', text: 'Para confirmar su reservación se requiere el pago del 50% del total de la estancia. La reservación no se considera confirmada hasta recibir dicho anticipo. El 50% restante deberá cubrirse al momento del check-in.' },
+      { title: 'Anticipo y garantía', text: 'Para confirmar su reservación se requiere el pago del ' + getAnticipoPct() + '% del total de la estancia. La reservación no se considera confirmada hasta recibir dicho anticipo. El ' + (100 - getAnticipoPct()) + '% restante deberá cubrirse al momento del check-in.' },
       { title: 'Cancelación con más de 7 días de anticipación', text: 'Se reembolsa el 100% del anticipo, o se puede reprogramar sin costo adicional, sujeto a disponibilidad.' },
       { title: 'Cancelación entre 3 y 7 días antes', text: 'Se retiene el 50% del anticipo como penalización. El 50% restante se reembolsa o se aplica como crédito para una futura estancia (válido por 90 días).' },
       { title: 'Cancelación con menos de 3 días / No Show', text: 'No aplica reembolso. Se retiene el 100% del anticipo como penalización por cancelación tardía o inasistencia.' },
@@ -7755,6 +7777,24 @@
           }
         }
       }
+      // Update anticipo hint and buttons dynamically
+      var _aPct = getAnticipoPct();
+      var hintEl = document.getElementById('newResPayHint');
+      if (hintEl) {
+        if (_aPct > 0) {
+          hintEl.style.display = '';
+          hintEl.innerHTML = '💡 Se requiere mínimo el ' + _aPct + '% de anticipo para confirmar la reserva y poder hacer check-in.';
+        } else {
+          hintEl.style.display = 'none';
+        }
+      }
+      var payBtns = document.getElementById('payPercentBtns');
+      if (payBtns) {
+        var btnsHtml = '';
+        if (_aPct > 0 && _aPct < 100) btnsHtml += '<button type="button" onclick="setPayPercent('+_aPct+')" class="form-button secondary" style="flex:1;padding:6px;font-size:11px">'+_aPct+'%</button>';
+        btnsHtml += '<button type="button" onclick="setPayPercent(100)" class="form-button secondary" style="flex:1;padding:6px;font-size:11px">100%</button>';
+        payBtns.innerHTML = btnsHtml;
+      }
       openModal('newReservaModal');
     }
 
@@ -7904,7 +7944,8 @@
 
     function showPostReservaConfirm(resId, huesped, roomNum) {
       var res = S.reservas.find(function(r){return r.id===resId});
-      var anticipo50 = Math.ceil(res.tarifaTotal * 0.5);
+      var _aPct = getAnticipoPct();
+      var anticipoMin = Math.ceil(res.tarifaTotal * getAnticipoFraction());
       var pmts = S.cobros.filter(function(c){return c.reservaId===resId});
       var totalPaid = pmts.reduce(function(s,c){return s + c.monto},0);
       var pctPaid = res.tarifaTotal > 0 ? Math.round((totalPaid / res.tarifaTotal) * 100) : 0;
@@ -7919,11 +7960,11 @@
 
       if (totalPaid > 0) {
         h += '<div style="background:#e8f5e9;border:1px solid #66bb6a;border-radius:10px;padding:10px;margin-bottom:10px;font-size:12px;color:#2e7d32">✅ Anticipo registrado: <strong>$' + totalPaid + '</strong> (' + pctPaid + '%)</div>';
-        if (totalPaid < anticipo50) {
-          h += '<div style="background:#fff8e1;border:1px solid #f0d060;border-radius:10px;padding:10px;margin-bottom:16px;font-size:12px;color:#8a6d00">⚠️ Falta para cubrir 50%: <strong>$' + (anticipo50 - totalPaid) + '</strong></div>';
+        if (_aPct > 0 && totalPaid < anticipoMin) {
+          h += '<div style="background:#fff8e1;border:1px solid #f0d060;border-radius:10px;padding:10px;margin-bottom:16px;font-size:12px;color:#8a6d00">⚠️ Falta para cubrir ' + _aPct + '%: <strong>$' + (anticipoMin - totalPaid) + '</strong></div>';
         }
-      } else {
-        h += '<div style="background:#fff8e1;border:1px solid #f0d060;border-radius:10px;padding:10px;margin-bottom:16px;font-size:12px;color:#8a6d00">💡 Anticipo requerido (50%): <strong>$' + anticipo50 + '</strong></div>';
+      } else if (_aPct > 0) {
+        h += '<div style="background:#fff8e1;border:1px solid #f0d060;border-radius:10px;padding:10px;margin-bottom:16px;font-size:12px;color:#8a6d00">💡 Anticipo requerido (' + _aPct + '%): <strong>$' + anticipoMin + '</strong></div>';
       }
 
       h += '<div style="font-size:13px;font-weight:600;color:#333;margin-bottom:12px">¿Enviar confirmación al huésped?</div>';
@@ -7975,9 +8016,10 @@
         const res = S.reservas.find(r => r.id === resId);
         var pmts = S.cobros.filter(c => c.reservaId === res.id);
         var paid = pmts.reduce((s, c) => s + c.monto, 0);
-        var minReq = Math.ceil(res.tarifaTotal * 0.5);
+        var _aPctCI = getAnticipoPct();
+        var minReq = _aPctCI > 0 ? Math.ceil(res.tarifaTotal * getAnticipoFraction()) : 0;
         var pctPaid = res.tarifaTotal > 0 ? Math.round((paid / res.tarifaTotal) * 100) : 0;
-        var payOk = paid >= minReq;
+        var payOk = _aPctCI > 0 ? paid >= minReq : true;
         const preview = `
           <div style="background: var(--surface3); padding: 12px; border-radius: var(--radius); margin-top: 16px;">
             <div style="font-weight: 700; margin-bottom: 8px;">${res.huesped}</div>
@@ -7986,7 +8028,7 @@
               <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px"><span>Total:</span><span style="font-family:Space Mono;font-weight:700">$${res.tarifaTotal}</span></div>
               <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px"><span>Pagado (${pctPaid}%):</span><span style="font-family:Space Mono;font-weight:700;color:${payOk ? 'var(--green)' : 'var(--red)'}">$${paid}</span></div>
               <div style="background:var(--surface2);border-radius:6px;height:6px;margin:8px 0;overflow:hidden"><div style="background:${payOk ? 'var(--green)' : 'var(--yellow)'};height:100%;width:${Math.min(pctPaid, 100)}%;border-radius:6px"></div></div>
-              <div style="font-size:11px;text-align:center;color:${payOk ? 'var(--green)' : 'var(--red)'};font-weight:600">${payOk ? '✅ Anticipo cubierto — Listo para check-in' : '⚠️ Falta anticipo mínimo (50%): $' + (minReq - paid)}</div>
+              <div style="font-size:11px;text-align:center;color:${payOk ? 'var(--green)' : 'var(--red)'};font-weight:600">${payOk ? '✅ ' + (_aPctCI > 0 ? 'Anticipo cubierto — ' : '') + 'Listo para check-in' : '⚠️ Falta anticipo mínimo (' + _aPctCI + '%): $' + (minReq - paid)}</div>
             </div>
           </div>
         `;
@@ -8004,13 +8046,16 @@
       const res = S.reservas.find(r => r.id === resId);
       const room = S.rooms.find(r => r.numero === res.habitacionNum);
 
-      // Check if at least 50% has been paid
+      // Check if minimum anticipo has been paid
+      var _aPctExec = getAnticipoPct();
       var payments = S.cobros.filter(c => c.reservaId === res.id);
       var totalPaid = payments.reduce((s, c) => s + c.monto, 0);
-      var minRequired = Math.ceil(res.tarifaTotal * 0.5);
-      if (totalPaid < minRequired) {
-        showCheckinBlocked(res, totalPaid, minRequired);
-        return;
+      if (_aPctExec > 0) {
+        var minRequired = Math.ceil(res.tarifaTotal * getAnticipoFraction());
+        if (totalPaid < minRequired) {
+          showCheckinBlocked(res, totalPaid, minRequired);
+          return;
+        }
       }
 
       // Show check-in checklist before proceeding
@@ -8024,20 +8069,20 @@
       var html = '<div style="text-align:center;margin-bottom:16px">' +
         '<div style="font-size:42px;margin-bottom:8px">🚫</div>' +
         '<div style="font-size:14px;font-weight:700;color:var(--yellow)">No se puede hacer Check-in</div>' +
-        '<div style="font-size:13px;color:var(--text2)">Se requiere al menos el 50% del total como anticipo antes del check-in.</div>' +
+        '<div style="font-size:13px;color:var(--text2)">Se requiere al menos el ' + getAnticipoPct() + '% del total como anticipo antes del check-in.</div>' +
         '</div>';
 
       html += '<div style="background:var(--surface3);padding:14px;border-radius:var(--radius);margin-bottom:16px">' +
         '<div style="font-weight:700;margin-bottom:10px">' + res.huesped + ' — Hab. ' + res.habitacionNum + '</div>' +
         '<div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="color:var(--text2);font-size:13px">Total reserva</span><span style="font-family:Space Mono;font-weight:700">$' + res.tarifaTotal + '</span></div>' +
-        '<div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="color:var(--text2);font-size:13px">Mínimo requerido (50%)</span><span style="font-family:Space Mono;font-weight:700;color:var(--yellow)">$' + minRequired + '</span></div>' +
+        '<div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="color:var(--text2);font-size:13px">Mínimo requerido (' + getAnticipoPct() + '%)</span><span style="font-family:Space Mono;font-weight:700;color:var(--yellow)">$' + minRequired + '</span></div>' +
         '<div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="color:var(--text2);font-size:13px">Pagado (' + pct + '%)</span><span style="font-family:Space Mono;font-weight:700;color:' + (totalPaid > 0 ? 'var(--green)' : 'var(--red)') + '">$' + totalPaid + '</span></div>' +
         '<div style="display:flex;justify-content:space-between;padding-top:8px;border-top:1px solid var(--surface2)"><span style="font-weight:700;color:var(--red);font-size:14px">Falta por cubrir</span><span style="font-family:Space Mono;font-weight:700;color:var(--red);font-size:18px">$' + deficit + '</span></div>' +
         '</div>';
 
       // Progress bar
       html += '<div style="background:var(--surface2);border-radius:8px;height:8px;margin-bottom:16px;overflow:hidden">' +
-        '<div style="background:' + (pct >= 50 ? 'var(--green)' : 'var(--yellow)') + ';height:100%;width:' + Math.min(pct, 100) + '%;border-radius:8px;transition:width 0.3s"></div>' +
+        '<div style="background:' + (pct >= getAnticipoPct() ? 'var(--green)' : 'var(--yellow)') + ';height:100%;width:' + Math.min(pct, 100) + '%;border-radius:8px;transition:width 0.3s"></div>' +
         '</div>';
 
       html += '<div style="display:flex;flex-direction:column;gap:10px">' +
