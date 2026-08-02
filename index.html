@@ -1763,35 +1763,34 @@
               <div class="user-role" id="userRoleText"></div>
             </div>
 
-            <div>
-              <div class="stats-grid">
-                <div class="stat-box blue">
-                  <div class="stat-label">Ocupadas/Total</div>
-                  <div class="stat-value" id="statOccupied">0/9</div>
-                </div>
-                <div class="stat-box green">
-                  <div class="stat-label">Disponibles</div>
-                  <div class="stat-value" id="statAvailable">9</div>
-                </div>
-                <div class="stat-box yellow">
-                  <div class="stat-label">Check-ins Hoy</div>
-                  <div class="stat-value" id="statCheckins">0</div>
-                </div>
-                <div class="stat-box red">
-                  <div class="stat-label">Check-outs Hoy</div>
-                  <div class="stat-value" id="statCheckouts">0</div>
-                </div>
+            <!-- Quick Availability Panel -->
+            <div style="background:var(--surface2);border-radius:var(--radius);padding:14px;margin-bottom:16px;border:1px solid var(--surface3)">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+                <div style="font-size:13px;font-weight:700;color:var(--text)">🔍 Disponibilidad</div>
+                <div id="dashAvailCount" style="font-size:11px;color:var(--text2)"></div>
               </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:end">
+                <div>
+                  <label style="font-size:10px;color:var(--text2);display:block;margin-bottom:3px">Entrada</label>
+                  <input type="date" id="dashAvailIn" class="form-input" style="padding:8px;font-size:13px" onchange="dashAvailSearch()">
+                </div>
+                <div>
+                  <label style="font-size:10px;color:var(--text2);display:block;margin-bottom:3px">Salida</label>
+                  <input type="date" id="dashAvailOut" class="form-input" style="padding:8px;font-size:13px" onchange="dashAvailSearch()">
+                </div>
+                <button onclick="dashAvailSearch()" style="background:var(--accent);color:var(--bg);border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer;height:38px">Buscar</button>
+              </div>
+              <div id="dashAvailResults" style="margin-top:12px"></div>
             </div>
 
             <div class="actions-grid">
               <button class="action-btn" onclick="openCheckinModal()">
                 <div class="action-btn-icon">🔑</div>
-                <div>Check-in Rápido</div>
+                <div>Check-in</div>
               </button>
               <button class="action-btn" onclick="openNewReservaModal()">
                 <div class="action-btn-icon">📋</div>
-                <div>Nueva Reserva</div>
+                <div>Reservar</div>
               </button>
               <button class="action-btn" onclick="switchTab('housekeeping')">
                 <div class="action-btn-icon">🧹</div>
@@ -1826,6 +1825,28 @@
             </div>
 
             <div id="dashboardBookingCard"></div>
+
+            <div style="margin-top:8px">
+              <div class="section-title" style="font-size:12px;color:var(--text2)">Resumen</div>
+              <div class="stats-grid">
+                <div class="stat-box blue">
+                  <div class="stat-label">Ocupadas/Total</div>
+                  <div class="stat-value" id="statOccupied">0/9</div>
+                </div>
+                <div class="stat-box green">
+                  <div class="stat-label">Disponibles</div>
+                  <div class="stat-value" id="statAvailable">9</div>
+                </div>
+                <div class="stat-box yellow">
+                  <div class="stat-label">Check-ins Hoy</div>
+                  <div class="stat-value" id="statCheckins">0</div>
+                </div>
+                <div class="stat-box red">
+                  <div class="stat-label">Check-outs Hoy</div>
+                  <div class="stat-value" id="statCheckouts">0</div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -2966,7 +2987,7 @@
         ]);
         _bookingRooms = results[0].map(function(r) {
           return { id: r[0], numero: r[1], tipo: r[2], tarifa: parseFloat(r[3]) || 0, estado: r[4], notas: r[5] || '' };
-        }).filter(function(r) { return r.estado !== 'Fuera de servicio'; });
+        }).filter(function(r) { return r.estado !== 'Fuera de servicio' && r.estado !== 'Mantenimiento'; });
         _bookingReservas = results[1].filter(function(r) {
           return r[11] !== 'Cancelada' && r[11] !== 'Completada' && r[11] !== '__DELETED__';
         }).map(function(r) {
@@ -3013,6 +3034,8 @@
       h += '<div id="bookingRoomsContainer"></div>';
 
       document.getElementById('guestFormContainer').innerHTML = h;
+      // Auto-search on load to show rooms immediately
+      searchAvailableRooms();
     }
 
     function updateBookingCheckout() {
@@ -3053,17 +3076,23 @@
         h += '<div style="font-size:12px;color:var(--text2);margin-top:4px;">No hay habitaciones disponibles en esas fechas. Prueba con otras fechas.</div>';
         h += '</div>';
       } else {
-        h += '<div style="font-size:11px;color:var(--text2);margin-bottom:10px;">' + available.length + ' habitación(es) disponible(s) · ' + nights + ' noche(s)</div>';
+        h += '<div style="font-size:12px;color:var(--text2);margin-bottom:12px;text-align:center">' + available.length + ' habitación(es) disponible(s) · ' + nights + ' noche(s)</div>';
         available.forEach(function(room) {
           var total = room.tarifa * nights;
-          h += '<div onclick="selectBookingRoom(\'' + room.numero + '\')" style="background:var(--surface3);padding:14px;border-radius:var(--radius);margin-bottom:10px;cursor:pointer;border:2px solid transparent;transition:border-color 0.2s;" id="bookRoom_' + room.numero + '">';
-          h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">';
-          h += '<div><span style="font-weight:700;font-size:15px;">Hab. ' + room.numero + '</span> <span style="font-size:12px;color:var(--text2);">· ' + room.tipo + '</span></div>';
-          h += '<div style="text-align:right;"><div style="font-family:Space Mono,monospace;font-weight:800;font-size:16px;color:var(--accent);">$' + room.tarifa + '</div><div style="font-size:10px;color:var(--text2);">por noche</div></div>';
+          h += '<div onclick="selectBookingRoom(\'' + room.numero + '\')" style="background:var(--surface3);padding:16px;border-radius:14px;margin-bottom:12px;cursor:pointer;border:2px solid transparent;transition:all 0.2s;" id="bookRoom_' + room.numero + '">';
+          h += '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">';
+          h += '<div>';
+          h += '<div style="font-weight:800;font-size:18px;font-family:Space Mono,monospace;color:var(--accent);margin-bottom:2px">Hab. ' + room.numero + '</div>';
+          h += '<div style="font-size:13px;font-weight:600;color:var(--text)">' + room.tipo + '</div>';
           h += '</div>';
-          h += '<div style="display:flex;justify-content:space-between;align-items:center;">';
-          h += '<div style="font-size:11px;color:var(--text2);">' + (room.notas || room.tipo) + '</div>';
-          h += '<div style="font-family:Space Mono,monospace;font-weight:700;font-size:13px;color:var(--green);">Total: $' + total + '</div>';
+          h += '<div style="text-align:right">';
+          h += '<div style="font-family:Space Mono,monospace;font-weight:800;font-size:20px;color:var(--accent)">$' + room.tarifa + '</div>';
+          h += '<div style="font-size:10px;color:var(--text2)">por noche</div>';
+          h += '</div></div>';
+          if (room.notas) h += '<div style="font-size:11px;color:var(--text2);margin-bottom:8px">' + room.notas + '</div>';
+          h += '<div style="display:flex;justify-content:space-between;align-items:center;padding-top:8px;border-top:1px solid var(--surface2)">';
+          h += '<div style="font-size:11px;color:var(--text2)">' + nights + ' noche(s)</div>';
+          h += '<div style="font-family:Space Mono,monospace;font-weight:700;font-size:15px;color:var(--green)">Total: $' + total + '</div>';
           h += '</div>';
           h += '</div>';
         });
@@ -3740,6 +3769,88 @@
       return tasks;
     }
 
+    // ============ DASHBOARD AVAILABILITY PANEL ============
+    function initDashAvail() {
+      var today = normDate(new Date());
+      var tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+      var el1 = document.getElementById('dashAvailIn');
+      var el2 = document.getElementById('dashAvailOut');
+      if (el1 && !el1.value) { el1.value = today; el1.min = today; }
+      if (el2 && !el2.value) { el2.value = normDate(tomorrow); el2.min = normDate(tomorrow); }
+      dashAvailSearch();
+    }
+
+    function dashAvailSearch() {
+      var checkin = document.getElementById('dashAvailIn').value;
+      var checkout = document.getElementById('dashAvailOut').value;
+      if (!checkin || !checkout) return;
+
+      // Fix checkout min
+      var nextDay = new Date(checkin + 'T12:00:00'); nextDay.setDate(nextDay.getDate() + 1);
+      var minOut = normDate(nextDay);
+      var outEl = document.getElementById('dashAvailOut');
+      outEl.min = minOut;
+      if (checkout <= checkin) { outEl.value = minOut; checkout = minOut; }
+
+      var nights = daysUntil(checkin, checkout);
+
+      var available = [];
+      var unavailable = [];
+      S.rooms.forEach(function(room) {
+        if (room.estado === 'Mantenimiento') {
+          unavailable.push({ room: room, reason: '🛠️ Mantenimiento' });
+          return;
+        }
+        var conflict = S.reservas.find(function(r) {
+          return r.habitacionNum === room.numero &&
+                 r.estado !== 'Cancelada' && r.estado !== 'Check-out' &&
+                 r.fechaEntrada < checkout && r.fechaSalida > checkin;
+        });
+        if (conflict) {
+          unavailable.push({ room: room, reason: '⛔ ' + conflict.huesped.split(' ')[0] });
+        } else {
+          available.push(room);
+        }
+      });
+
+      document.getElementById('dashAvailCount').textContent = available.length + ' de ' + S.rooms.length + ' disponibles · ' + nights + ' noche(s)';
+
+      var h = '';
+      if (available.length === 0) {
+        h += '<div style="text-align:center;padding:16px;color:var(--text2);font-size:13px">Sin habitaciones disponibles en esas fechas</div>';
+      } else {
+        h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px">';
+        available.forEach(function(room) {
+          var total = room.tarifa * nights;
+          h += '<div onclick="openNewReservaModal(\'' + room.numero + '\',\'' + checkin + '\')" style="background:var(--surface3);border-radius:10px;padding:12px;cursor:pointer;border:2px solid transparent;transition:all .15s" onmouseover="this.style.borderColor=\'var(--accent)\'" onmouseout="this.style.borderColor=\'transparent\'">';
+          h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">';
+          h += '<div style="font-weight:800;font-size:16px;font-family:Space Mono,monospace;color:var(--accent)">' + room.numero + '</div>';
+          h += '<div style="font-size:9px;padding:2px 6px;border-radius:6px;background:rgba(139,170,106,.2);color:var(--green);font-weight:600">Disponible</div>';
+          h += '</div>';
+          h += '<div style="font-size:12px;color:var(--text2);margin-bottom:6px">' + room.tipo + '</div>';
+          h += '<div style="display:flex;justify-content:space-between;align-items:baseline">';
+          h += '<div style="font-family:Space Mono,monospace;font-weight:700;font-size:15px">$' + room.tarifa + '<span style="font-size:10px;font-weight:400;color:var(--text2)">/noche</span></div>';
+          h += '</div>';
+          h += '<div style="font-family:Space Mono,monospace;font-size:11px;color:var(--green);margin-top:4px;font-weight:600">Total: $' + total + '</div>';
+          h += '</div>';
+        });
+        h += '</div>';
+      }
+
+      // Show unavailable rooms collapsed
+      if (unavailable.length > 0) {
+        h += '<div style="margin-top:8px;font-size:11px;color:var(--text2)">';
+        h += '<details><summary style="cursor:pointer;user-select:none">No disponibles (' + unavailable.length + ')</summary>';
+        h += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">';
+        unavailable.forEach(function(u) {
+          h += '<span style="background:var(--surface3);padding:3px 8px;border-radius:6px;font-size:10px;opacity:.7">' + u.room.numero + ' ' + u.reason + '</span>';
+        });
+        h += '</div></details></div>';
+      }
+
+      document.getElementById('dashAvailResults').innerHTML = h;
+    }
+
     function renderDashboard() {
       if (!S.user || !S.rooms) return;
       const today = normDate(new Date());
@@ -4022,6 +4133,9 @@
         bkCard += '</div></div>';
         document.getElementById('dashboardBookingCard').innerHTML = bkCard;
       }
+
+      // Init availability panel
+      initDashAvail();
     }
 
     function renderRooms() {
