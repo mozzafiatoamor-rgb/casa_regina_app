@@ -5226,17 +5226,10 @@
       var margin = 15;
       var contentW = pageW - margin * 2;
 
-      // Add logo
-      try { doc.addImage(LOGO_V_DARK_B64||LOGO_V_DARK, 'PNG', margin, y, 28, Math.round(28/LOGO_V_RATIO)); } catch(e) {}
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(16);
-      doc.text(HOTEL_NAME, margin + 32, y + 8);
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(120);
-      doc.text('Hotel Boutique', margin + 32, y + 13);
-      doc.setTextColor(0);
-      y += 22;
+      // Logo centrado (sin texto — el logo ya incluye el nombre)
+      var _rLogoW = 60, _rLogoH = Math.round(_rLogoW / LOGO_H_RATIO);
+      try { doc.addImage(LOGO_H_DARK_B64||LOGO_H_DARK, 'PNG', (pageW - _rLogoW) / 2, y, _rLogoW, _rLogoH); } catch(e) {}
+      y += _rLogoH + 6;
       doc.setFontSize(10);
       doc.text('Reporte generado: ' + now(), margin, y); y += 8;
 
@@ -5352,7 +5345,7 @@
       y += 10;
       doc.setFontSize(8);
       doc.setTextColor(150);
-      doc.text('Generado por ' + HOTEL_NAME + ' PMS — ' + now(), margin, y);
+      doc.text('Generado: ' + now(), margin, y);
 
       doc.save('reporte_' + type + '_' + normDate(new Date()) + '.pdf');
       toast('PDF descargado');
@@ -5594,7 +5587,8 @@
       doc.text('Responsable: ' + (S.user ? S.user.nombre : ''), 40, y, { align: 'center' }); y += 3;
       doc.text('Generado: ' + now(), 40, y, { align: 'center' });
 
-      doc.save('CasaRegina_Corte_' + today + '.pdf');
+      var _corteFileName = HOTEL_NAME.replace(/\s+/g,'_') + '_Corte_' + today + '.pdf';
+      doc.save(_corteFileName);
       toast('PDF de corte generado');
 
       // Log to bitácora
@@ -6862,12 +6856,9 @@
       var doc = new jsPDF({ unit: 'mm', format: 'a4' });
       var margin = 20, y = 20;
 
-      try { doc.addImage(LOGO_V_DARK_B64||LOGO_V_DARK, 'PNG', margin, y, 30, Math.round(30/LOGO_V_RATIO)); } catch(e) {}
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(18); doc.setTextColor(40);
-      doc.text(HOTEL_NAME, margin + 25, y + 9);
-      doc.setFontSize(10); doc.setFont('helvetica', 'normal'); doc.setTextColor(120);
-      doc.text('Hotel Boutique', margin + 25, y + 15);
-      y += 28;
+      var _eLogoW = 60, _eLogoH = Math.round(_eLogoW / LOGO_H_RATIO);
+      try { doc.addImage(LOGO_H_DARK_B64||LOGO_H_DARK, 'PNG', (210 - _eLogoW) / 2, y, _eLogoW, _eLogoH); } catch(e) {}
+      y += _eLogoH + 10;
 
       doc.setFont('helvetica', 'bold'); doc.setFontSize(16); doc.setTextColor(200, 0, 0);
       doc.text('DIRECTORIO DE EMERGENCIA', 105, y, { align: 'center' }); y += 4;
@@ -6914,8 +6905,8 @@
 
       y += 8;
       doc.setFontSize(8); doc.setTextColor(150);
-      doc.text('Generado: ' + now() + '  |  ' + HOTEL_NAME, 105, y, { align: 'center' });
-      doc.save('CasaRegina_Emergencia.pdf');
+      doc.text('Generado: ' + now(), 105, y, { align: 'center' });
+      doc.save(HOTEL_NAME.replace(/\s+/g,'_') + '_Emergencia.pdf');
       toast('PDF de emergencia generado');
     }
 
@@ -6981,12 +6972,9 @@
       var doc = new jsPDF({ unit: 'mm', format: 'a4' });
       var margin = 20, y = 20;
 
-      try { doc.addImage(LOGO_V_DARK_B64||LOGO_V_DARK, 'PNG', margin, y, 30, Math.round(30/LOGO_V_RATIO)); } catch(e) {}
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(18); doc.setTextColor(40);
-      doc.text(HOTEL_NAME, margin + 25, y + 9);
-      doc.setFontSize(10); doc.setFont('helvetica', 'normal'); doc.setTextColor(120);
-      doc.text('Hotel Boutique', margin + 25, y + 15);
-      y += 28;
+      var _ruLogoW = 60, _ruLogoH = Math.round(_ruLogoW / LOGO_H_RATIO);
+      try { doc.addImage(LOGO_H_DARK_B64||LOGO_H_DARK, 'PNG', (210 - _ruLogoW) / 2, y, _ruLogoW, _ruLogoH); } catch(e) {}
+      y += _ruLogoH + 10;
 
       doc.setFont('helvetica', 'bold'); doc.setFontSize(15); doc.setTextColor(107, 138, 74);
       doc.text('Rutina Diaria de Operación', 105, y, { align: 'center' }); y += 4;
@@ -7006,8 +6994,8 @@
 
       y += 5;
       doc.setFontSize(8); doc.setTextColor(150);
-      doc.text('Generado: ' + now() + '  |  ' + HOTEL_NAME, 105, y, { align: 'center' });
-      doc.save('CasaRegina_Rutina_Diaria.pdf');
+      doc.text('Generado: ' + now(), 105, y, { align: 'center' });
+      doc.save(HOTEL_NAME.replace(/\s+/g,'_') + '_Rutina_Diaria.pdf');
       toast('PDF de rutina generado');
     }
 
@@ -7031,36 +7019,28 @@
         doc.setLineWidth(0.3);
         doc.roundedRect(marginX, yBase, cardW, cardH, 3, 3);
 
-        // Logo
-        try { doc.addImage(LOGO_V_DARK_B64||LOGO_V_DARK, 'PNG', marginX + 8, yBase + 6, 32, Math.round(32/LOGO_V_RATIO)); } catch(e) {}
-
-        // Header
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(18);
-        doc.setTextColor(40);
-        doc.text(HOTEL_NAME, marginX + 35, yBase + 15);
-        doc.setFontSize(10);
-        doc.setFont('helvetica', 'normal');
-        doc.setTextColor(120);
-        doc.text('Hotel Boutique', marginX + 35, yBase + 21);
+        // Logo centrado (sin texto — el logo ya incluye el nombre)
+        var _wcLogoW = 50, _wcLogoH = Math.round(_wcLogoW / LOGO_H_RATIO);
+        try { doc.addImage(LOGO_H_DARK_B64||LOGO_H_DARK, 'PNG', marginX + (cardW - _wcLogoW) / 2, yBase + 6, _wcLogoW, _wcLogoH); } catch(e) {}
 
         // Room info
         doc.setFontSize(13);
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(107, 138, 74);
-        doc.text('Habitación ' + room.numero + ' — ' + room.tipo, marginX + 35, yBase + 28);
+        doc.text('Habitación ' + room.numero + ' — ' + room.tipo, marginX + 8, yBase + 6 + _wcLogoH + 8);
 
         // Divider
+        var _wcDivY = yBase + 6 + _wcLogoH + 14;
         doc.setDrawColor(200);
-        doc.line(marginX + 8, yBase + 32, marginX + cardW - 8, yBase + 32);
+        doc.line(marginX + 8, _wcDivY, marginX + cardW - 8, _wcDivY);
 
-        var y = yBase + 40;
+        var y = _wcDivY + 8;
         doc.setTextColor(60);
         doc.setFontSize(9);
 
         // Welcome
         doc.setFont('helvetica', 'bold');
-        doc.text('¡Bienvenido(a) a ' + getHotelInfo().nombre.replace('Hotel ','') + '!', marginX + 8, y); y += 7;
+        doc.text('¡Bienvenido(a)!', marginX + 8, y); y += 7;
         doc.setFont('helvetica', 'normal');
 
         // WiFi
@@ -7098,7 +7078,7 @@
         doc.text('Cualquier duda, contacte a recepción. ¡Que disfrute su estancia!', marginX + cardW / 2, yBase + cardH - 6, { align: 'center' });
       });
 
-      doc.save('CasaRegina_Bienvenida.pdf');
+      doc.save(HOTEL_NAME.replace(/\s+/g,'_') + '_Bienvenida.pdf');
       toast('PDF de tarjetas generado');
     }
 
@@ -7121,39 +7101,29 @@
         doc.setLineWidth(0.3);
         doc.roundedRect(34, yBase + 4, 142, 112, 3, 3);
 
-        // Logo
-        try { doc.addImage(LOGO_V_DARK_B64||LOGO_V_DARK, 'PNG', centerX - 12, yBase + 12, 34, Math.round(34/LOGO_V_RATIO)); } catch(e) {}
-
-        // Hotel name
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(10);
-        doc.setTextColor(120);
-        doc.text(HOTEL_NAME, centerX, yBase + 44, { align: 'center' });
+        // Logo centrado grande (sin texto — el logo ya incluye el nombre)
+        var _dsLogoW = 50, _dsLogoH = Math.round(_dsLogoW / LOGO_H_RATIO);
+        try { doc.addImage(LOGO_H_DARK_B64||LOGO_H_DARK, 'PNG', centerX - _dsLogoW/2, yBase + 10, _dsLogoW, _dsLogoH); } catch(e) {}
 
         // Room number — BIG
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(60);
         doc.setTextColor(40);
-        doc.text(String(room.numero), centerX, yBase + 80, { align: 'center' });
+        doc.text(String(room.numero), centerX, yBase + 10 + _dsLogoH + 38, { align: 'center' });
 
         // Room type
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(14);
         doc.setTextColor(107, 138, 74);
-        doc.text(room.tipo, centerX, yBase + 92, { align: 'center' });
+        doc.text(room.tipo, centerX, yBase + 10 + _dsLogoH + 50, { align: 'center' });
 
         // Decorative line
         doc.setDrawColor(107, 138, 74);
         doc.setLineWidth(0.5);
-        doc.line(centerX - 25, yBase + 97, centerX + 25, yBase + 97);
-
-        // Leaf emoji simulation
-        doc.setFontSize(12);
-        doc.setTextColor(107, 138, 74);
-        doc.text(getHotelInfo().nombre.replace('Hotel ',''), centerX, yBase + 108, { align: 'center' });
+        doc.line(centerX - 25, yBase + 10 + _dsLogoH + 55, centerX + 25, yBase + 10 + _dsLogoH + 55);
       });
 
-      doc.save('CasaRegina_Letreros.pdf');
+      doc.save(HOTEL_NAME.replace(/\s+/g,'_') + '_Letreros.pdf');
       toast('PDF de letreros generado');
     }
 
@@ -7165,17 +7135,10 @@
       var contentW = pageW - margin * 2;
       var y = 20;
 
-      // Logo and header
-      try { doc.addImage(LOGO_V_DARK_B64||LOGO_V_DARK, 'PNG', margin, y, 32, Math.round(32/LOGO_V_RATIO)); } catch(e) {}
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(20);
-      doc.setTextColor(40);
-      doc.text(HOTEL_NAME, margin + 28, y + 10);
-      doc.setFontSize(11);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(120);
-      doc.text('Hotel Boutique', margin + 28, y + 17);
-      y += 30;
+      // Logo centrado (sin texto — el logo ya incluye el nombre)
+      var _rgLogoW = 60, _rgLogoH = Math.round(_rgLogoW / LOGO_H_RATIO);
+      try { doc.addImage(LOGO_H_DARK_B64||LOGO_H_DARK, 'PNG', (pageW - _rgLogoW) / 2, y, _rgLogoW, _rgLogoH); } catch(e) {}
+      y += _rgLogoH + 10;
 
       // Title
       doc.setFont('helvetica', 'bold');
@@ -7249,9 +7212,9 @@
       y += 10;
       doc.setFontSize(8);
       doc.setTextColor(150);
-      doc.text(HOTEL_NAME + ' · Hotel Boutique · Documento generado: ' + now(), pageW / 2, y, { align: 'center' });
+      doc.text('Documento generado: ' + now(), pageW / 2, y, { align: 'center' });
 
-      doc.save('CasaRegina_Reglamento.pdf');
+      doc.save(HOTEL_NAME.replace(/\s+/g,'_') + '_Reglamento.pdf');
       toast('PDF de reglamento generado');
     }
 
