@@ -1945,6 +1945,7 @@
         <div class="tab-scroll">
           <!-- Config Sub-tabs -->
           <div class="tabs-pills" id="configPills"></div>
+          <div id="configSyncBar"></div>
           <div id="configContent"></div>
         </div>
       </div>
@@ -6546,6 +6547,13 @@
         return '<div class="pill ' + (S.configTab === p.id ? 'active' : '') + '" onclick="S.configTab=\'' + p.id + '\';renderConfig()">' + p.label + '</div>';
       }).join('');
       document.getElementById('configPills').innerHTML = ph;
+
+      // Sync bar at top of config
+      var syncBar = '<div style="display:flex;gap:8px;margin-bottom:12px">';
+      syncBar += '<button class="form-button" onclick="syncAllConfigToSheet()" style="flex:1;background:var(--accent);color:var(--bg);padding:10px;font-size:12px">☁️ Subir config al Sheet</button>';
+      syncBar += '<button class="form-button secondary" onclick="refreshData()" style="flex:1;padding:10px;font-size:12px">⬇️ Descargar del Sheet</button>';
+      syncBar += '</div>';
+      document.getElementById('configSyncBar').innerHTML = syncBar;
 
       if (S.configTab === 'terminos') {
         renderTermsConfig();
