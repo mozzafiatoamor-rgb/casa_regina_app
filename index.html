@@ -2806,22 +2806,26 @@
           if (cfg.r) localStorage.setItem('reviewLink', cfg.r);
         } catch(e) {}
       }
-      // New short links: ?reservar&s=SHEET_ID&k=API_KEY (scriptUrl from ⚙️ Config tab)
+      // Secure links: ?reservar&u=SCRIPT_URL (reads via Apps Script, no API key)
       if ((guestRegId || guestBooking) && !guestCfg) {
+        var urlU = urlParams.get('u');
         var urlS = urlParams.get('s');
         var urlK = urlParams.get('k');
-        if (urlS && urlK) {
+        if (urlU) {
+          S.scriptUrl = urlU;
+          S._publicMode = true; // flag: read via script, no API key
+        } else if (urlS && urlK) {
+          // Legacy short links with API key (backward compat)
           S.sheetId = urlS;
           S.apiKey = urlK;
-          // scriptUrl will be loaded from ⚙️ Config tab in showBookingMode/showGuestMode
         }
       }
 
-      if (guestRegId && S.sheetId && S.apiKey) {
+      if (guestRegId && (S._publicMode || (S.sheetId && S.apiKey))) {
         showGuestMode(guestRegId);
         return;
       }
-      if (guestBooking && S.sheetId && S.apiKey) {
+      if (guestBooking && (S._publicMode || (S.sheetId && S.apiKey))) {
         showBookingMode();
         return;
       }
@@ -2858,15 +2862,19 @@
       container.innerHTML = '<div style="text-align:center;padding:40px 0;"><div style="font-size:28px;margin-bottom:8px;">⏳</div><div style="color:var(--text2);">Cargando tu reserva...</div></div>';
 
       try {
-        // Load config + reservations in parallel
+        // Use publicRead (via Apps Script) when in secure public mode, else legacy Sheets API
+        var _grd = S._publicMode
+          ? function(sh, rg) { return publicRead(S.scriptUrl, sh, rg); }
+          : function(sh, rg) { return sheets.read(sh, rg); };
+
         var _gResults = await Promise.all([
-          sheets.read('📋 Reservas', 'A2:P5000'),
-          sheets.read('⚙️ Config', 'A2:B50').catch(function() { return []; })
+          _grd('📋 Reservas', 'A2:P5000'),
+          _grd('⚙️ Config', 'A2:B50').catch(function() { return []; })
         ]);
         var reservas = _gResults[0];
-        // Apply config (scriptUrl, whatsapp, etc.)
+        // Apply config (whatsapp, etc.)
         _gResults[1].forEach(function(row) {
-          if (row[0] === 'scriptUrl' && row[1]) {
+          if (row[0] === 'scriptUrl' && row[1] && !S._publicMode) {
             try { S.scriptUrl = JSON.parse(row[1]); } catch(e) { S.scriptUrl = row[1]; }
           }
           if (row[0] === 'hotelInfo' && row[1]) {
@@ -3038,8 +3046,8 @@
     }
 
     function getGuestRegistrationLink(resId) {
-      // Short link: scriptUrl/whatsapp loaded from ⚙️ Config tab
-      return window.location.origin + window.location.pathname + '?registro=' + resId + '&s=' + encodeURIComponent(S.sheetId) + '&k=' + encodeURIComponent(S.apiKey);
+      // Secure link: only scriptUrl (reads via Apps Script doGet, no API key exposed)
+      return window.location.origin + window.location.pathname + '?registro=' + resId + '&u=' + encodeURIComponent(S.scriptUrl);
     }
 
     function copyGuestLink(resId) {
@@ -3092,13 +3100,18 @@
       container.innerHTML = '<div style="text-align:center;padding:40px 0;"><div style="font-size:28px;margin-bottom:8px;">⏳</div><div style="color:var(--text2);">Cargando disponibilidad...</div></div>';
 
       try {
+        // Use publicRead (via Apps Script) when in secure public mode, else legacy Sheets API
+        var _rd = S._publicMode
+          ? function(sh, rg) { return publicRead(S.scriptUrl, sh, rg); }
+          : function(sh, rg) { return sheets.read(sh, rg); };
+
         var results = await Promise.all([
-          sheets.read('🏨 Habitaciones', 'A2:F20'),
-          sheets.read('📋 Reservas', 'A2:P5000'),
-          sheets.read('⚙️ Config', 'A2:B50').catch(function() { return []; })
+          _rd('🏨 Habitaciones', 'A2:F20'),
+          _rd('📋 Reservas', 'A2:P5000'),
+          _rd('⚙️ Config', 'A2:B50').catch(function() { return []; })
         ]);
 
-        // Apply config from Sheet (scriptUrl, whatsapp, reviewLink, etc.)
+        // Apply config from Sheet (whatsapp, reviewLink, etc.)
         var cfgRows = results[2];
         cfgRows.forEach(function(row) {
           if (row[0] === 'hotelInfo' && row[1]) {
@@ -3106,18 +3119,12 @@
               var hi = JSON.parse(row[1]);
               if (hi.whatsapp) localStorage.setItem('hotelWhatsApp', hi.whatsapp);
               if (hi.reviewLink) localStorage.setItem('reviewLink', hi.reviewLink);
-              // Set scriptUrl if not already set
-              if (!S.scriptUrl) {
-                // scriptUrl is stored in localStorage from setup, not in hotelInfo
-              }
             } catch(e) {}
           }
-          // scriptUrl stored as separate config key
-          if (row[0] === 'scriptUrl' && row[1]) {
+          if (row[0] === 'scriptUrl' && row[1] && !S._publicMode) {
             try { S.scriptUrl = JSON.parse(row[1]); } catch(e) { S.scriptUrl = row[1]; }
           }
         });
-        // Also check if scriptUrl was stored in setup localStorage
         if (!S.scriptUrl) {
           S.scriptUrl = localStorage.getItem('scriptUrl') || '';
         }
@@ -3399,8 +3406,8 @@
     }
 
     function getBookingLink() {
-      // Short link: only sheetId + apiKey; scriptUrl/whatsapp/reviewLink loaded from ⚙️ Config tab
-      return window.location.origin + window.location.pathname + '?reservar&s=' + encodeURIComponent(S.sheetId) + '&k=' + encodeURIComponent(S.apiKey);
+      // Secure link: only scriptUrl (reads via Apps Script doGet, no API key exposed)
+      return window.location.origin + window.location.pathname + '?reservar&u=' + encodeURIComponent(S.scriptUrl);
     }
 
     function copyBookingLink() {
@@ -3570,6 +3577,14 @@
     }
 
     // ============ SHEETS API ============
+    // Read via Apps Script doGet (for public pages — no API key needed)
+    async function publicRead(scriptUrl, sheetName, range) {
+      var url = scriptUrl + '?action=read&sheet=' + encodeURIComponent(sheetName) + '&range=' + encodeURIComponent(range);
+      var res = await fetch(url);
+      if (!res.ok) throw new Error('Script read error: ' + res.status);
+      return await res.json();
+    }
+
     const sheets = {
       async read(sheetName, range) {
         const url = `https://sheets.googleapis.com/v4/spreadsheets/${S.sheetId}/values/${sheetName}!${range}?key=${S.apiKey}`;
