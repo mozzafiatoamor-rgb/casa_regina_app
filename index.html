@@ -3131,12 +3131,12 @@
         _bookingRooms = results[0].filter(function(r) {
           return r[0] && String(r[0]).trim() !== '';
         }).map(function(r) {
-          return { id: r[0], numero: r[1], tipo: r[2], tarifa: parseFloat(r[3]) || 0, estado: r[4], notas: r[5] || '' };
+          return { id: String(r[0]), numero: String(r[1]), tipo: String(r[2]), tarifa: parseFloat(r[3]) || 0, estado: String(r[4]), notas: r[5] ? String(r[5]) : '' };
         }).filter(function(r) { return r.estado !== 'Fuera de servicio' && r.estado !== 'Mantenimiento'; });
         _bookingReservas = results[1].filter(function(r) {
-          return r[11] !== 'Cancelada' && r[11] !== 'Completada' && r[11] !== '__DELETED__';
+          return r[0] && String(r[11]) !== 'Cancelada' && String(r[11]) !== 'Completada' && String(r[11]) !== '__DELETED__';
         }).map(function(r) {
-          return { habitacionNum: r[1], fechaEntrada: r[5], fechaSalida: r[6], estado: r[11] };
+          return { habitacionNum: String(r[1]), fechaEntrada: String(r[5]), fechaSalida: String(r[6]), estado: String(r[11]) };
         });
         renderBookingDatePicker();
       } catch(e) {
