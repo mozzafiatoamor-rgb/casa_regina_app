@@ -3128,7 +3128,9 @@
         if (!S.scriptUrl) {
           S.scriptUrl = localStorage.getItem('scriptUrl') || '';
         }
-        _bookingRooms = results[0].map(function(r) {
+        _bookingRooms = results[0].filter(function(r) {
+          return r[0] && String(r[0]).trim() !== '';
+        }).map(function(r) {
           return { id: r[0], numero: r[1], tipo: r[2], tarifa: parseFloat(r[3]) || 0, estado: r[4], notas: r[5] || '' };
         }).filter(function(r) { return r.estado !== 'Fuera de servicio' && r.estado !== 'Mantenimiento'; });
         _bookingReservas = results[1].filter(function(r) {
