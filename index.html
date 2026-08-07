@@ -2888,16 +2888,16 @@
 
         var found = null;
         for (var i = 0; i < reservas.length; i++) {
-          if (reservas[i][0] === resId) { found = reservas[i]; break; }
+          if (String(reservas[i][0]) === String(resId)) { found = reservas[i]; break; }
         }
         if (!found) {
           container.innerHTML = '<div style="text-align:center;padding:40px 0;"><img src="' + LOGO_V_DARK + '" style="width:220px;object-fit:contain;margin-bottom:16px;"><div style="font-size:14px;color:var(--red);margin-top:20px;">❌ Reserva no encontrada</div><div style="font-size:12px;color:var(--text2);margin-top:8px;">El enlace puede haber expirado o ser incorrecto.</div></div>';
           return;
         }
         _guestRes = {
-          id: found[0], habitacionNum: found[1], huesped: found[2],
-          telefono: found[3], email: found[4],
-          fechaEntrada: found[5], fechaSalida: found[6],
+          id: String(found[0]), habitacionNum: String(found[1]), huesped: String(found[2]),
+          telefono: String(found[3] || ''), email: String(found[4] || ''),
+          fechaEntrada: String(found[5]).substring(0,10), fechaSalida: String(found[6]).substring(0,10),
           adultos: found[7], niños: found[8]
         };
         renderGuestForm();
@@ -3136,7 +3136,7 @@
         _bookingReservas = results[1].filter(function(r) {
           return r[0] && String(r[11]) !== 'Cancelada' && String(r[11]) !== 'Completada' && String(r[11]) !== '__DELETED__';
         }).map(function(r) {
-          return { habitacionNum: String(r[1]), fechaEntrada: String(r[5]), fechaSalida: String(r[6]), estado: String(r[11]) };
+          return { habitacionNum: String(r[1]), fechaEntrada: String(r[5]).substring(0,10), fechaSalida: String(r[6]).substring(0,10), estado: String(r[11]) };
         });
         renderBookingDatePicker();
       } catch(e) {
