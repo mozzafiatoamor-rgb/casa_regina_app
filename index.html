@@ -2387,6 +2387,7 @@
 
     function saveHotelInfo(info) {
       localStorage.setItem('hotelInfo', JSON.stringify(info));
+      syncConfigToSheet('hotelInfo', info);
     }
 
     // Compat helpers (used in links/cfg)
@@ -2512,6 +2513,7 @@
 
     function saveDailyRoutine(routine) {
       localStorage.setItem('dailyRoutine', JSON.stringify(routine));
+      syncConfigToSheet('dailyRoutine', routine);
     }
 
     // Plantillas de mensajes por defecto
@@ -2549,6 +2551,84 @@
 
     function saveMsgTemplates(templates) {
       localStorage.setItem('msgTemplates', JSON.stringify(templates));
+      syncConfigToSheet('msgTemplates', templates);
+    }
+
+    // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
+    // Config keys stored in ⚙️ Config tab: [key, JSON_value]
+    var CONFIG_KEYS = ['hotelInfo', 'hotelTerms', 'dailyRoutine', 'msgTemplates', 'emergencyContacts'];
+
+    function applyConfigFromSheet(configData) {
+      if (!configData || !configData.length) return;
+      configData.forEach(function(row) {
+        var key = row[0];
+        var val = row[1];
+        if (CONFIG_KEYS.indexOf(key) !== -1 && val) {
+          try {
+            JSON.parse(val); // validate JSON
+            localStorage.setItem(key, val);
+          } catch(e) {}
+        }
+      });
+      // Refresh HOTEL_NAME in case it changed
+      HOTEL_NAME = getHotelInfo().nombre;
+    }
+
+    async function syncConfigToSheet(key, value) {
+      if (!S.scriptUrl) return;
+      try {
+        var configData = await sheets.read('⚙️ Config', 'A2:B50').catch(function() { return []; });
+        var exists = configData.some(function(row) { return row[0] === key; });
+        var jsonVal = JSON.stringify(value);
+
+        if (exists) {
+          await sheets.multi([
+            { type: 'updateById', sheet: '⚙️ Config', id: key, values: [key, jsonVal] }
+          ]);
+        } else {
+          await sheets.multi([
+            { type: 'append', sheet: '⚙️ Config', values: [key, jsonVal] }
+          ]);
+        }
+      } catch(e) {
+        console.error('Config sync error for ' + key + ':', e);
+      }
+    }
+
+    // Push all current config to Sheet (first-time sync or manual)
+    async function syncAllConfigToSheet() {
+      if (!S.scriptUrl) return;
+      try {
+        var configData = await sheets.read('⚙️ Config', 'A2:B50').catch(function() { return []; });
+        var existingKeys = {};
+        configData.forEach(function(row) { existingKeys[row[0]] = true; });
+
+        var operations = [];
+        CONFIG_KEYS.forEach(function(key) {
+          var stored = localStorage.getItem(key);
+          if (!stored) return;
+          if (existingKeys[key]) {
+            operations.push({ type: 'updateById', sheet: '⚙️ Config', id: key, values: [key, stored] });
+          } else {
+            operations.push({ type: 'append', sheet: '⚙️ Config', values: [key, stored] });
+          }
+        });
+        // Also sync scriptUrl
+        if (S.scriptUrl) {
+          if (existingKeys['scriptUrl']) {
+            operations.push({ type: 'updateById', sheet: '⚙️ Config', id: 'scriptUrl', values: ['scriptUrl', JSON.stringify(S.scriptUrl)] });
+          } else {
+            operations.push({ type: 'append', sheet: '⚙️ Config', values: ['scriptUrl', JSON.stringify(S.scriptUrl)] });
+          }
+        }
+
+        if (operations.length > 0) {
+          await sheets.multi(operations);
+          toast('Configuración sincronizada');
+        }
+      } catch(e) {
+        console.error('Full config sync error:', e);
+      }
     }
 
     function renderMsgTemplate(templateKey, resId) {
@@ -2713,6 +2793,8 @@
       var guestRegId = urlParams.get('registro');
       var guestBooking = urlParams.has('reservar');
       var guestCfg = urlParams.get('cfg');
+
+      // Legacy full cfg= base64 links (backward compat)
       if ((guestRegId || guestBooking) && guestCfg) {
         try {
           var cfg = JSON.parse(atob(guestCfg));
@@ -2723,6 +2805,17 @@
           if (cfg.r) localStorage.setItem('reviewLink', cfg.r);
         } catch(e) {}
       }
+      // New short links: ?reservar&s=SHEET_ID&k=API_KEY (scriptUrl from ⚙️ Config tab)
+      if ((guestRegId || guestBooking) && !guestCfg) {
+        var urlS = urlParams.get('s');
+        var urlK = urlParams.get('k');
+        if (urlS && urlK) {
+          S.sheetId = urlS;
+          S.apiKey = urlK;
+          // scriptUrl will be loaded from ⚙️ Config tab in showBookingMode/showGuestMode
+        }
+      }
+
       if (guestRegId && S.sheetId && S.apiKey) {
         showGuestMode(guestRegId);
         return;
@@ -2764,7 +2857,26 @@
       container.innerHTML = '<div style="text-align:center;padding:40px 0;"><div style="font-size:28px;margin-bottom:8px;">⏳</div><div style="color:var(--text2);">Cargando tu reserva...</div></div>';
 
       try {
-        var reservas = await sheets.read('📋 Reservas', 'A2:P5000');
+        // Load config + reservations in parallel
+        var _gResults = await Promise.all([
+          sheets.read('📋 Reservas', 'A2:P5000'),
+          sheets.read('⚙️ Config', 'A2:B50').catch(function() { return []; })
+        ]);
+        var reservas = _gResults[0];
+        // Apply config (scriptUrl, whatsapp, etc.)
+        _gResults[1].forEach(function(row) {
+          if (row[0] === 'scriptUrl' && row[1]) {
+            try { S.scriptUrl = JSON.parse(row[1]); } catch(e) { S.scriptUrl = row[1]; }
+          }
+          if (row[0] === 'hotelInfo' && row[1]) {
+            try {
+              var hi = JSON.parse(row[1]);
+              if (hi.whatsapp) localStorage.setItem('hotelWhatsApp', hi.whatsapp);
+            } catch(e) {}
+          }
+        });
+        if (!S.scriptUrl) S.scriptUrl = localStorage.getItem('scriptUrl') || '';
+
         var found = null;
         for (var i = 0; i < reservas.length; i++) {
           if (reservas[i][0] === resId) { found = reservas[i]; break; }
@@ -2925,10 +3037,8 @@
     }
 
     function getGuestRegistrationLink(resId) {
-      var cfgObj = { s: S.sheetId, k: S.apiKey, u: S.scriptUrl };
-      var hw = getHotelWhatsApp(); if (hw) cfgObj.w = hw;
-      var cfg = btoa(JSON.stringify(cfgObj));
-      return window.location.origin + window.location.pathname + '?registro=' + resId + '&cfg=' + encodeURIComponent(cfg);
+      // Short link: scriptUrl/whatsapp loaded from ⚙️ Config tab
+      return window.location.origin + window.location.pathname + '?registro=' + resId + '&s=' + encodeURIComponent(S.sheetId) + '&k=' + encodeURIComponent(S.apiKey);
     }
 
     function copyGuestLink(resId) {
@@ -2983,8 +3093,33 @@
       try {
         var results = await Promise.all([
           sheets.read('🏨 Habitaciones', 'A2:F20'),
-          sheets.read('📋 Reservas', 'A2:P5000')
+          sheets.read('📋 Reservas', 'A2:P5000'),
+          sheets.read('⚙️ Config', 'A2:B50').catch(function() { return []; })
         ]);
+
+        // Apply config from Sheet (scriptUrl, whatsapp, reviewLink, etc.)
+        var cfgRows = results[2];
+        cfgRows.forEach(function(row) {
+          if (row[0] === 'hotelInfo' && row[1]) {
+            try {
+              var hi = JSON.parse(row[1]);
+              if (hi.whatsapp) localStorage.setItem('hotelWhatsApp', hi.whatsapp);
+              if (hi.reviewLink) localStorage.setItem('reviewLink', hi.reviewLink);
+              // Set scriptUrl if not already set
+              if (!S.scriptUrl) {
+                // scriptUrl is stored in localStorage from setup, not in hotelInfo
+              }
+            } catch(e) {}
+          }
+          // scriptUrl stored as separate config key
+          if (row[0] === 'scriptUrl' && row[1]) {
+            try { S.scriptUrl = JSON.parse(row[1]); } catch(e) { S.scriptUrl = row[1]; }
+          }
+        });
+        // Also check if scriptUrl was stored in setup localStorage
+        if (!S.scriptUrl) {
+          S.scriptUrl = localStorage.getItem('scriptUrl') || '';
+        }
         _bookingRooms = results[0].map(function(r) {
           return { id: r[0], numero: r[1], tipo: r[2], tarifa: parseFloat(r[3]) || 0, estado: r[4], notas: r[5] || '' };
         }).filter(function(r) { return r.estado !== 'Fuera de servicio' && r.estado !== 'Mantenimiento'; });
@@ -3263,11 +3398,8 @@
     }
 
     function getBookingLink() {
-      var cfgObj = { s: S.sheetId, k: S.apiKey, u: S.scriptUrl };
-      var hw = getHotelWhatsApp(); if (hw) cfgObj.w = hw;
-      var rl = getReviewLink(); if (rl) cfgObj.r = rl;
-      var cfg = btoa(JSON.stringify(cfgObj));
-      return window.location.origin + window.location.pathname + '?reservar&cfg=' + encodeURIComponent(cfg);
+      // Short link: only sheetId + apiKey; scriptUrl/whatsapp/reviewLink loaded from ⚙️ Config tab
+      return window.location.origin + window.location.pathname + '?reservar&s=' + encodeURIComponent(S.sheetId) + '&k=' + encodeURIComponent(S.apiKey);
     }
 
     function copyBookingLink() {
@@ -3340,6 +3472,8 @@
       localStorage.setItem('sheetId', S.sheetId);
       localStorage.setItem('apiKey', S.apiKey);
       localStorage.setItem('scriptUrl', S.scriptUrl);
+      // Sync scriptUrl to config tab so short links can find it
+      syncConfigToSheet('scriptUrl', S.scriptUrl);
       showLoginScreen();
     }
 
@@ -3510,7 +3644,7 @@
     // ============ DATA LOADING ============
     async function loadData() {
       await busy(async () => {
-        const [roomsData, reservasData, housekeepingData, bitacoraData, usuariosData, cobrosData, clientesData, inventarioData] = await Promise.all([
+        const [roomsData, reservasData, housekeepingData, bitacoraData, usuariosData, cobrosData, clientesData, inventarioData, configData] = await Promise.all([
           sheets.read('🏨 Habitaciones', 'A2:F20'),
           sheets.read('📋 Reservas', 'A2:P5000'),
           sheets.read('🧹 Housekeeping', 'A2:L5000'),
@@ -3518,8 +3652,12 @@
           sheets.read('👤 Usuarios', 'A2:E50'),
           sheets.read('💰 Cobros', 'A2:I5000'),
           sheets.read('👥 Clientes', 'A2:I5000').catch(function() { return []; }),
-          sheets.read('📦 Inventario', 'A2:H500').catch(function() { return []; })
+          sheets.read('📦 Inventario', 'A2:H500').catch(function() { return []; }),
+          sheets.read('⚙️ Config', 'A2:B50').catch(function() { return []; })
         ]);
+
+        // Sync config from Sheet → localStorage (Sheet wins on load)
+        applyConfigFromSheet(configData);
 
         S.usuarios = usuariosData;
 
@@ -6529,6 +6667,13 @@
       h += '<div class="breakdown-item"><div class="breakdown-label">Usuarios</div><div class="breakdown-value">' + S.usuarios.length + '</div></div>';
       h += '</div>';
 
+      // Sync config
+      h += '<div style="background:var(--surface2);border-radius:var(--radius);padding:16px;margin-bottom:12px">';
+      h += '<div style="font-weight:700;font-size:14px;margin-bottom:6px">☁️ Sincronización</div>';
+      h += '<div style="font-size:11px;color:var(--text2);margin-bottom:10px">La configuración (datos del hotel, términos, plantillas, rutina, contactos de emergencia) se sincroniza automáticamente al guardar. Si este es tu primer dispositivo o necesitas forzar la sincronización:</div>';
+      h += '<button class="form-button" onclick="syncAllConfigToSheet()" style="width:100%;background:var(--accent);color:var(--bg)">☁️ Subir config de este dispositivo al Sheet</button>';
+      h += '</div>';
+
       // Session info
       h += '<div style="background:var(--surface2);border-radius:var(--radius);padding:16px;margin-bottom:12px">';
       h += '<div style="font-weight:700;font-size:14px;margin-bottom:10px">👤 Sesión Actual</div>';
@@ -6636,6 +6781,7 @@
 
     function saveEmergencyContacts(contacts) {
       localStorage.setItem('emergencyContacts', JSON.stringify(contacts));
+      syncConfigToSheet('emergencyContacts', contacts);
     }
 
     function renderEmergenciaConfig() {
@@ -7422,6 +7568,7 @@
         return;
       }
       localStorage.setItem('hotelTerms', JSON.stringify(terms));
+      syncConfigToSheet('hotelTerms', terms);
       toast('Términos y condiciones guardados');
       renderTermsEditor();
     }
