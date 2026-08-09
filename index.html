@@ -2413,6 +2413,53 @@
     }
     function getAnticipoFraction() { return getAnticipoPct() / 100; }
 
+    // ============ BREAKFAST PROMO ============
+    var DEFAULT_BREAKFAST_PROMO = {
+      active: false,
+      startDate: '',
+      endDate: '',
+      partner: 'Restaurante Cafeteria Mozzafiato',
+      rules: [
+        { tipo: 'Doble', personas: 2 },
+        { tipo: 'Queen Size', personas: 1 }
+      ]
+    };
+
+    function getBreakfastPromo() {
+      try {
+        var stored = localStorage.getItem('breakfastPromo');
+        if (stored) return Object.assign({}, DEFAULT_BREAKFAST_PROMO, JSON.parse(stored));
+      } catch(e) {}
+      return Object.assign({}, DEFAULT_BREAKFAST_PROMO);
+    }
+
+    function saveBreakfastPromo(promo) {
+      localStorage.setItem('breakfastPromo', JSON.stringify(promo));
+      syncConfigToSheet('breakfastPromo', promo);
+    }
+
+    function isBreakfastPromoActive() {
+      var p = getBreakfastPromo();
+      if (!p.active) return false;
+      var today = normDate(new Date());
+      if (p.startDate && today < p.startDate) return false;
+      if (p.endDate && today > p.endDate) return false;
+      return true;
+    }
+
+    function getBreakfastPersonas(roomTipo) {
+      var p = getBreakfastPromo();
+      var rule = p.rules.find(function(r) { return r.tipo === roomTipo; });
+      return rule ? rule.personas : 0;
+    }
+
+    function generateBreakfastCode() {
+      var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      var code = 'DES-';
+      for (var i = 0; i < 4; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
+      return code;
+    }
+
     // Global accessor
     var HOTEL_NAME = getHotelInfo().nombre;
 
@@ -2557,7 +2604,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var CONFIG_KEYS = ['hotelInfo', 'hotelTerms', 'dailyRoutine', 'msgTemplates', 'emergencyContacts'];
+    var CONFIG_KEYS = ['hotelInfo', 'hotelTerms', 'dailyRoutine', 'msgTemplates', 'emergencyContacts', 'breakfastPromo'];
 
     function applyConfigFromSheet(configData) {
       if (!configData || !configData.length) return;
@@ -2793,10 +2840,11 @@
       var urlParams = new URLSearchParams(window.location.search);
       var guestRegId = urlParams.get('registro');
       var guestBooking = urlParams.has('reservar');
+      var guestValidar = urlParams.has('validar');
       var guestCfg = urlParams.get('cfg');
 
       // Legacy full cfg= base64 links (backward compat)
-      if ((guestRegId || guestBooking) && guestCfg) {
+      if ((guestRegId || guestBooking || guestValidar) && guestCfg) {
         try {
           var cfg = JSON.parse(atob(guestCfg));
           S.sheetId = cfg.s;
@@ -2807,7 +2855,7 @@
         } catch(e) {}
       }
       // Secure links: ?reservar&u=SCRIPT_URL (reads via Apps Script, no API key)
-      if ((guestRegId || guestBooking) && !guestCfg) {
+      if ((guestRegId || guestBooking || guestValidar) && !guestCfg) {
         var urlU = urlParams.get('u');
         var urlS = urlParams.get('s');
         var urlK = urlParams.get('k');
@@ -2827,6 +2875,10 @@
       }
       if (guestBooking && (S._publicMode || (S.sheetId && S.apiKey))) {
         showBookingMode();
+        return;
+      }
+      if (guestValidar && (S._publicMode || (S.sheetId && S.apiKey))) {
+        showValidarMode();
         return;
       }
 
@@ -3443,6 +3495,207 @@
       openModal('taskDetailModal');
     }
 
+    // ============ PUBLIC VALIDATION MODE (?validar) ============
+    async function showValidarMode() {
+      document.getElementById('setupScreen').classList.remove('active');
+      document.getElementById('loginScreen').classList.remove('active');
+      document.getElementById('appContainer').classList.add('hidden');
+      document.getElementById('guestScreen').classList.add('active');
+      var container = document.getElementById('guestFormContainer');
+
+      var _rd = S._publicMode
+        ? function(sh, rg) { return publicRead(S.scriptUrl, sh, rg); }
+        : function(sh, rg) { return sheets.read(sh, rg); };
+
+      // Load breakfast promo config for partner name
+      var promoName = '';
+      try {
+        var cfgData = await _rd('⚙️ Config', 'A2:B50');
+        for (var ci = 0; ci < cfgData.length; ci++) {
+          if (cfgData[ci][0] === 'breakfastPromo') {
+            try { promoName = JSON.parse(cfgData[ci][1]).partner || ''; } catch(e) {}
+          }
+        }
+      } catch(e) {}
+
+      container.innerHTML =
+        '<div style="text-align:center;margin-bottom:20px;">' +
+          '<img src="' + LOGO_H_DARK + '" alt="Logo" style="max-width:200px;margin:0 auto 10px;" onerror="this.style.display=\'none\'">' +
+        '</div>' +
+        '<h2 style="text-align:center;margin-bottom:4px;">🍳 Validar Desayuno</h2>' +
+        (promoName ? '<p style="text-align:center;color:var(--text-secondary);margin-bottom:20px;font-size:14px;">' + promoName + '</p>' : '') +
+        '<div id="validarForm">' +
+          '<label style="display:block;margin-bottom:6px;font-weight:600;">Código de desayuno</label>' +
+          '<input type="text" id="validarCode" placeholder="DES-XXXX" maxlength="8" ' +
+            'style="width:100%;padding:14px;font-size:20px;text-align:center;text-transform:uppercase;border:2px solid var(--border);border-radius:12px;font-family:monospace;letter-spacing:4px;" ' +
+            'oninput="this.value=this.value.toUpperCase()">' +
+          '<button onclick="validarDesayunoCode()" ' +
+            'style="width:100%;margin-top:16px;padding:14px;background:var(--primary);color:white;border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;">' +
+            'Validar Código</button>' +
+        '</div>' +
+        '<div id="validarResult" style="margin-top:20px;"></div>' +
+        '<div id="validarHistory" style="margin-top:30px;"></div>';
+
+      // Auto-focus
+      setTimeout(function() { document.getElementById('validarCode').focus(); }, 100);
+
+      // Enter key support
+      document.getElementById('validarCode').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') validarDesayunoCode();
+      });
+    }
+
+    async function validarDesayunoCode() {
+      var code = (document.getElementById('validarCode').value || '').trim().toUpperCase();
+      var resultDiv = document.getElementById('validarResult');
+      if (!code) { resultDiv.innerHTML = '<p style="color:var(--danger);text-align:center;">Ingresa un código</p>'; return; }
+
+      resultDiv.innerHTML = '<p style="text-align:center;">Buscando...</p>';
+
+      var _rd = S._publicMode
+        ? function(sh, rg) { return publicRead(S.scriptUrl, sh, rg); }
+        : function(sh, rg) { return sheets.read(sh, rg); };
+
+      try {
+        var data = await _rd('🍳 Desayunos', 'A2:I5000');
+        var found = null;
+        for (var i = 0; i < data.length; i++) {
+          if (String(data[i][0]).toUpperCase() === code) { found = data[i]; break; }
+        }
+
+        if (!found) {
+          resultDiv.innerHTML =
+            '<div style="text-align:center;padding:20px;background:var(--danger-light,#fee);border-radius:12px;">' +
+              '<div style="font-size:48px;margin-bottom:8px;">❌</div>' +
+              '<p style="font-size:18px;font-weight:600;color:var(--danger);">Código no encontrado</p>' +
+              '<p style="color:var(--text-secondary);font-size:14px;">Verifica que el código sea correcto</p>' +
+            '</div>';
+          return;
+        }
+
+        var estado = String(found[6] || 'Pendiente');
+        var huesped = String(found[2]);
+        var habitacion = String(found[3]);
+        var fecha = String(found[4]).substring(0, 10);
+        var personas = parseInt(found[5]) || 1;
+        var today = new Date().toISOString().substring(0, 10);
+
+        if (estado === 'Consumido') {
+          var validadoPor = String(found[7] || '');
+          var horaVal = String(found[8] || '');
+          resultDiv.innerHTML =
+            '<div style="text-align:center;padding:20px;background:#fff3cd;border-radius:12px;">' +
+              '<div style="font-size:48px;margin-bottom:8px;">⚠️</div>' +
+              '<p style="font-size:18px;font-weight:600;color:#856404;">Ya fue consumido</p>' +
+              '<p style="margin-top:8px;">Huésped: <strong>' + huesped + '</strong></p>' +
+              '<p>Validado: ' + horaVal + '</p>' +
+            '</div>';
+          return;
+        }
+
+        if (estado === 'Cancelado') {
+          resultDiv.innerHTML =
+            '<div style="text-align:center;padding:20px;background:var(--danger-light,#fee);border-radius:12px;">' +
+              '<div style="font-size:48px;margin-bottom:8px;">🚫</div>' +
+              '<p style="font-size:18px;font-weight:600;color:var(--danger);">Código cancelado</p>' +
+            '</div>';
+          return;
+        }
+
+        if (fecha !== today) {
+          resultDiv.innerHTML =
+            '<div style="text-align:center;padding:20px;background:#fff3cd;border-radius:12px;">' +
+              '<div style="font-size:48px;margin-bottom:8px;">📅</div>' +
+              '<p style="font-size:18px;font-weight:600;color:#856404;">No es válido hoy</p>' +
+              '<p style="margin-top:8px;">Este código es para: <strong>' + formatDate(fecha) + '</strong></p>' +
+            '</div>';
+          return;
+        }
+
+        // Valid! Show confirmation
+        resultDiv.innerHTML =
+          '<div style="text-align:center;padding:20px;background:#d4edda;border-radius:12px;">' +
+            '<div style="font-size:48px;margin-bottom:8px;">✅</div>' +
+            '<p style="font-size:20px;font-weight:700;color:#155724;">Código válido</p>' +
+            '<div style="margin-top:16px;text-align:left;padding:0 10px;">' +
+              '<p>👤 Huésped: <strong>' + huesped + '</strong></p>' +
+              '<p>🚪 Habitación: <strong>' + habitacion + '</strong></p>' +
+              '<p>👥 Personas: <strong>' + personas + '</strong></p>' +
+              '<p>📅 Fecha: <strong>' + formatDate(fecha) + '</strong></p>' +
+            '</div>' +
+            '<button onclick="confirmarDesayuno(\'' + code + '\')" ' +
+              'style="width:100%;margin-top:16px;padding:14px;background:#28a745;color:white;border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;">' +
+              '🍳 Marcar como consumido</button>' +
+          '</div>';
+
+      } catch(err) {
+        resultDiv.innerHTML = '<p style="color:var(--danger);text-align:center;">Error: ' + err.message + '</p>';
+      }
+
+      document.getElementById('validarCode').value = '';
+      document.getElementById('validarCode').focus();
+    }
+
+    async function confirmarDesayuno(code) {
+      var resultDiv = document.getElementById('validarResult');
+      resultDiv.querySelector('button').disabled = true;
+      resultDiv.querySelector('button').textContent = 'Procesando...';
+
+      try {
+        // Write via Apps Script POST
+        var nowStr = new Date().toLocaleString('es-MX');
+        var body = {
+          action: 'multi',
+          operations: []
+        };
+
+        // Read current data to get full row
+        var _rd = S._publicMode
+          ? function(sh, rg) { return publicRead(S.scriptUrl, sh, rg); }
+          : function(sh, rg) { return sheets.read(sh, rg); };
+
+        var data = await _rd('🍳 Desayunos', 'A2:I5000');
+        var found = null;
+        for (var i = 0; i < data.length; i++) {
+          if (String(data[i][0]).toUpperCase() === code) { found = data[i]; break; }
+        }
+
+        if (!found) { throw new Error('Código no encontrado'); }
+
+        body.operations.push({
+          type: 'updateById',
+          sheet: '🍳 Desayunos',
+          id: code,
+          values: [String(found[0]), String(found[1]), String(found[2]), String(found[3]), String(found[4]).substring(0,10), parseInt(found[5]) || 1, 'Consumido', 'Restaurante', nowStr]
+        });
+
+        var scriptUrl = S.scriptUrl;
+        var res = await fetch(scriptUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+
+        if (!res.ok) throw new Error('Error del servidor');
+
+        resultDiv.innerHTML =
+          '<div style="text-align:center;padding:20px;background:#d4edda;border-radius:12px;">' +
+            '<div style="font-size:64px;margin-bottom:12px;">🎉</div>' +
+            '<p style="font-size:20px;font-weight:700;color:#155724;">Desayuno registrado</p>' +
+            '<p style="margin-top:8px;color:#155724;">Código <strong>' + code + '</strong> marcado como consumido</p>' +
+            '<p style="margin-top:4px;font-size:13px;color:var(--text-secondary);">' + nowStr + '</p>' +
+          '</div>';
+
+      } catch(err) {
+        resultDiv.innerHTML =
+          '<div style="text-align:center;padding:20px;background:var(--danger-light,#fee);border-radius:12px;">' +
+            '<p style="color:var(--danger);">Error al registrar: ' + err.message + '</p>' +
+            '<button onclick="confirmarDesayuno(\'' + code + '\')" ' +
+              'style="margin-top:12px;padding:10px 20px;background:var(--primary);color:white;border:none;border-radius:8px;cursor:pointer;">Reintentar</button>' +
+          '</div>';
+      }
+    }
+
     // ============ SETUP FLOW ============
     function showSetup() {
       document.getElementById('setupScreen').classList.add('active');
@@ -3662,7 +3915,7 @@
     // ============ DATA LOADING ============
     async function loadData() {
       await busy(async () => {
-        const [roomsData, reservasData, housekeepingData, bitacoraData, usuariosData, cobrosData, clientesData, inventarioData, configData] = await Promise.all([
+        const [roomsData, reservasData, housekeepingData, bitacoraData, usuariosData, cobrosData, clientesData, inventarioData, configData, desayunosData] = await Promise.all([
           sheets.read('🏨 Habitaciones', 'A2:F20'),
           sheets.read('📋 Reservas', 'A2:P5000'),
           sheets.read('🧹 Housekeeping', 'A2:L5000'),
@@ -3671,7 +3924,8 @@
           sheets.read('💰 Cobros', 'A2:I5000'),
           sheets.read('👥 Clientes', 'A2:I5000').catch(function() { return []; }),
           sheets.read('📦 Inventario', 'A2:H500').catch(function() { return []; }),
-          sheets.read('⚙️ Config', 'A2:B50').catch(function() { return []; })
+          sheets.read('⚙️ Config', 'A2:B50').catch(function() { return []; }),
+          sheets.read('🍳 Desayunos', 'A2:I5000').catch(function() { return []; })
         ]);
 
         // Sync config from Sheet → localStorage (Sheet wins on load)
@@ -3748,6 +4002,14 @@
             stock: parseInt(i[3]) || 0, minimo: parseInt(i[4]) || 0,
             unidad: i[5] || 'pzas', notas: i[6] || '',
             ultimaActualizacion: i[7] || ''
+          };
+        });
+
+        S.desayunos = desayunosData.map(function(d) {
+          return {
+            codigo: d[0], reservaId: d[1], huesped: d[2], habitacion: d[3],
+            fecha: d[4], personas: parseInt(d[5]) || 1,
+            estado: d[6] || 'Pendiente', validadoPor: d[7] || '', horaValidacion: d[8] || ''
           };
         });
 
@@ -4944,6 +5206,7 @@
         { id: 'ingresos', label: 'Ingresos' },
         { id: 'clientes', label: 'Top Clientes' },
         { id: 'diario', label: 'Diario' },
+        { id: 'desayunos', label: 'Desayunos' },
         { id: 'bitacora', label: 'Bitácora' }
       ];
       var pillsHtml = pills.map(function(p) {
@@ -4961,6 +5224,8 @@
         content = renderReportClientes();
       } else if (S.filterReports === 'diario') {
         content = renderReportDiario();
+      } else if (S.filterReports === 'desayunos') {
+        content = renderReportDesayunos();
       } else if (S.filterReports === 'bitacora') {
         content = renderReportBitacora();
       }
@@ -5216,6 +5481,129 @@
     }
 
     // --- Bitácora (existing, refactored) ---
+    // --- Desayunos ---
+    if (!S.reportDesayunoStart) S.reportDesayunoStart = normDate(new Date(new Date().setDate(new Date().getDate() - new Date().getDay() + 1)));
+    if (!S.reportDesayunoEnd) S.reportDesayunoEnd = normDate(new Date());
+
+    function renderReportDesayunos() {
+      var promo = getBreakfastPromo();
+      var des = S.desayunos || [];
+      var start = S.reportDesayunoStart;
+      var end = S.reportDesayunoEnd;
+
+      var filtered = des.filter(function(d) { return d.fecha >= start && d.fecha <= end; });
+      var consumidos = filtered.filter(function(d) { return d.estado === 'Consumido'; });
+      var pendientes = filtered.filter(function(d) { return d.estado === 'Pendiente'; });
+      var cancelados = filtered.filter(function(d) { return d.estado === 'Cancelado'; });
+      var totalPersonas = consumidos.reduce(function(s, d) { return s + d.personas; }, 0);
+
+      var h = '<div class="report-box">';
+      h += '<div class="report-title">🍳 Reporte de Desayunos</div>';
+      h += '<div style="margin-bottom:12px;font-size:13px;color:var(--text2);">Convenio: <strong>' + promo.partner + '</strong></div>';
+      h += '<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">';
+      h += '<div style="flex:1;min-width:120px;"><label style="font-size:11px;color:var(--text2);">Desde</label><input type="date" class="form-input" value="' + start + '" onchange="S.reportDesayunoStart=this.value;renderReports()" style="font-size:13px;"></div>';
+      h += '<div style="flex:1;min-width:120px;"><label style="font-size:11px;color:var(--text2);">Hasta</label><input type="date" class="form-input" value="' + end + '" onchange="S.reportDesayunoEnd=this.value;renderReports()" style="font-size:13px;"></div>';
+      h += '</div>';
+      h += '</div>';
+
+      // Summary cards
+      h += '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:12px;">';
+      h += '<div class="report-box" style="text-align:center;"><div style="font-size:24px;font-weight:800;color:var(--green);">' + consumidos.length + '</div><div style="font-size:11px;color:var(--text2);">Consumidos</div></div>';
+      h += '<div class="report-box" style="text-align:center;"><div style="font-size:24px;font-weight:800;color:var(--yellow);">' + pendientes.length + '</div><div style="font-size:11px;color:var(--text2);">Pendientes</div></div>';
+      h += '<div class="report-box" style="text-align:center;"><div style="font-size:24px;font-weight:800;color:var(--accent);">' + totalPersonas + '</div><div style="font-size:11px;color:var(--text2);">Personas atendidas</div></div>';
+      h += '<div class="report-box" style="text-align:center;"><div style="font-size:24px;font-weight:800;color:var(--red);">' + cancelados.length + '</div><div style="font-size:11px;color:var(--text2);">Cancelados</div></div>';
+      h += '</div>';
+
+      // Detail table
+      if (consumidos.length > 0) {
+        h += '<div class="report-box"><div class="report-title">Detalle de consumidos (para facturación)</div>';
+        h += '<div style="overflow-x:auto;"><table style="width:100%;font-size:12px;border-collapse:collapse;">';
+        h += '<thead><tr style="background:var(--surface3);"><th style="padding:6px;text-align:left;">Fecha</th><th style="padding:6px;text-align:left;">Código</th><th style="padding:6px;text-align:left;">Huésped</th><th style="padding:6px;text-align:left;">Hab.</th><th style="padding:6px;text-align:center;">Personas</th><th style="padding:6px;text-align:left;">Hora</th></tr></thead><tbody>';
+        consumidos.sort(function(a,b) { return a.fecha < b.fecha ? -1 : 1; }).forEach(function(d) {
+          h += '<tr style="border-bottom:1px solid var(--border);">';
+          h += '<td style="padding:6px;">' + formatDate(d.fecha) + '</td>';
+          h += '<td style="padding:6px;font-family:monospace;">' + d.codigo + '</td>';
+          h += '<td style="padding:6px;">' + d.huesped + '</td>';
+          h += '<td style="padding:6px;">' + d.habitacion + '</td>';
+          h += '<td style="padding:6px;text-align:center;">' + d.personas + '</td>';
+          h += '<td style="padding:6px;">' + (d.horaValidacion || '') + '</td>';
+          h += '</tr>';
+        });
+        h += '</tbody></table></div>';
+        h += '<div style="margin-top:10px;padding:10px;background:var(--surface3);border-radius:8px;font-size:13px;">';
+        h += '<strong>Total para facturar:</strong> ' + consumidos.length + ' desayunos, ' + totalPersonas + ' personas';
+        h += '</div></div>';
+      }
+
+      h += '<button class="report-export-btn" onclick="exportDesayunosPDF()">📄 Exportar PDF para facturación</button>';
+      return h;
+    }
+
+    function exportDesayunosPDF() {
+      var { jsPDF } = window.jspdf;
+      var doc = new jsPDF({ unit: 'mm', format: 'a4' });
+      var y = 15, pageW = 210, margin = 15, contentW = pageW - margin * 2;
+      var promo = getBreakfastPromo();
+
+      var _rLogoW = 60, _rLogoH = Math.round(_rLogoW / LOGO_H_RATIO);
+      try { doc.addImage(LOGO_H_DARK_B64||LOGO_H_DARK, 'PNG', (pageW - _rLogoW) / 2, y, _rLogoW, _rLogoH); } catch(e) {}
+      y += _rLogoH + 6;
+
+      doc.setFontSize(14); doc.setFont('helvetica', 'bold');
+      doc.text('Reporte de Desayunos — Facturación', margin, y); y += 7;
+      doc.setFontSize(10); doc.setFont('helvetica', 'normal');
+      doc.text('Convenio: ' + promo.partner, margin, y); y += 5;
+      doc.text('Período: ' + formatDate(S.reportDesayunoStart) + ' — ' + formatDate(S.reportDesayunoEnd), margin, y); y += 5;
+      doc.text('Generado: ' + now(), margin, y); y += 8;
+      doc.setDrawColor(200); doc.line(margin, y, pageW - margin, y); y += 6;
+
+      var des = (S.desayunos || []).filter(function(d) { return d.fecha >= S.reportDesayunoStart && d.fecha <= S.reportDesayunoEnd && d.estado === 'Consumido'; });
+      des.sort(function(a,b) { return a.fecha < b.fecha ? -1 : 1; });
+
+      if (des.length === 0) {
+        doc.text('No hay desayunos consumidos en este período.', margin, y);
+      } else {
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+        var cols = [margin, margin+22, margin+42, margin+85, margin+110, margin+130];
+        doc.text('Fecha', cols[0], y);
+        doc.text('Código', cols[1], y);
+        doc.text('Huésped', cols[2], y);
+        doc.text('Hab.', cols[3], y);
+        doc.text('Personas', cols[4], y);
+        doc.text('Hora', cols[5], y);
+        y += 2; doc.line(margin, y, pageW - margin, y); y += 5;
+
+        doc.setFont('helvetica', 'normal');
+        var totalP = 0;
+        des.forEach(function(d) {
+          if (y > 275) { doc.addPage(); y = 15; }
+          doc.text(formatDate(d.fecha), cols[0], y);
+          doc.text(d.codigo, cols[1], y);
+          doc.text((d.huesped || '').substring(0, 25), cols[2], y);
+          doc.text(String(d.habitacion), cols[3], y);
+          doc.text(String(d.personas), cols[4] + 6, y);
+          doc.text(d.horaValidacion || '', cols[5], y);
+          totalP += d.personas;
+          y += 5;
+        });
+
+        y += 4; doc.line(margin, y, pageW - margin, y); y += 6;
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
+        doc.text('Total: ' + des.length + ' desayunos, ' + totalP + ' personas', margin, y);
+      }
+
+      // Footer
+      var pageCount = doc.internal.getNumberOfPages();
+      for (var p = 1; p <= pageCount; p++) {
+        doc.setPage(p);
+        doc.setFontSize(8); doc.setFont('helvetica', 'normal');
+        doc.text('Generado: ' + now(), margin, 290);
+        doc.text('Pág. ' + p + '/' + pageCount, pageW - margin - 15, 290);
+      }
+
+      doc.save(HOTEL_NAME.replace(/\s+/g, '_') + '_Desayunos_' + S.reportDesayunoStart + '_' + S.reportDesayunoEnd + '.pdf');
+    }
+
     function renderReportBitacora() {
       var activities = S.bitacora.slice(-30).reverse();
       var h = '<div>';
@@ -6552,6 +6940,7 @@
         { id: 'emergencia', label: '🆘 Emergencia' },
         { id: 'usuarios', label: '👤 Usuarios' },
         { id: 'tarifas', label: '💲 Tarifas' },
+        { id: 'desayunos', label: '🍳 Desayunos' },
         { id: 'app', label: '📱 App' }
       ];
       var ph = pills.map(function(p) {
@@ -6578,6 +6967,8 @@
         renderUsersConfig();
       } else if (S.configTab === 'tarifas') {
         renderTarifasConfig();
+      } else if (S.configTab === 'desayunos') {
+        renderDesayunosConfig();
       } else if (S.configTab === 'app') {
         renderAppConfig();
       }
@@ -6646,6 +7037,95 @@
       saveMsgTemplates(templates);
       toast('Plantilla restaurada');
       renderMensajesConfig();
+    }
+
+    function renderDesayunosConfig() {
+      var promo = getBreakfastPromo();
+      var h = '<div style="margin-bottom:16px">';
+      h += '<div class="section-title">Promoción de Desayunos</div>';
+      h += '<div style="font-size:12px;color:var(--text2);margin-bottom:16px">Configura el convenio con el restaurante. Los códigos se generan al hacer check-in en habitaciones que califiquen.</div>';
+      h += '</div>';
+
+      // Active toggle
+      h += '<div style="background:var(--surface3);padding:14px;border-radius:var(--radius);margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">';
+      h += '<div><div style="font-weight:600;font-size:13px">Promoción activa</div><div style="font-size:11px;color:var(--text2)">Genera códigos de desayuno al hacer check-in</div></div>';
+      h += '<label style="position:relative;width:44px;height:24px;display:inline-block"><input type="checkbox" id="bfActive" ' + (promo.active ? 'checked' : '') + ' onchange="toggleBreakfastPromo(this.checked)" style="opacity:0;width:0;height:0"><span style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:' + (promo.active ? 'var(--accent)' : 'var(--surface2)') + ';border-radius:24px;transition:.3s"><span style="position:absolute;content:\'\';height:18px;width:18px;left:' + (promo.active ? '22px' : '3px') + ';bottom:3px;background:white;border-radius:50%;transition:.3s;display:block"></span></span></label>';
+      h += '</div>';
+
+      // Date range
+      h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">';
+      h += '<div><label class="form-label" style="font-size:11px">Fecha inicio</label>';
+      h += '<input type="date" id="bfStart" class="login-input" value="' + (promo.startDate || '') + '" onchange="updateBreakfastField(\'startDate\',this.value)" style="padding:8px;font-size:12px"></div>';
+      h += '<div><label class="form-label" style="font-size:11px">Fecha fin</label>';
+      h += '<input type="date" id="bfEnd" class="login-input" value="' + (promo.endDate || '') + '" onchange="updateBreakfastField(\'endDate\',this.value)" style="padding:8px;font-size:12px"></div>';
+      h += '</div>';
+
+      // Partner
+      h += '<div style="margin-bottom:12px"><label class="form-label" style="font-size:11px">Restaurante asociado</label>';
+      h += '<input type="text" id="bfPartner" class="login-input" value="' + (promo.partner || '') + '" onchange="updateBreakfastField(\'partner\',this.value)" style="padding:8px;font-size:12px"></div>';
+
+      // Rules
+      h += '<div style="margin-bottom:12px"><div class="form-label" style="font-size:11px;margin-bottom:8px">Reglas por tipo de habitación</div>';
+      (promo.rules || []).forEach(function(rule, i) {
+        h += '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;background:var(--surface3);padding:8px 10px;border-radius:8px">';
+        h += '<input type="text" value="' + rule.tipo + '" onchange="updateBreakfastRule(' + i + ',\'tipo\',this.value)" style="flex:1;background:var(--surface2);border:1px solid var(--surface3);border-radius:6px;padding:6px 8px;font-size:12px;color:var(--text)" placeholder="Tipo de hab.">';
+        h += '<span style="font-size:11px;color:var(--text2);white-space:nowrap">máx. personas:</span>';
+        h += '<input type="number" value="' + rule.personas + '" min="1" max="10" onchange="updateBreakfastRule(' + i + ',\'personas\',parseInt(this.value))" style="width:50px;background:var(--surface2);border:1px solid var(--surface3);border-radius:6px;padding:6px;font-size:12px;text-align:center;color:var(--text)">';
+        h += '<button onclick="removeBreakfastRule(' + i + ')" style="background:none;border:none;color:var(--red);font-size:16px;cursor:pointer;padding:2px">✕</button>';
+        h += '</div>';
+      });
+      h += '<button class="form-button secondary" onclick="addBreakfastRule()" style="font-size:11px;padding:6px 12px;margin-top:4px">+ Agregar tipo</button>';
+      h += '</div>';
+
+      // Status
+      var statusColor = isBreakfastPromoActive() ? 'var(--green)' : 'var(--text2)';
+      var statusText = isBreakfastPromoActive() ? '✅ Promoción activa' : '⏸️ Promoción inactiva';
+      h += '<div style="text-align:center;padding:10px;background:var(--surface3);border-radius:var(--radius);font-size:12px;color:' + statusColor + ';font-weight:600">' + statusText + '</div>';
+
+      // Validation link
+      if (promo.active) {
+        var valLink = window.location.origin + window.location.pathname + '?validar&u=' + encodeURIComponent(S.scriptUrl);
+        h += '<div style="margin-top:12px;background:var(--surface3);padding:12px;border-radius:var(--radius)">';
+        h += '<div style="font-size:11px;color:var(--text2);margin-bottom:6px">Link de validación para el restaurante:</div>';
+        h += '<div style="font-size:10px;word-break:break-all;color:var(--accent);font-family:Space Mono,monospace">' + valLink + '</div>';
+        h += '<button class="form-button secondary" onclick="navigator.clipboard.writeText(\'' + valLink + '\');toast(\'Link copiado\')" style="font-size:11px;padding:6px 12px;margin-top:8px;width:100%">📋 Copiar link</button>';
+        h += '</div>';
+      }
+
+      document.getElementById('configContent').innerHTML = h;
+    }
+
+    function toggleBreakfastPromo(active) {
+      var promo = getBreakfastPromo();
+      promo.active = active;
+      saveBreakfastPromo(promo);
+      renderConfig();
+    }
+
+    function updateBreakfastField(field, value) {
+      var promo = getBreakfastPromo();
+      promo[field] = value;
+      saveBreakfastPromo(promo);
+    }
+
+    function updateBreakfastRule(idx, field, value) {
+      var promo = getBreakfastPromo();
+      promo.rules[idx][field] = value;
+      saveBreakfastPromo(promo);
+    }
+
+    function addBreakfastRule() {
+      var promo = getBreakfastPromo();
+      promo.rules.push({ tipo: '', personas: 1 });
+      saveBreakfastPromo(promo);
+      renderConfig();
+    }
+
+    function removeBreakfastRule(idx) {
+      var promo = getBreakfastPromo();
+      promo.rules.splice(idx, 1);
+      saveBreakfastPromo(promo);
+      renderConfig();
     }
 
     function renderAppConfig() {
@@ -7850,6 +8330,28 @@
         document.getElementById('reservaModalContent').insertAdjacentHTML('beforeend', regSection);
       }
 
+      // Breakfast codes section
+      var resBf = (S.desayunos || []).filter(function(d) { return d.reservaId === resId; });
+      if (resBf.length > 0) {
+        var bfSection = '<div style="background:var(--surface3);padding:12px;border-radius:var(--radius);margin-bottom:12px;">';
+        bfSection += '<div style="font-size:12px;color:var(--text2);margin-bottom:8px">🍳 DESAYUNOS INCLUIDOS (' + resBf.length + ')</div>';
+        resBf.forEach(function(bf) {
+          var stColor = bf.estado === 'Consumido' ? 'var(--green)' : bf.estado === 'Cancelado' ? 'var(--red)' : bf.estado === 'Expirado' ? 'var(--text2)' : 'var(--accent)';
+          var stIcon = bf.estado === 'Consumido' ? '✅' : bf.estado === 'Cancelado' ? '❌' : bf.estado === 'Expirado' ? '⏰' : '🎟️';
+          bfSection += '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--surface2);font-size:12px">';
+          bfSection += '<div><span style="font-family:Space Mono,monospace;font-weight:700;color:' + stColor + '">' + bf.codigo + '</span>';
+          bfSection += '<span style="color:var(--text2);margin-left:6px">' + formatDate(bf.fecha) + '</span>';
+          bfSection += '<span style="color:var(--text2);margin-left:4px">(' + bf.personas + ' pers.)</span></div>';
+          bfSection += '<span style="font-size:11px">' + stIcon + ' ' + bf.estado + '</span>';
+          bfSection += '</div>';
+        });
+        bfSection += '<div style="display:flex;gap:6px;margin-top:8px">';
+        bfSection += '<button onclick="shareBreakfastCodes(\'' + resId + '\')" style="flex:1;background:#25D366;color:white;border:none;border-radius:8px;padding:6px;font-size:11px;cursor:pointer">📲 Enviar códigos</button>';
+        bfSection += '<button onclick="cancelBreakfastCodes(\'' + resId + '\')" style="background:var(--surface2);border:1px solid var(--surface3);border-radius:8px;padding:6px 10px;font-size:11px;cursor:pointer;color:var(--red)">Cancelar</button>';
+        bfSection += '</div></div>';
+        document.getElementById('reservaModalContent').insertAdjacentHTML('beforeend', bfSection);
+      }
+
       // Add action buttons based on estado
       var payments = S.cobros.filter(function(c){return c.reservaId===resId});
       var totalPaid = payments.reduce(function(s,c){return s+c.monto},0);
@@ -7890,6 +8392,38 @@
       }
 
       openModal('reservaModal');
+    }
+
+    // ============ BREAKFAST CODE HELPERS ============
+    function shareBreakfastCodes(resId) {
+      var res = S.reservas.find(function(r) { return r.id === resId; });
+      var codes = (S.desayunos || []).filter(function(d) { return d.reservaId === resId && d.estado === 'Pendiente'; });
+      if (codes.length === 0) { toast('No hay códigos pendientes', true); return; }
+      var promo = getBreakfastPromo();
+      var msg = '🍳 *Desayunos incluidos*\n\n';
+      msg += 'Hola *' + res.huesped + '* 👋\n\n';
+      msg += 'Tu estancia incluye desayuno continental en *' + promo.partner + '*.\n\n';
+      msg += 'Tus códigos:\n';
+      codes.forEach(function(c) {
+        msg += '📅 ' + formatDate(c.fecha) + ' → *' + c.codigo + '* (' + c.personas + ' persona' + (c.personas > 1 ? 's' : '') + ')\n';
+      });
+      msg += '\nMuestra el código al llegar al restaurante.\n\n_' + HOTEL_NAME + '_ 🌿';
+      var phone = (res.telefono || '').replace(/\D/g, '');
+      window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(msg), '_blank');
+    }
+
+    async function cancelBreakfastCodes(resId) {
+      if (!confirm('¿Cancelar todos los desayunos pendientes de esta reserva?')) return;
+      var pending = (S.desayunos || []).filter(function(d) { return d.reservaId === resId && d.estado === 'Pendiente'; });
+      if (pending.length === 0) { toast('No hay códigos pendientes'); return; }
+      var ops = pending.map(function(d) {
+        return { type: 'updateById', sheet: '🍳 Desayunos', id: d.codigo, values: [d.codigo, d.reservaId, d.huesped, d.habitacion, d.fecha, d.personas, 'Cancelado', S.user ? S.user.nombre : '', now()] };
+      });
+      await sheets.multi(ops);
+      pending.forEach(function(d) { d.estado = 'Cancelado'; });
+      toast(pending.length + ' desayuno(s) cancelado(s)');
+      closeModal();
+      openReservaModal(resId);
     }
 
     // ============ CONFIRM RESERVA ============
@@ -8626,19 +9160,42 @@
         var roomRow = [room.id, room.numero, room.tipo, room.tarifa, 'Ocupada', room.notas];
         var logRow = [normDate(new Date()), n.split(' ')[1], S.user.usuario, 'Check-in', res.huesped + ' en Hab. ' + res.habitacionNum, 'info'];
 
-        await sheets.multi([
+        var multiOps = [
           { type: 'updateById', sheet: '📋 Reservas', id: res.id, values: resRow },
           { type: 'updateById', sheet: '🏨 Habitaciones', id: room.id, values: roomRow },
           { type: 'append', sheet: '📜 Bitácora', values: logRow }
-        ]);
+        ];
+
+        // Generate breakfast codes if promo is active for this room type
+        var _bfPersonas = isBreakfastPromoActive() ? getBreakfastPersonas(room.tipo) : 0;
+        var _bfCodes = [];
+        if (_bfPersonas > 0) {
+          var nights = daysUntil(res.fechaEntrada, res.fechaSalida);
+          for (var _di = 0; _di < nights; _di++) {
+            var _bfDate = new Date(res.fechaEntrada + 'T12:00:00');
+            _bfDate.setDate(_bfDate.getDate() + _di + 1); // breakfast = morning after each night
+            var _bfDateStr = normDate(_bfDate);
+            var _bfCode = generateBreakfastCode();
+            var _bfRow = [_bfCode, res.id, res.huesped, res.habitacionNum, _bfDateStr, _bfPersonas, 'Pendiente', '', ''];
+            multiOps.push({ type: 'append', sheet: '🍳 Desayunos', values: _bfRow });
+            _bfCodes.push({ codigo: _bfCode, reservaId: res.id, huesped: res.huesped, habitacion: res.habitacionNum, fecha: _bfDateStr, personas: _bfPersonas, estado: 'Pendiente', validadoPor: '', horaValidacion: '' });
+          }
+        }
+
+        await sheets.multi(multiOps);
 
         // Update local state
         var resIdx = S.reservas.findIndex(r => r.id === res.id);
         S.reservas[resIdx].estado = 'Check-in';
         var roomIdx = S.rooms.findIndex(r => r.numero === res.habitacionNum);
         S.rooms[roomIdx].estado = 'Ocupada';
+        // Add breakfast codes to local state
+        if (_bfCodes.length > 0) {
+          S.desayunos = (S.desayunos || []).concat(_bfCodes);
+        }
 
-        toast('Check-in completado');
+        var _bfMsg = _bfCodes.length > 0 ? ' · 🍳 ' + _bfCodes.length + ' desayuno(s) generado(s)' : '';
+        toast('Check-in completado' + _bfMsg);
         closeModal();
         render();
       }, 'Procesando check-in...');
