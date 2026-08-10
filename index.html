@@ -1947,6 +1947,13 @@
         </div>
       </div>
 
+      <!-- Desayunos Tab -->
+      <div class="tab-content" id="tabDesayunos">
+        <div class="tab-scroll">
+          <div id="desayunosContent"></div>
+        </div>
+      </div>
+
       <!-- Config Tab -->
       <div class="tab-content" id="tabConfig">
         <div class="tab-scroll">
@@ -2447,8 +2454,18 @@
     function getBreakfastPromo() {
       try {
         var stored = localStorage.getItem('breakfastPromo');
-        if (stored) return Object.assign({}, DEFAULT_BREAKFAST_PROMO, JSON.parse(stored));
-      } catch(e) {}
+        if (stored) {
+          var parsed = JSON.parse(stored);
+          // If parsed is still a string (double-encoded), parse again
+          if (typeof parsed === 'string') { try { parsed = JSON.parse(parsed); } catch(e2) {} }
+          if (typeof parsed === 'object' && parsed !== null) {
+            var result = Object.assign({}, DEFAULT_BREAKFAST_PROMO, parsed);
+            // Ensure rules array exists
+            if (!Array.isArray(result.rules)) result.rules = DEFAULT_BREAKFAST_PROMO.rules.slice();
+            return result;
+          }
+        }
+      } catch(e) { console.warn('getBreakfastPromo parse error:', e.message); }
       return Object.assign({}, DEFAULT_BREAKFAST_PROMO);
     }
 
@@ -2632,16 +2649,24 @@
         var val = row[1];
         if (CONFIG_KEYS.indexOf(key) !== -1 && val) {
           try {
-            // Handle double-encoded JSON (sometimes val is a string-wrapped JSON)
-            var parsed = val;
-            if (typeof val === 'string') {
-              parsed = JSON.parse(val);
-              // If the result is still a string, try parsing again (double-encoded)
-              if (typeof parsed === 'string') {
-                try { parsed = JSON.parse(parsed); } catch(e2) {}
+            // Goal: localStorage must end up with a JSON string of the config object
+            // val from Sheet can be: JSON string, double-encoded JSON, or raw string
+            var finalObj = val;
+            // Keep parsing until we get an object (or array), max 3 levels of nesting
+            for (var _pi = 0; _pi < 3; _pi++) {
+              if (typeof finalObj === 'string') {
+                try { finalObj = JSON.parse(finalObj); } catch(e) { break; }
+              } else {
+                break;
               }
             }
-            localStorage.setItem(key, typeof parsed === 'string' ? parsed : JSON.stringify(parsed));
+            // finalObj should now be the actual config object
+            if (typeof finalObj === 'object' && finalObj !== null) {
+              localStorage.setItem(key, JSON.stringify(finalObj));
+            } else if (typeof finalObj === 'string') {
+              // Couldn't parse, store as-is (might be a plain string value)
+              localStorage.setItem(key, finalObj);
+            }
           } catch(e) {
             console.warn('Config parse error for ' + key + ':', e.message);
           }
@@ -4169,6 +4194,7 @@
       renderCobros();
       renderClientes();
       renderCotizaciones();
+      renderDesayunosTab();
       renderConfig();
       updateUserBadge();
     }
@@ -6568,6 +6594,89 @@
 
       h += '<button class="report-export-btn" onclick="exportReportPDF(\'diario\')">📄 Exportar a PDF</button>';
       return h;
+    }
+
+    // ============ DESAYUNOS TAB ============
+    function renderDesayunosTab() {
+      var promo = getBreakfastPromo();
+      var promoActive = isBreakfastPromoActive();
+      var des = S.desayunos || [];
+      var today = normDate(new Date());
+
+      var h = '';
+      h += '<div class="section-title" style="margin-bottom:14px;">🍳 Desayunos</div>';
+
+      // Status banner
+      if (promoActive) {
+        h += '<div style="background:linear-gradient(135deg,rgba(46,125,50,0.12),rgba(76,175,80,0.06));border:1px solid rgba(76,175,80,0.3);border-radius:var(--radius);padding:12px;margin-bottom:14px;">';
+        h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;"><span style="font-size:18px;">✅</span><span style="font-weight:700;color:#2e7d32;">Promoción activa</span></div>';
+        h += '<div style="font-size:12px;color:var(--text2);">' + promo.partner + '</div>';
+        if (promo.descripcion) h += '<div style="font-size:11px;color:var(--text1);margin-top:4px;">🍽️ ' + promo.descripcion + '</div>';
+        h += '</div>';
+      } else {
+        h += '<div style="background:var(--surface3);border-radius:var(--radius);padding:12px;margin-bottom:14px;text-align:center;">';
+        h += '<div style="font-size:13px;color:var(--text2);">⏸️ Promoción inactiva — Actívala en <a href="#" onclick="switchTab(\'config\');return false;" style="color:var(--accent);">Ajustes</a></div>';
+        h += '</div>';
+      }
+
+      // Today summary
+      var todayCodes = des.filter(function(d) { return d.fecha === today; });
+      var todayPendientes = todayCodes.filter(function(d) { return d.estado === 'Pendiente'; });
+      var todayConsumidos = todayCodes.filter(function(d) { return d.estado === 'Consumido'; });
+
+      h += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;">';
+      h += '<div class="report-box" style="text-align:center;padding:10px;"><div style="font-size:22px;font-weight:800;color:var(--yellow);">' + todayPendientes.length + '</div><div style="font-size:10px;color:var(--text2);">Pendientes hoy</div></div>';
+      h += '<div class="report-box" style="text-align:center;padding:10px;"><div style="font-size:22px;font-weight:800;color:var(--green);">' + todayConsumidos.length + '</div><div style="font-size:10px;color:var(--text2);">Consumidos hoy</div></div>';
+      h += '<div class="report-box" style="text-align:center;padding:10px;"><div style="font-size:22px;font-weight:800;color:var(--accent);">' + des.length + '</div><div style="font-size:10px;color:var(--text2);">Total códigos</div></div>';
+      h += '</div>';
+
+      // Validation link
+      if (promoActive && S.scriptUrl) {
+        var valLink = window.location.origin + window.location.pathname + '?validar&u=' + encodeURIComponent(S.scriptUrl);
+        h += '<div style="background:var(--surface3);padding:10px 12px;border-radius:var(--radius);margin-bottom:14px;">';
+        h += '<div style="font-size:11px;color:var(--text2);margin-bottom:4px;">Link de validación para restaurante:</div>';
+        h += '<div style="display:flex;gap:6px;">';
+        h += '<button class="form-button secondary" onclick="navigator.clipboard.writeText(\'' + valLink.replace(/'/g, "\\'") + '\');toast(\'Link copiado\')" style="font-size:11px;padding:6px 10px;flex:1;">📋 Copiar link</button>';
+        h += '<button class="form-button secondary" onclick="window.open(\'' + valLink.replace(/'/g, "\\'") + '\',\'_blank\')" style="font-size:11px;padding:6px 10px;">🔗 Abrir</button>';
+        h += '</div></div>';
+      }
+
+      // Today's pending codes
+      if (todayPendientes.length > 0) {
+        h += '<div class="section-title" style="font-size:13px;margin-bottom:8px;">🎟️ Pendientes de hoy</div>';
+        todayPendientes.forEach(function(bf) {
+          h += '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:var(--surface2);border-radius:var(--radius);margin-bottom:6px;border-left:3px solid var(--yellow);">';
+          h += '<div>';
+          h += '<div style="font-family:Space Mono,monospace;font-weight:700;font-size:14px;color:var(--accent);">' + bf.codigo + '</div>';
+          h += '<div style="font-size:11px;color:var(--text2);">' + bf.huesped + ' · Hab. ' + bf.habitacion + ' · ' + bf.personas + ' pers.</div>';
+          h += '</div>';
+          h += '<span style="background:var(--yellow);color:#000;font-size:10px;font-weight:700;padding:3px 8px;border-radius:10px;">Pendiente</span>';
+          h += '</div>';
+        });
+      }
+
+      // Recent consumed
+      var recentConsumidos = des.filter(function(d) { return d.estado === 'Consumido'; }).sort(function(a, b) { return (b.horaValidacion || '').localeCompare(a.horaValidacion || ''); }).slice(0, 10);
+      if (recentConsumidos.length > 0) {
+        h += '<div class="section-title" style="font-size:13px;margin:14px 0 8px;">✅ Últimos consumidos</div>';
+        recentConsumidos.forEach(function(bf) {
+          h += '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--surface2);border-radius:var(--radius);margin-bottom:4px;border-left:3px solid var(--green);font-size:12px;">';
+          h += '<div>';
+          h += '<span style="font-family:Space Mono,monospace;font-weight:600;">' + bf.codigo + '</span>';
+          h += '<span style="color:var(--text2);margin-left:6px;">' + bf.huesped + ' · ' + formatDate(bf.fecha) + '</span>';
+          h += '</div>';
+          h += '<span style="font-size:10px;color:var(--text2);">' + (bf.horaValidacion || '') + '</span>';
+          h += '</div>';
+        });
+      }
+
+      // Export button
+      h += '<div style="margin-top:16px;display:flex;gap:8px;">';
+      h += '<button class="form-button secondary" onclick="switchTab(\'reports\');S.filterReports=\'desayunos\';renderReports();" style="flex:1;font-size:12px;">📊 Reporte completo</button>';
+      h += '<button class="form-button secondary" onclick="exportDesayunosPDF()" style="flex:1;font-size:12px;">📄 PDF facturación</button>';
+      h += '</div>';
+
+      document.getElementById('desayunosContent').innerHTML = h;
     }
 
     // --- Bitácora (existing, refactored) ---
@@ -11016,6 +11125,7 @@
       { id: 'housekeeping', icon: '🧹', label: 'Limpieza' },
       { id: 'inventario', icon: '📦', label: 'Inventario' },
       { id: 'cotizaciones', icon: '📝', label: 'Cotización' },
+      { id: 'desayunos', icon: '🍳', label: 'Desayunos' },
       { id: 'reports', icon: '📊', label: 'Reportes' }
     ];
 
