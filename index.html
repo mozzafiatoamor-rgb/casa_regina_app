@@ -2631,9 +2631,19 @@
         var val = row[1];
         if (CONFIG_KEYS.indexOf(key) !== -1 && val) {
           try {
-            JSON.parse(val); // validate JSON
-            localStorage.setItem(key, val);
-          } catch(e) {}
+            // Handle double-encoded JSON (sometimes val is a string-wrapped JSON)
+            var parsed = val;
+            if (typeof val === 'string') {
+              parsed = JSON.parse(val);
+              // If the result is still a string, try parsing again (double-encoded)
+              if (typeof parsed === 'string') {
+                try { parsed = JSON.parse(parsed); } catch(e2) {}
+              }
+            }
+            localStorage.setItem(key, typeof parsed === 'string' ? parsed : JSON.stringify(parsed));
+          } catch(e) {
+            console.warn('Config parse error for ' + key + ':', e.message);
+          }
         }
       });
       // Refresh HOTEL_NAME in case it changed
@@ -4010,6 +4020,21 @@
 
         // Sync config from Sheet → localStorage (Sheet wins on load)
         applyConfigFromSheet(configData);
+        // If Sheet has no config rows but localStorage does, push localStorage → Sheet
+        if ((!configData || configData.length === 0) && S.scriptUrl) {
+          syncAllConfigToSheet();
+        } else if (configData && configData.length > 0) {
+          // Check if any CONFIG_KEYS are missing from Sheet but exist in localStorage
+          var sheetKeys = configData.map(function(r) { return r[0]; });
+          CONFIG_KEYS.forEach(function(key) {
+            if (sheetKeys.indexOf(key) === -1 && localStorage.getItem(key)) {
+              try {
+                var val = JSON.parse(localStorage.getItem(key));
+                syncConfigToSheet(key, val);
+              } catch(e) {}
+            }
+          });
+        }
 
         S.usuarios = usuariosData;
 
@@ -5486,11 +5511,20 @@
       h += '<div class="section-title" style="margin-bottom:0">' + (_editingCotId ? '✏️ Editar Cotización' : 'Nueva Cotización') + '</div>';
       h += '</div>';
 
+      // Prominent name header
+      var _cotNombreVal = _cotizacionData ? _cotizacionData.nombre : '';
+      if (_cotNombreVal) {
+        h += '<div style="background:var(--accent);color:#fff;border-radius:var(--radius);padding:14px 16px;margin-bottom:12px;text-align:center;">';
+        h += '<div style="font-size:11px;opacity:.8;">Cotización para</div>';
+        h += '<div style="font-size:18px;font-weight:700;">' + _cotNombreVal + '</div>';
+        h += '</div>';
+      }
+
       h += '<div style="background:var(--surface2);border-radius:var(--radius);padding:16px;margin-bottom:16px;">';
 
       // Guest info
       h += '<div class="form-group"><label class="form-label">Nombre del huésped</label>';
-      h += '<input type="text" id="cotNombre" class="form-input" placeholder="Nombre completo" value="' + (_cotizacionData ? _cotizacionData.nombre : '') + '" oninput="calcCotizacion()" /></div>';
+      h += '<input type="text" id="cotNombre" class="form-input" placeholder="Nombre completo" value="' + (_cotNombreVal || '') + '" oninput="calcCotizacion()" style="font-size:15px;font-weight:600;padding:12px;" /></div>';
 
       h += '<div class="form-group"><label class="form-label">Teléfono</label>';
       h += '<input type="tel" id="cotTelefono" class="form-input" placeholder="+52 999 123 4567" value="' + (_cotizacionData ? _cotizacionData.telefono : '') + '" /></div>';
@@ -5508,10 +5542,13 @@
       h += '<input type="date" id="cotCheckout" class="form-input" value="' + (_cotizacionData ? _cotizacionData.checkout : _pasado) + '" onchange="calcCotizacion()" style="padding:10px;" /></div>';
       h += '</div>';
 
+      // Auto-calculated guest totals (computed in calcCotizacion from room lines)
+      var _autoAdultos = 0;
+      _cotRooms.forEach(function(rm) { _autoAdultos += (rm.huespedesPorHab || 2) * rm.cantidad; });
       h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">';
-      h += '<div class="form-group"><label class="form-label">Adultos (total)</label>';
-      h += '<input type="number" id="cotAdultos" class="form-input" value="' + (_cotizacionData ? _cotizacionData.adultos : 2) + '" min="1" max="50" onchange="calcCotizacion()" style="padding:10px;" /></div>';
-      h += '<div class="form-group"><label class="form-label">Niños (total)</label>';
+      h += '<div class="form-group"><label class="form-label">Huéspedes (auto)</label>';
+      h += '<div id="cotAdultosDisplay" style="background:var(--surface3);border-radius:var(--radius);padding:10px;font-size:14px;font-weight:600;text-align:center;">' + _autoAdultos + ' persona' + (_autoAdultos !== 1 ? 's' : '') + '</div></div>';
+      h += '<div class="form-group"><label class="form-label">Niños</label>';
       h += '<input type="number" id="cotNinos" class="form-input" value="' + (_cotizacionData ? _cotizacionData.ninos : 0) + '" min="0" max="50" onchange="calcCotizacion()" style="padding:10px;" /></div>';
       h += '</div>';
 
@@ -5582,7 +5619,7 @@
       h += '</div>';
 
       h += '<div class="form-group"><label class="form-label">Observaciones (opcional)</label>';
-      h += '<textarea id="cotNotas" class="form-input" rows="2" placeholder="Solicitudes especiales, notas..." style="resize:vertical;">' + (_cotizacionData ? _cotizacionData.notas : '') + '</textarea></div>';
+      h += '<textarea id="cotNotas" class="form-input" rows="2" placeholder="Solicitudes especiales, notas..." style="resize:vertical;">' + (_cotizacionData && _cotizacionData.notas ? _cotizacionData.notas : '') + '</textarea></div>';
 
       h += '</div>';
       h += '<div id="cotPreview"></div>';
@@ -5608,8 +5645,13 @@
       var hi = getHotelInfo();
       var promo = getBreakfastPromo();
       var peRate = hi.persona_extra || 0;
-      var adultos = parseInt(document.getElementById('cotAdultos').value) || 1;
+      // Auto-calculate adultos from room lines
+      var adultos = 0;
+      _cotRooms.forEach(function(rm) { adultos += (rm.huespedesPorHab || 2) * rm.cantidad; });
       var ninos = parseInt(document.getElementById('cotNinos').value) || 0;
+      // Update display
+      var adDisplay = document.getElementById('cotAdultosDisplay');
+      if (adDisplay) adDisplay.textContent = adultos + ' persona' + (adultos !== 1 ? 's' : '');
       var conIVA = document.getElementById('cotIVA').checked;
       var mostrarHorarios = document.getElementById('cotHorarios').checked;
       var desayunoEl = document.getElementById('cotDesayuno');
@@ -5682,7 +5724,7 @@
       p += '<div style="color:var(--text2);">Check-out:</div><div>' + formatDate(checkout) + (mostrarHorarios ? ' · ' + formatHoraDisplay(hi.checkout_hora) : '') + '</div>';
       p += '<div style="color:var(--text2);">Noches:</div><div>' + nights + '</div>';
       p += '<div style="color:var(--text2);">Habitaciones:</div><div style="font-weight:600;">' + totalHabs + '</div>';
-      p += '<div style="color:var(--text2);">Huéspedes:</div><div>' + adultos + ' adulto' + (adultos > 1 ? 's' : '') + (ninos > 0 ? ' + ' + ninos + ' niño' + (ninos > 1 ? 's' : '') : '') + '</div>';
+      p += '<div style="color:var(--text2);">Huéspedes:</div><div>' + adultos + ' persona' + (adultos > 1 ? 's' : '') + (ninos > 0 ? ' + ' + ninos + ' niño' + (ninos > 1 ? 's' : '') : '') + '</div>';
       p += '</div>';
 
       // Room lines detail
@@ -5722,13 +5764,38 @@
       document.getElementById('cotPreview').innerHTML = p;
 
       var a = '';
-      a += '<button class="form-button" onclick="generateCotizacionPDF(\'download\')" style="flex:1;">📄 Descargar PDF</button>';
-      a += '<button class="form-button" onclick="generateCotizacionPDF(\'whatsapp\')" style="flex:1;background:#25D366;">📱 WhatsApp</button>';
+      a += '<button class="form-button" onclick="guardarCotizacionSolo()" style="flex:1;background:var(--green);">💾 Guardar</button>';
+      a += '<button class="form-button" onclick="generateCotizacionPDF(\'download\')" style="flex:1;">📄 PDF</button>';
+      a += '<button class="form-button" onclick="generateCotizacionPDF(\'whatsapp\')" style="flex:1;background:#25D366;">📱 WA</button>';
       a += '<button class="form-button secondary" onclick="resetCotizacion()" style="flex:0;">🗑️</button>';
       document.getElementById('cotActions').innerHTML = a;
     }
 
     function resetCotizacion() { _cotizacionData = null; _cotRooms = []; _editingCotId = null; renderCotizacionForm(); }
+
+    async function guardarCotizacionSolo() {
+      calcCotizacion();
+      if (!_cotizacionData) { toast('Completa la cotización primero', true); return; }
+      if (!_cotizacionData.nombre) { toast('Ingresa el nombre del huésped', true); return; }
+      var d = _cotizacionData;
+      // Generate cotNum if new
+      var cotNum;
+      if (_editingCotId) {
+        var ex = S.cotizaciones.find(function(c) { return c.id === _editingCotId; });
+        cotNum = ex ? ex.numero : 'COT-' + String(++_cotizacionCounter).padStart(4, '0');
+      } else {
+        _cotizacionCounter++;
+        localStorage.setItem('cotizacionCounter', _cotizacionCounter);
+        cotNum = 'COT-' + String(_cotizacionCounter).padStart(4, '0');
+      }
+      await saveCotizacionToSheet(cotNum, d);
+      toast('Cotización ' + cotNum + ' guardada');
+      // After saving a new one, set _editingCotId so subsequent saves update instead of creating new
+      if (!_editingCotId) {
+        var saved = S.cotizaciones[S.cotizaciones.length - 1];
+        if (saved) _editingCotId = saved.id;
+      }
+    }
 
     async function generateCotizacionPDF(mode) {
       if (!_cotizacionData) { toast('Completa la cotización primero', true); return; }
