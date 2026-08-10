@@ -5274,16 +5274,71 @@
       }, 'Eliminando...');
     }
 
-    // ============ COTIZACIONES ============
+    // ============ COTIZACIONES (multi-habitación) ============
     var _cotizacionData = null;
     var _cotizacionCounter = parseInt(localStorage.getItem('cotizacionCounter') || '0');
+    var _cotRooms = []; // array of {tipo, cantidad, tarifa, huespedesPorHab, personasExtra}
 
     function _fmt(n) { return n.toLocaleString('es-MX', {minimumFractionDigits:2}); }
+
+    function _getCotRoomTypes() {
+      var tipos = {};
+      S.rooms.forEach(function(r) { if (!tipos[r.tipo]) tipos[r.tipo] = r.tarifa; });
+      return tipos;
+    }
+
+    function addCotRoom() {
+      var tipos = _getCotRoomTypes();
+      var keys = Object.keys(tipos);
+      var pick = keys.find(function(k) { return !_cotRooms.some(function(r) { return r.tipo === k; }); }) || keys[0];
+      _cotRooms.push({ tipo: pick, cantidad: 1, tarifa: tipos[pick] || 0, huespedesPorHab: 2, personasExtra: 0 });
+      renderCotizaciones();
+    }
+
+    function removeCotRoom(idx) {
+      if (_cotRooms.length <= 1) { toast('Debe haber al menos una habitación', true); return; }
+      _cotRooms.splice(idx, 1);
+      renderCotizaciones();
+    }
+
+    function cotRoomChanged(idx, field) {
+      var tipos = _getCotRoomTypes();
+      if (field === 'tipo') {
+        var sel = document.getElementById('cotRoomTipo_' + idx);
+        _cotRooms[idx].tipo = sel.value;
+        _cotRooms[idx].tarifa = tipos[sel.value] || _cotRooms[idx].tarifa;
+        document.getElementById('cotTarifa_' + idx).value = _cotRooms[idx].tarifa;
+      } else if (field === 'cantidad') {
+        _cotRooms[idx].cantidad = Math.max(1, parseInt(document.getElementById('cotCant_' + idx).value) || 1);
+      } else if (field === 'tarifa') {
+        _cotRooms[idx].tarifa = parseFloat(document.getElementById('cotTarifa_' + idx).value) || 0;
+      } else if (field === 'huespedes') {
+        var hph = Math.max(1, parseInt(document.getElementById('cotHPH_' + idx).value) || 1);
+        _cotRooms[idx].huespedesPorHab = hph;
+        // Auto-calculate extras: anything over 2 base
+        var autoExtra = Math.max(0, hph - 2);
+        _cotRooms[idx].personasExtra = autoExtra;
+        var peEl = document.getElementById('cotPE_' + idx);
+        if (peEl) peEl.value = autoExtra;
+      } else if (field === 'pe') {
+        // Manual override
+        _cotRooms[idx].personasExtra = Math.max(0, parseInt(document.getElementById('cotPE_' + idx).value) || 0);
+      }
+      calcCotizacion();
+    }
 
     function renderCotizaciones() {
       var hi = getHotelInfo();
       var promo = getBreakfastPromo();
       var promoActive = isBreakfastPromoActive();
+      var tipos = _getCotRoomTypes();
+
+      // Init default room if empty
+      if (_cotRooms.length === 0) {
+        var firstType = Object.keys(tipos)[0] || '';
+        _cotRooms = [{ tipo: firstType, cantidad: 1, tarifa: tipos[firstType] || 0, huespedesPorHab: 2, personasExtra: 0 }];
+      }
+
       var h = '';
       h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">';
       h += '<div class="section-title" style="margin-bottom:0">Cotización de Habitaciones</div>';
@@ -5291,6 +5346,7 @@
 
       h += '<div style="background:var(--surface2);border-radius:var(--radius);padding:16px;margin-bottom:16px;">';
 
+      // Guest info
       h += '<div class="form-group"><label class="form-label">Nombre del huésped</label>';
       h += '<input type="text" id="cotNombre" class="form-input" placeholder="Nombre completo" value="' + (_cotizacionData ? _cotizacionData.nombre : '') + '" oninput="calcCotizacion()" /></div>';
 
@@ -5300,6 +5356,7 @@
       h += '<div class="form-group"><label class="form-label">Email (opcional)</label>';
       h += '<input type="email" id="cotEmail" class="form-input" placeholder="correo@ejemplo.com" value="' + (_cotizacionData ? _cotizacionData.email : '') + '" /></div>';
 
+      // Dates
       h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">';
       var _tomorrow = normDate(new Date(Date.now() + 86400000));
       var _pasado = normDate(new Date(Date.now() + 172800000));
@@ -5310,52 +5367,69 @@
       h += '</div>';
 
       h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">';
-      h += '<div class="form-group"><label class="form-label">Adultos</label>';
-      h += '<input type="number" id="cotAdultos" class="form-input" value="' + (_cotizacionData ? _cotizacionData.adultos : 2) + '" min="1" max="10" onchange="calcCotizacion()" style="padding:10px;" /></div>';
-      h += '<div class="form-group"><label class="form-label">Niños</label>';
-      h += '<input type="number" id="cotNinos" class="form-input" value="' + (_cotizacionData ? _cotizacionData.ninos : 0) + '" min="0" max="10" onchange="calcCotizacion()" style="padding:10px;" /></div>';
+      h += '<div class="form-group"><label class="form-label">Adultos (total)</label>';
+      h += '<input type="number" id="cotAdultos" class="form-input" value="' + (_cotizacionData ? _cotizacionData.adultos : 2) + '" min="1" max="50" onchange="calcCotizacion()" style="padding:10px;" /></div>';
+      h += '<div class="form-group"><label class="form-label">Niños (total)</label>';
+      h += '<input type="number" id="cotNinos" class="form-input" value="' + (_cotizacionData ? _cotizacionData.ninos : 0) + '" min="0" max="50" onchange="calcCotizacion()" style="padding:10px;" /></div>';
       h += '</div>';
 
-      // Room type
-      h += '<div class="form-group"><label class="form-label">Tipo de habitación</label>';
-      h += '<select id="cotRoomTipo" class="form-input" onchange="calcCotizacion()">';
-      var _tipos = {};
-      S.rooms.forEach(function(r) { if (!_tipos[r.tipo]) _tipos[r.tipo] = r.tarifa; });
-      Object.keys(_tipos).forEach(function(tipo) {
-        var sel = _cotizacionData && _cotizacionData.roomTipo === tipo ? ' selected' : '';
-        h += '<option value="' + tipo + '" data-tarifa="' + _tipos[tipo] + '"' + sel + '>' + tipo + ' — $' + _tipos[tipo].toLocaleString() + '/noche</option>';
-      });
-      h += '</select></div>';
-
-      h += '<div class="form-group"><label class="form-label">Tarifa por noche (editable)</label>';
-      h += '<input type="number" id="cotTarifa" class="form-input" step="0.01" min="0" oninput="calcCotizacion()" style="padding:10px;" /></div>';
-
-      // Persona extra
+      // ---- Room lines ----
       var peRate = hi.persona_extra || 0;
-      h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">';
-      h += '<div class="form-group" style="margin-bottom:0;"><label class="form-label">Personas extra</label>';
-      h += '<input type="number" id="cotPersonasExtra" class="form-input" value="' + (_cotizacionData ? _cotizacionData.personasExtra : 0) + '" min="0" max="10" onchange="calcCotizacion()" style="padding:10px;" /></div>';
-      h += '<div style="display:flex;align-items:flex-end;padding-bottom:2px;font-size:11px;color:var(--text2);">$' + _fmt(peRate) + '/noche c/u' + (peRate === 0 ? ' (configura en Ajustes)' : '') + '</div>';
-      h += '</div>';
+      h += '<div style="margin:14px 0 8px;"><label class="form-label" style="font-size:13px;font-weight:700;">Habitaciones</label></div>';
 
-      // Toggles section
+      _cotRooms.forEach(function(rm, idx) {
+        h += '<div style="background:var(--surface3);border-radius:var(--radius);padding:12px;margin-bottom:8px;position:relative;">';
+        // Remove button (if more than 1)
+        if (_cotRooms.length > 1) {
+          h += '<button onclick="removeCotRoom(' + idx + ')" style="position:absolute;top:8px;right:8px;background:rgba(207,107,107,.2);border:none;color:var(--red);width:24px;height:24px;border-radius:8px;cursor:pointer;font-size:11px;">✕</button>';
+        }
+        h += '<div style="display:grid;grid-template-columns:2fr 1fr;gap:8px;margin-bottom:8px;">';
+        // Type
+        h += '<div><label class="form-label" style="font-size:11px;">Tipo</label>';
+        h += '<select id="cotRoomTipo_' + idx + '" class="form-input" onchange="cotRoomChanged(' + idx + ',\'tipo\')" style="padding:8px;font-size:12px;">';
+        Object.keys(tipos).forEach(function(tipo) {
+          h += '<option value="' + tipo + '"' + (rm.tipo === tipo ? ' selected' : '') + '>' + tipo + '</option>';
+        });
+        h += '</select></div>';
+        // Cantidad
+        h += '<div><label class="form-label" style="font-size:11px;">Cantidad</label>';
+        h += '<input type="number" id="cotCant_' + idx + '" class="form-input" value="' + rm.cantidad + '" min="1" max="20" onchange="cotRoomChanged(' + idx + ',\'cantidad\')" style="padding:8px;font-size:12px;" /></div>';
+        h += '</div>';
+
+        h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">';
+        // Tarifa
+        h += '<div><label class="form-label" style="font-size:11px;">Tarifa/noche</label>';
+        h += '<input type="number" id="cotTarifa_' + idx + '" class="form-input" value="' + rm.tarifa + '" step="0.01" min="0" oninput="cotRoomChanged(' + idx + ',\'tarifa\')" style="padding:8px;font-size:12px;" /></div>';
+        // Huéspedes por hab
+        h += '<div><label class="form-label" style="font-size:11px;">Huéspedes/hab.</label>';
+        h += '<input type="number" id="cotHPH_' + idx + '" class="form-input" value="' + (rm.huespedesPorHab || 2) + '" min="1" max="10" onchange="cotRoomChanged(' + idx + ',\'huespedes\')" style="padding:8px;font-size:12px;" /></div>';
+        // PE (auto but editable)
+        h += '<div><label class="form-label" style="font-size:11px;">Extra' + (rm.personasExtra > 0 ? ' ⚡' : '') + '</label>';
+        h += '<input type="number" id="cotPE_' + idx + '" class="form-input" value="' + rm.personasExtra + '" min="0" max="10" onchange="cotRoomChanged(' + idx + ',\'pe\')" style="padding:8px;font-size:12px;' + (rm.personasExtra > 0 ? 'border-color:var(--yellow);' : '') + '" /></div>';
+        h += '</div>';
+        h += '</div>';
+      });
+
+      h += '<button class="form-button secondary" onclick="addCotRoom()" style="width:100%;margin-bottom:12px;font-size:12px;">+ Agregar tipo de habitación</button>';
+
+      if (peRate > 0) {
+        h += '<div style="font-size:11px;color:var(--text2);margin-bottom:10px;">Cargo persona extra: $' + _fmt(peRate) + '/noche c/u</div>';
+      }
+
+      // Toggles
       h += '<div style="display:flex;flex-direction:column;gap:8px;margin:10px 0;">';
-
-      // IVA toggle
       h += '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface3);border-radius:var(--radius);">';
       h += '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;flex:1;">';
       h += '<input type="checkbox" id="cotIVA" onchange="calcCotizacion()" ' + (_cotizacionData && _cotizacionData.conIVA ? 'checked' : '') + ' style="accent-color:var(--accent);width:18px;height:18px;" />';
       h += '<div><div style="font-size:13px;font-weight:600;">Incluir IVA 16%</div><div style="font-size:11px;color:var(--text2);">Marcar si requiere factura</div></div>';
       h += '</label></div>';
 
-      // Horarios toggle
       h += '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface3);border-radius:var(--radius);">';
       h += '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;flex:1;">';
       h += '<input type="checkbox" id="cotHorarios" onchange="calcCotizacion()" ' + (_cotizacionData && _cotizacionData.mostrarHorarios ? 'checked' : '') + ' style="accent-color:var(--accent);width:18px;height:18px;" />';
       h += '<div><div style="font-size:13px;font-weight:600;">Mostrar horarios check-in / check-out</div><div style="font-size:11px;color:var(--text2);">' + formatHoraDisplay(hi.checkin_hora) + ' / ' + formatHoraDisplay(hi.checkout_hora) + '</div></div>';
       h += '</label></div>';
 
-      // Promo desayunos toggle (only if active)
       if (promoActive && promo.precioPorPersona > 0) {
         h += '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface3);border-radius:var(--radius);">';
         h += '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;flex:1;">';
@@ -5386,47 +5460,53 @@
         document.getElementById('cotActions').innerHTML = '';
         return;
       }
-
       var nights = daysUntil(checkin, checkout);
       if (nights <= 0) { document.getElementById('cotPreview').innerHTML = ''; document.getElementById('cotActions').innerHTML = ''; return; }
 
-      var tarifaInput = document.getElementById('cotTarifa');
-      var roomSelect = document.getElementById('cotRoomTipo');
-      var selectedOpt = roomSelect.options[roomSelect.selectedIndex];
-      var tarifaBase = parseFloat(selectedOpt.getAttribute('data-tarifa')) || 0;
-      if (!tarifaInput.value && !_cotizacionData) tarifaInput.value = tarifaBase;
-      var tarifa = parseFloat(tarifaInput.value) || tarifaBase;
-
       var hi = getHotelInfo();
       var promo = getBreakfastPromo();
-      var roomTipo = roomSelect.value;
+      var peRate = hi.persona_extra || 0;
       var adultos = parseInt(document.getElementById('cotAdultos').value) || 1;
       var ninos = parseInt(document.getElementById('cotNinos').value) || 0;
-      var personasExtra = parseInt(document.getElementById('cotPersonasExtra').value) || 0;
       var conIVA = document.getElementById('cotIVA').checked;
       var mostrarHorarios = document.getElementById('cotHorarios').checked;
       var desayunoEl = document.getElementById('cotDesayuno');
       var incluyeDesayuno = desayunoEl ? desayunoEl.checked : false;
 
-      // Calculate room cost
-      var subtotalHab = tarifa * nights;
-
-      // Persona extra
-      var peRate = hi.persona_extra || 0;
-      var subtotalPE = personasExtra * peRate * nights;
-
-      // Breakfast promo
-      var bfPersonas = 0;
+      // Calculate per-room-line
+      var roomLines = [];
+      var grandSubtotalHab = 0;
+      var grandSubtotalPE = 0;
+      var totalHabs = 0;
+      var bfAhorroTotal = 0;
       var bfPrecio = promo.precioPorPersona || 0;
-      var bfAhorro = 0;
-      if (incluyeDesayuno && bfPrecio > 0) {
-        // Get max persons for this room type from promo rules
-        var rule = (promo.rules || []).find(function(r) { return r.tipo === roomTipo; });
-        bfPersonas = rule ? rule.personas : adultos;
-        bfAhorro = bfPersonas * bfPrecio * nights;
-      }
 
-      var subtotal = subtotalHab + subtotalPE;
+      _cotRooms.forEach(function(rm) {
+        var lineSubHab = rm.tarifa * rm.cantidad * nights;
+        var linePE = rm.personasExtra * rm.cantidad * peRate * nights;
+        grandSubtotalHab += lineSubHab;
+        grandSubtotalPE += linePE;
+        totalHabs += rm.cantidad;
+
+        // Breakfast per room line
+        var lineBfPersonas = 0;
+        var lineBfAhorro = 0;
+        if (incluyeDesayuno && bfPrecio > 0) {
+          var rule = (promo.rules || []).find(function(r) { return r.tipo === rm.tipo; });
+          lineBfPersonas = rule ? rule.personas : 2;
+          lineBfAhorro = lineBfPersonas * rm.cantidad * bfPrecio * nights;
+          bfAhorroTotal += lineBfAhorro;
+        }
+
+        roomLines.push({
+          tipo: rm.tipo, cantidad: rm.cantidad, tarifa: rm.tarifa,
+          personasExtra: rm.personasExtra,
+          subtotalHab: lineSubHab, subtotalPE: linePE,
+          bfPersonas: lineBfPersonas, bfAhorro: lineBfAhorro
+        });
+      });
+
+      var subtotal = grandSubtotalHab + grandSubtotalPE;
       var iva = conIVA ? Math.round(subtotal * 0.16 * 100) / 100 : 0;
       var total = subtotal + iva;
       var anticipo_pct = getAnticipoPct();
@@ -5438,14 +5518,15 @@
         email: (document.getElementById('cotEmail').value || '').trim(),
         checkin: checkin, checkout: checkout,
         adultos: adultos, ninos: ninos,
-        roomTipo: roomTipo, tarifa: tarifa, nights: nights,
-        personasExtra: personasExtra, peRate: peRate, subtotalPE: subtotalPE,
-        subtotalHab: subtotalHab, subtotal: subtotal,
-        conIVA: conIVA, iva: iva, total: total,
+        nights: nights, totalHabs: totalHabs,
+        roomLines: roomLines,
+        peRate: peRate,
+        grandSubtotalHab: grandSubtotalHab, grandSubtotalPE: grandSubtotalPE,
+        subtotal: subtotal, conIVA: conIVA, iva: iva, total: total,
         anticipo_pct: anticipo_pct, anticipoMonto: anticipoMonto,
         mostrarHorarios: mostrarHorarios,
         incluyeDesayuno: incluyeDesayuno,
-        bfPartner: promo.partner, bfPrecio: bfPrecio, bfPersonas: bfPersonas, bfAhorro: bfAhorro,
+        bfPartner: promo.partner, bfPrecio: bfPrecio, bfAhorroTotal: bfAhorroTotal,
         notas: (document.getElementById('cotNotas').value || '').trim()
       };
 
@@ -5455,19 +5536,22 @@
 
       p += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:13px;margin-bottom:12px;">';
       p += '<div style="color:var(--text2);">Huésped:</div><div style="font-weight:600;">' + (nombre || '—') + '</div>';
-      p += '<div style="color:var(--text2);">Habitación:</div><div style="font-weight:600;">' + roomTipo + '</div>';
       p += '<div style="color:var(--text2);">Check-in:</div><div>' + formatDate(checkin) + (mostrarHorarios ? ' · ' + formatHoraDisplay(hi.checkin_hora) : '') + '</div>';
       p += '<div style="color:var(--text2);">Check-out:</div><div>' + formatDate(checkout) + (mostrarHorarios ? ' · ' + formatHoraDisplay(hi.checkout_hora) : '') + '</div>';
       p += '<div style="color:var(--text2);">Noches:</div><div>' + nights + '</div>';
-      p += '<div style="color:var(--text2);">Huéspedes:</div><div>' + adultos + ' adulto' + (adultos > 1 ? 's' : '') + (ninos > 0 ? ' + ' + ninos + ' niño' + (ninos > 1 ? 's' : '') : '') + (personasExtra > 0 ? ' + ' + personasExtra + ' extra' : '') + '</div>';
+      p += '<div style="color:var(--text2);">Habitaciones:</div><div style="font-weight:600;">' + totalHabs + '</div>';
+      p += '<div style="color:var(--text2);">Huéspedes:</div><div>' + adultos + ' adulto' + (adultos > 1 ? 's' : '') + (ninos > 0 ? ' + ' + ninos + ' niño' + (ninos > 1 ? 's' : '') : '') + '</div>';
       p += '</div>';
 
-      // Desglose
+      // Room lines detail
       p += '<div style="border-top:1px solid var(--surface3);padding-top:10px;font-size:13px;">';
-      p += '<div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>Hospedaje ' + roomTipo + ' × ' + nights + ' noches:</span><span>$' + _fmt(subtotalHab) + '</span></div>';
-      if (personasExtra > 0 && peRate > 0) {
-        p += '<div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>Persona extra (' + personasExtra + ' × $' + _fmt(peRate) + ' × ' + nights + ' noches):</span><span>$' + _fmt(subtotalPE) + '</span></div>';
-      }
+      roomLines.forEach(function(rl) {
+        var label = rl.tipo + ' × ' + rl.cantidad + ' hab. × ' + nights + ' noches ($' + _fmt(rl.tarifa) + '/noche)';
+        p += '<div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>' + label + '</span><span>$' + _fmt(rl.subtotalHab) + '</span></div>';
+        if (rl.personasExtra > 0 && peRate > 0) {
+          p += '<div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:12px;color:var(--text2);padding-left:12px;"><span>↳ Pers. extra: ' + rl.personasExtra + '/hab. × ' + rl.cantidad + ' × $' + _fmt(peRate) + ' × ' + nights + 'n</span><span>$' + _fmt(rl.subtotalPE) + '</span></div>';
+        }
+      });
       if (conIVA) {
         p += '<div style="display:flex;justify-content:space-between;margin-bottom:4px;color:var(--text2);"><span>IVA (16%):</span><span>$' + _fmt(iva) + '</span></div>';
       }
@@ -5479,14 +5563,16 @@
       }
       p += '</div>';
 
-      // Promo desayuno
-      if (incluyeDesayuno && bfAhorro > 0) {
+      if (incluyeDesayuno && bfAhorroTotal > 0) {
         p += '<div style="margin-top:12px;padding:12px;background:linear-gradient(135deg,rgba(139,170,106,0.15),rgba(139,170,106,0.05));border-radius:var(--radius);border:1px solid rgba(139,170,106,0.3);">';
         p += '<div style="font-weight:700;font-size:13px;color:var(--green);margin-bottom:6px;">🍳 Desayuno incluido — ' + promo.partner + '</div>';
         p += '<div style="font-size:12px;color:var(--text2);margin-bottom:4px;">Precio regular por persona: $' + _fmt(bfPrecio) + '</div>';
-        p += '<div style="font-size:12px;color:var(--text2);margin-bottom:4px;">' + bfPersonas + ' persona' + (bfPersonas > 1 ? 's' : '') + ' × ' + nights + ' día' + (nights > 1 ? 's' : '') + ' = ' + (bfPersonas * nights) + ' desayunos</div>';
-        p += '<div style="font-size:12px;color:var(--text2);margin-bottom:4px;">Valor total: $' + _fmt(bfAhorro) + '</div>';
-        p += '<div style="font-weight:700;font-size:14px;color:var(--green);">Ahorro para el huésped: $' + _fmt(bfAhorro) + '</div>';
+        roomLines.forEach(function(rl) {
+          if (rl.bfAhorro > 0) {
+            p += '<div style="font-size:12px;color:var(--text2);margin-bottom:2px;">' + rl.tipo + ': ' + rl.bfPersonas + ' pers. × ' + rl.cantidad + ' hab. × ' + nights + ' días = $' + _fmt(rl.bfAhorro) + '</div>';
+          }
+        });
+        p += '<div style="font-weight:700;font-size:14px;color:var(--green);margin-top:4px;">Ahorro total: $' + _fmt(bfAhorroTotal) + '</div>';
         p += '</div>';
       }
       p += '</div>';
@@ -5500,7 +5586,7 @@
       document.getElementById('cotActions').innerHTML = a;
     }
 
-    function resetCotizacion() { _cotizacionData = null; renderCotizaciones(); }
+    function resetCotizacion() { _cotizacionData = null; _cotRooms = []; renderCotizaciones(); }
 
     function generateCotizacionPDF(mode) {
       if (!_cotizacionData) { toast('Completa la cotización primero', true); return; }
@@ -5559,16 +5645,15 @@
       doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(255, 255, 255);
       doc.text('DETALLE DE ESTANCIA', marginX + 6, y + 5.5); y += 8;
 
-      var guestStr = d.adultos + ' adulto' + (d.adultos > 1 ? 's' : '') + (d.ninos > 0 ? ', ' + d.ninos + ' niño' + (d.ninos > 1 ? 's' : '') : '') + (d.personasExtra > 0 ? ', ' + d.personasExtra + ' extra' : '');
-      var rows = [
-        ['Tipo de habitación', d.roomTipo],
+      var stayRows = [
         ['Fecha de entrada', formatDate(d.checkin) + (d.mostrarHorarios ? ' — ' + formatHoraDisplay(hi.checkin_hora) : '')],
         ['Fecha de salida', formatDate(d.checkout) + (d.mostrarHorarios ? ' — ' + formatHoraDisplay(hi.checkout_hora) : '')],
         ['Noches', String(d.nights)],
-        ['Huéspedes', guestStr]
+        ['Total habitaciones', String(d.totalHabs)],
+        ['Huéspedes', d.adultos + ' adulto' + (d.adultos > 1 ? 's' : '') + (d.ninos > 0 ? ', ' + d.ninos + ' niño' + (d.ninos > 1 ? 's' : '') : '')]
       ];
       doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
-      rows.forEach(function(row, i) {
+      stayRows.forEach(function(row, i) {
         if (i % 2 === 0) { doc.setFillColor(250, 250, 252); doc.rect(marginX, y, contentW, 7, 'F'); }
         doc.setTextColor(100, 100, 100); doc.text(row[0], marginX + 6, y + 5);
         doc.setTextColor(55, 71, 79); doc.setFont('helvetica', 'bold');
@@ -5584,21 +5669,23 @@
       doc.text('IMPORTE', pageW - marginX - 6, y + 5.5, { align: 'right' }); y += 8;
 
       var pricingRow = 0;
-      function addPricingRow(label, amount) {
+      function addPricingRow(label, amount, indent) {
         if (pricingRow % 2 === 0) { doc.setFillColor(250, 250, 252); doc.rect(marginX, y, contentW, 7, 'F'); }
-        doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
-        doc.setTextColor(80, 80, 80); doc.text(label, marginX + 6, y + 5);
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(indent ? 8 : 9);
+        doc.setTextColor(indent ? 120 : 80, indent ? 120 : 80, indent ? 120 : 80);
+        doc.text((indent ? '   ↳ ' : '') + label, marginX + 6, y + 5);
         doc.setTextColor(55, 71, 79); doc.text('$' + _fmt(amount), pageW - marginX - 6, y + 5, { align: 'right' });
         y += 7; pricingRow++;
       }
 
-      addPricingRow('Hospedaje — ' + d.roomTipo + ' × ' + d.nights + ' noche' + (d.nights > 1 ? 's' : '') + ' ($' + _fmt(d.tarifa) + '/noche)', d.subtotalHab);
-      if (d.personasExtra > 0 && d.peRate > 0) {
-        addPricingRow('Persona extra — ' + d.personasExtra + ' × $' + _fmt(d.peRate) + ' × ' + d.nights + ' noche' + (d.nights > 1 ? 's' : ''), d.subtotalPE);
-      }
-      if (d.conIVA) {
-        addPricingRow('IVA (16%)', d.iva);
-      }
+      d.roomLines.forEach(function(rl) {
+        var lbl = rl.tipo + ' × ' + rl.cantidad + ' hab. × ' + d.nights + ' noche' + (d.nights > 1 ? 's' : '') + ' ($' + _fmt(rl.tarifa) + '/noche)';
+        addPricingRow(lbl, rl.subtotalHab, false);
+        if (rl.personasExtra > 0 && d.peRate > 0) {
+          addPricingRow('Pers. extra: ' + rl.personasExtra + '/hab. × ' + rl.cantidad + ' hab. × $' + _fmt(d.peRate) + ' × ' + d.nights + 'n', rl.subtotalPE, true);
+        }
+      });
+      if (d.conIVA) { addPricingRow('IVA (16%)', d.iva, false); }
 
       // Total
       doc.setDrawColor(55, 71, 79); doc.setLineWidth(0.5);
@@ -5617,34 +5704,40 @@
         y += 18;
       }
 
-      // Breakfast promo section
-      if (d.incluyeDesayuno && d.bfAhorro > 0) {
-        doc.setFillColor(235, 245, 225); doc.roundedRect(marginX, y, contentW, 30, 2, 2, 'F');
+      // Breakfast promo
+      if (d.incluyeDesayuno && d.bfAhorroTotal > 0) {
+        var bfH = 14 + d.roomLines.filter(function(r){return r.bfAhorro > 0;}).length * 5;
+        doc.setFillColor(235, 245, 225); doc.roundedRect(marginX, y, contentW, bfH, 2, 2, 'F');
         doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(80, 120, 50);
-        doc.text('DESAYUNO INCLUIDO', marginX + 6, y + 7);
-        doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(80, 80, 80);
-        doc.text('Restaurante: ' + d.bfPartner, marginX + 6, y + 13);
-        doc.text('Precio regular por persona: $' + _fmt(d.bfPrecio), marginX + 6, y + 18);
-        doc.text(d.bfPersonas + ' persona' + (d.bfPersonas > 1 ? 's' : '') + ' × ' + d.nights + ' día' + (d.nights > 1 ? 's' : '') + ' = ' + (d.bfPersonas * d.nights) + ' desayunos', marginX + 6, y + 23);
+        doc.text('DESAYUNO INCLUIDO — ' + d.bfPartner, marginX + 6, y + 7);
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(80, 80, 80);
+        var bfY = y + 12;
+        d.roomLines.forEach(function(rl) {
+          if (rl.bfAhorro > 0) {
+            doc.text(rl.tipo + ': ' + rl.bfPersonas + ' pers. × ' + rl.cantidad + ' hab. × ' + d.nights + ' días × $' + _fmt(d.bfPrecio) + ' = $' + _fmt(rl.bfAhorro), marginX + 6, bfY);
+            bfY += 5;
+          }
+        });
         doc.setFont('helvetica', 'bold'); doc.setTextColor(80, 120, 50);
-        doc.text('Ahorro total: $' + _fmt(d.bfAhorro) + ' MXN', pageW - marginX - 6, y + 23, { align: 'right' });
-        y += 36;
+        doc.text('Ahorro total: $' + _fmt(d.bfAhorroTotal) + ' MXN', pageW - marginX - 6, y + bfH - 4, { align: 'right' });
+        y += bfH + 6;
       }
 
-      // Terms
+      // Terms — with auto page break
       doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(55, 71, 79);
       doc.text('POLÍTICAS Y CONDICIONES', marginX, y); y += 6;
       doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(100, 100, 100);
       var terms = getTerms();
       terms.forEach(function(t) {
-        if (y > 268) return;
         var line = '• ' + t.title + ': ' + t.text;
         var lines = doc.splitTextToSize(line, contentW - 4);
-        if (y + lines.length * 4 > 273) return;
-        doc.text(lines, marginX + 2, y); y += lines.length * 4 + 1;
+        var blockH = lines.length * 4 + 1;
+        if (y + blockH > 278) { doc.addPage(); y = 20; }
+        doc.text(lines, marginX + 2, y); y += blockH;
       });
 
       if (d.notas) {
+        if (y + 15 > 278) { doc.addPage(); y = 20; }
         y += 4;
         doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(55, 71, 79);
         doc.text('OBSERVACIONES', marginX, y); y += 5;
@@ -5653,10 +5746,14 @@
         doc.text(nl, marginX + 2, y);
       }
 
-      // Footer
-      doc.setFont('helvetica', 'italic'); doc.setFontSize(7); doc.setTextColor(160, 160, 160);
-      doc.text('Esta cotización tiene una vigencia de 7 días a partir de la fecha de emisión. Precios sujetos a disponibilidad.', pageW / 2, 285, { align: 'center' });
-      doc.text(hi.nombre + ' — ' + cotNum, pageW / 2, 290, { align: 'center' });
+      // Footer on last page
+      var pageCount = doc.internal.getNumberOfPages();
+      for (var pg = 1; pg <= pageCount; pg++) {
+        doc.setPage(pg);
+        doc.setFont('helvetica', 'italic'); doc.setFontSize(7); doc.setTextColor(160, 160, 160);
+        doc.text('Esta cotización tiene una vigencia de 7 días a partir de la fecha de emisión. Precios sujetos a disponibilidad.', pageW / 2, 285, { align: 'center' });
+        doc.text(hi.nombre + ' — ' + cotNum + ' — Pág. ' + pg + '/' + pageCount, pageW / 2, 290, { align: 'center' });
+      }
 
       var fileName = 'Cotizacion_' + d.nombre.replace(/\s+/g, '_') + '_' + cotNum + '.pdf';
 
@@ -5665,21 +5762,20 @@
         window.open(URL.createObjectURL(pdfBlob), '_blank');
 
         var msg = '📝 *COTIZACIÓN ' + cotNum + '*\n\n🏨 *' + hi.nombre + '*\n\nHola *' + d.nombre + '* 👋\n\nAquí tienes tu cotización:\n\n';
-        msg += '🛏️ *' + d.roomTipo + '*\n';
         msg += '📅 ' + formatDate(d.checkin) + ' → ' + formatDate(d.checkout) + '\n';
-        msg += '🌙 ' + d.nights + ' noche' + (d.nights > 1 ? 's' : '') + '\n';
-        msg += '👥 ' + d.adultos + ' adulto' + (d.adultos > 1 ? 's' : '') + (d.ninos > 0 ? ' + ' + d.ninos + ' niño' + (d.ninos > 1 ? 's' : '') : '') + (d.personasExtra > 0 ? ' + ' + d.personasExtra + ' extra' : '') + '\n\n';
-        msg += '💰 *Desglose:*\n';
-        msg += '• Hospedaje: $' + _fmt(d.subtotalHab) + '\n';
-        if (d.personasExtra > 0 && d.peRate > 0) msg += '• Persona extra: $' + _fmt(d.subtotalPE) + '\n';
-        if (d.conIVA) msg += '• IVA (16%): $' + _fmt(d.iva) + '\n';
+        msg += '🌙 ' + d.nights + ' noche' + (d.nights > 1 ? 's' : '') + '\n\n';
+        msg += '🛏️ *Habitaciones:*\n';
+        d.roomLines.forEach(function(rl) {
+          msg += '• ' + rl.tipo + ' × ' + rl.cantidad + ' — $' + _fmt(rl.tarifa) + '/noche = $' + _fmt(rl.subtotalHab) + '\n';
+          if (rl.personasExtra > 0 && d.peRate > 0) {
+            msg += '  _+ ' + rl.personasExtra + ' pers. extra/hab. = $' + _fmt(rl.subtotalPE) + '_\n';
+          }
+        });
+        if (d.conIVA) msg += '\n🧾 IVA (16%): $' + _fmt(d.iva) + '\n';
         msg += '\n✅ *Total: $' + _fmt(d.total) + ' MXN*\n';
         if (d.anticipo_pct > 0) msg += '\n💳 Anticipo (' + d.anticipo_pct + '%): *$' + _fmt(d.anticipoMonto) + '*\n';
-        if (d.incluyeDesayuno && d.bfAhorro > 0) {
-          msg += '\n🍳 *Desayuno incluido*\n';
-          msg += '📍 ' + d.bfPartner + '\n';
-          msg += '🎁 Valor: $' + _fmt(d.bfPrecio) + '/persona × ' + d.bfPersonas + ' pers. × ' + d.nights + ' días\n';
-          msg += '💚 *Ahorro: $' + _fmt(d.bfAhorro) + '*\n';
+        if (d.incluyeDesayuno && d.bfAhorroTotal > 0) {
+          msg += '\n🍳 *Desayuno incluido*\n📍 ' + d.bfPartner + '\n💚 *Ahorro: $' + _fmt(d.bfAhorroTotal) + '*\n';
         }
         msg += '\n📌 _Vigencia: 7 días. Sujeto a disponibilidad._\n';
         msg += '\n¿Deseas reservar? ¡Con gusto te ayudamos! 😊\n\n_' + hi.nombre + '_ 🌿';
