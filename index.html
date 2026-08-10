@@ -5748,15 +5748,32 @@
       p += '</div>';
 
       if (incluyeDesayuno && bfAhorroTotal > 0) {
-        p += '<div style="margin-top:12px;padding:12px;background:linear-gradient(135deg,rgba(139,170,106,0.15),rgba(139,170,106,0.05));border-radius:var(--radius);border:1px solid rgba(139,170,106,0.3);">';
-        p += '<div style="font-weight:700;font-size:13px;color:var(--green);margin-bottom:6px;">🍳 Desayuno incluido — ' + promo.partner + '</div>';
-        p += '<div style="font-size:12px;color:var(--text2);margin-bottom:4px;">Precio regular por persona: $' + _fmt(bfPrecio) + '</div>';
+        p += '<div style="margin-top:12px;padding:14px;background:linear-gradient(135deg,rgba(46,125,50,0.12),rgba(76,175,80,0.06));border-radius:var(--radius);border:1px solid rgba(76,175,80,0.4);position:relative;overflow:hidden;">';
+        // Ribbon
+        p += '<div style="position:absolute;top:10px;right:-28px;background:#2e7d32;color:#fff;font-size:9px;font-weight:700;padding:3px 32px;transform:rotate(45deg);letter-spacing:1px;">GRATIS</div>';
+        // Header
+        p += '<div style="font-size:15px;font-weight:800;color:#2e7d32;margin-bottom:2px;">🍳 DESAYUNO INCLUIDO</div>';
+        p += '<div style="font-size:12px;color:var(--text2);margin-bottom:10px;">' + promo.partner + '</div>';
+        // Value comparison
+        p += '<div style="background:rgba(255,255,255,0.6);border-radius:8px;padding:10px;margin-bottom:8px;">';
+        p += '<div style="font-size:11px;color:var(--text2);margin-bottom:4px;">Valor real del desayuno por su estadía:</div>';
         roomLines.forEach(function(rl) {
           if (rl.bfAhorro > 0) {
-            p += '<div style="font-size:12px;color:var(--text2);margin-bottom:2px;">' + rl.tipo + ': ' + rl.bfPersonas + ' pers. × ' + rl.cantidad + ' hab. × ' + nights + ' días = $' + _fmt(rl.bfAhorro) + '</div>';
+            p += '<div style="font-size:12px;margin-bottom:3px;display:flex;justify-content:space-between;">';
+            p += '<span style="color:var(--text2);">' + rl.tipo + ': ' + rl.bfPersonas + ' pers. × ' + rl.cantidad + ' hab. × ' + nights + ' días × $' + _fmt(bfPrecio) + '</span>';
+            p += '<span style="text-decoration:line-through;color:#c62828;font-weight:600;">$' + _fmt(rl.bfAhorro) + '</span>';
+            p += '</div>';
           }
         });
-        p += '<div style="font-weight:700;font-size:14px;color:var(--green);margin-top:4px;">Ahorro total: $' + _fmt(bfAhorroTotal) + '</div>';
+        p += '</div>';
+        // Big savings callout
+        p += '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#2e7d32;border-radius:8px;color:#fff;">';
+        p += '<div style="font-size:13px;">Usted se ahorra:</div>';
+        p += '<div style="display:flex;align-items:center;gap:8px;">';
+        p += '<span style="text-decoration:line-through;opacity:.7;font-size:13px;">$' + _fmt(bfAhorroTotal) + '</span>';
+        p += '<span style="font-size:18px;font-weight:800;">$0.00</span>';
+        p += '</div></div>';
+        p += '<div style="text-align:center;margin-top:6px;font-size:11px;color:#2e7d32;font-weight:600;">Desayuno cortesía del hotel durante toda su estadía</div>';
         p += '</div>';
       }
       p += '</div>';
@@ -5913,22 +5930,38 @@
         y += 18;
       }
 
-      // Breakfast promo
+      // Breakfast promo — high impact
       if (d.incluyeDesayuno && d.bfAhorroTotal > 0) {
-        var bfH = 14 + d.roomLines.filter(function(r){return r.bfAhorro > 0;}).length * 5;
-        doc.setFillColor(235, 245, 225); doc.roundedRect(marginX, y, contentW, bfH, 2, 2, 'F');
-        doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(80, 120, 50);
-        doc.text('DESAYUNO INCLUIDO — ' + d.bfPartner, marginX + 6, y + 7);
-        doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(80, 80, 80);
-        var bfY = y + 12;
-        d.roomLines.forEach(function(rl) {
-          if (rl.bfAhorro > 0) {
-            doc.text(rl.tipo + ': ' + rl.bfPersonas + ' pers. × ' + rl.cantidad + ' hab. × ' + d.nights + ' días × $' + _fmt(d.bfPrecio) + ' = $' + _fmt(rl.bfAhorro), marginX + 6, bfY);
-            bfY += 5;
-          }
+        var bfLines = d.roomLines.filter(function(r){return r.bfAhorro > 0;});
+        var bfH = 28 + bfLines.length * 5;
+        if (y + bfH > 270) { doc.addPage(); y = 20; }
+        // Green background box
+        doc.setFillColor(232, 245, 233); doc.roundedRect(marginX, y, contentW, bfH, 3, 3, 'F');
+        doc.setDrawColor(46, 125, 50); doc.setLineWidth(0.5);
+        doc.roundedRect(marginX, y, contentW, bfH, 3, 3, 'S');
+        // Header
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(46, 125, 50);
+        doc.text('DESAYUNO INCLUIDO SIN COSTO', marginX + 6, y + 7);
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(100, 100, 100);
+        doc.text(d.bfPartner, marginX + 6, y + 12);
+        // Detail lines with strikethrough value
+        var bfY = y + 18;
+        bfLines.forEach(function(rl) {
+          doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(80, 80, 80);
+          doc.text(rl.tipo + ': ' + rl.bfPersonas + ' pers. x ' + rl.cantidad + ' hab. x ' + d.nights + ' dias x $' + _fmt(d.bfPrecio), marginX + 6, bfY);
+          // Strikethrough price
+          var valStr = '$' + _fmt(rl.bfAhorro);
+          var valW = doc.getTextWidth(valStr);
+          var valX = pageW - marginX - 6 - valW;
+          doc.setTextColor(198, 40, 40); doc.text(valStr, valX, bfY);
+          doc.setDrawColor(198, 40, 40); doc.setLineWidth(0.3);
+          doc.line(valX, bfY - 1, valX + valW, bfY - 1);
+          bfY += 5;
         });
-        doc.setFont('helvetica', 'bold'); doc.setTextColor(80, 120, 50);
-        doc.text('Ahorro total: $' + _fmt(d.bfAhorroTotal) + ' MXN', pageW - marginX - 6, y + bfH - 4, { align: 'right' });
+        // Big savings bar
+        doc.setFillColor(46, 125, 50); doc.roundedRect(marginX + 4, bfY, contentW - 8, 8, 2, 2, 'F');
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(255, 255, 255);
+        doc.text('Usted se ahorra: $' + _fmt(d.bfAhorroTotal) + ' MXN  —  CORTESIA DEL HOTEL', marginX + 8, bfY + 5.5);
         y += bfH + 6;
       }
 
@@ -5984,7 +6017,18 @@
         msg += '\n✅ *Total: $' + _fmt(d.total) + ' MXN*\n';
         if (d.anticipo_pct > 0) msg += '\n💳 Anticipo (' + d.anticipo_pct + '%): *$' + _fmt(d.anticipoMonto) + '*\n';
         if (d.incluyeDesayuno && d.bfAhorroTotal > 0) {
-          msg += '\n🍳 *Desayuno incluido*\n📍 ' + d.bfPartner + '\n💚 *Ahorro: $' + _fmt(d.bfAhorroTotal) + '*\n';
+          msg += '\n━━━━━━━━━━━━━━━━━\n';
+          msg += '🍳 *DESAYUNO INCLUIDO SIN COSTO*\n';
+          msg += '📍 ' + d.bfPartner + '\n\n';
+          d.roomLines.forEach(function(rl) {
+            if (rl.bfAhorro > 0) {
+              msg += '• ' + rl.tipo + ': ' + rl.bfPersonas + ' pers. × ' + rl.cantidad + ' hab. × ' + d.nights + ' días\n';
+            }
+          });
+          msg += '\n💰 Valor real: ~$' + _fmt(d.bfAhorroTotal) + '~\n';
+          msg += '🎁 *Su costo: $0.00 — CORTESÍA DEL HOTEL*\n';
+          msg += '✨ _¡Se ahorra $' + _fmt(d.bfAhorroTotal) + ' en desayunos!_\n';
+          msg += '━━━━━━━━━━━━━━━━━\n';
         }
         msg += '\n📌 _Vigencia: 7 días. Sujeto a disponibilidad._\n';
         msg += '\n¿Deseas reservar? ¡Con gusto te ayudamos! 😊\n\n_' + hi.nombre + '_ 🌿';
