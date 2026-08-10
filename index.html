@@ -2474,6 +2474,62 @@
       syncConfigToSheet('breakfastPromo', promo);
     }
 
+    function saveBreakfastPromoLocal(promo) {
+      localStorage.setItem('breakfastPromo', JSON.stringify(promo));
+    }
+
+    async function saveBreakfastPromoAndSync() {
+      var promo = getBreakfastPromo();
+      localStorage.setItem('breakfastPromo', JSON.stringify(promo));
+      if (!S.scriptUrl) { toast('Guardado localmente (sin conexión a Sheet)', true); return; }
+      try {
+        var configData = await sheets.read('⚙️ Config', 'A2:B50').catch(function() { return []; });
+        var exists = configData.some(function(row) { return row[0] === 'breakfastPromo'; });
+        var jsonVal = JSON.stringify(promo);
+        if (exists) {
+          await sheets.multi([
+            { type: 'updateById', sheet: '⚙️ Config', id: 'breakfastPromo', values: ['breakfastPromo', jsonVal] }
+          ]);
+        } else {
+          await sheets.multi([
+            { type: 'append', sheet: '⚙️ Config', values: ['breakfastPromo', jsonVal] }
+          ]);
+        }
+        toast('✅ Configuración guardada y sincronizada');
+      } catch(e) {
+        toast('Error al sincronizar: ' + (e.message || e), true);
+      }
+    }
+
+    async function importBreakfastFromSheet() {
+      if (!S.scriptUrl) { toast('No hay conexión a Sheet', true); return; }
+      try {
+        var cfgData = await sheets.read('⚙️ Config', 'A2:B50');
+        var found = false;
+        for (var i = 0; i < cfgData.length; i++) {
+          if (cfgData[i][0] === 'breakfastPromo' && cfgData[i][1]) {
+            var finalObj = cfgData[i][1];
+            for (var _pi = 0; _pi < 3; _pi++) {
+              if (typeof finalObj === 'string') { try { finalObj = JSON.parse(finalObj); } catch(e) { break; } } else { break; }
+            }
+            if (typeof finalObj === 'object' && finalObj !== null) {
+              localStorage.setItem('breakfastPromo', JSON.stringify(finalObj));
+              found = true;
+              break;
+            }
+          }
+        }
+        if (found) {
+          toast('✅ Configuración importada del Sheet');
+          renderConfig();
+        } else {
+          toast('No se encontró configuración de desayunos en el Sheet', true);
+        }
+      } catch(e) {
+        toast('Error al importar: ' + e.message, true);
+      }
+    }
+
     function isBreakfastPromoActive() {
       var p = getBreakfastPromo();
       if (!p.active) return false;
@@ -8254,24 +8310,24 @@
       // Date range
       h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">';
       h += '<div><label class="form-label" style="font-size:11px">Fecha inicio</label>';
-      h += '<input type="date" id="bfStart" class="login-input" value="' + (promo.startDate || '') + '" onchange="updateBreakfastField(\'startDate\',this.value)" style="padding:8px;font-size:12px"></div>';
+      h += '<input type="date" id="bfStart" class="login-input" value="' + (promo.startDate || '') + '" oninput="updateBreakfastField(\'startDate\',this.value)" style="padding:8px;font-size:12px"></div>';
       h += '<div><label class="form-label" style="font-size:11px">Fecha fin (opcional)</label>';
-      h += '<input type="date" id="bfEnd" class="login-input" value="' + (promo.endDate || '') + '" onchange="updateBreakfastField(\'endDate\',this.value)" style="padding:8px;font-size:12px"></div>';
+      h += '<input type="date" id="bfEnd" class="login-input" value="' + (promo.endDate || '') + '" oninput="updateBreakfastField(\'endDate\',this.value)" style="padding:8px;font-size:12px"></div>';
       h += '</div>';
 
       // Partner
       h += '<div style="margin-bottom:12px"><label class="form-label" style="font-size:11px">Restaurante asociado</label>';
-      h += '<input type="text" id="bfPartner" class="login-input" value="' + (promo.partner || '') + '" onchange="updateBreakfastField(\'partner\',this.value)" style="padding:8px;font-size:12px"></div>';
+      h += '<input type="text" id="bfPartner" class="login-input" value="' + (promo.partner || '') + '" oninput="updateBreakfastField(\'partner\',this.value)" style="padding:8px;font-size:12px"></div>';
 
       // Descripción del platillo/bebida
       h += '<div style="margin-bottom:12px"><label class="form-label" style="font-size:11px">Descripción del desayuno incluido</label>';
-      h += '<textarea id="bfDescripcion" class="login-input" rows="3" placeholder="Ej: Desayuno continental: jugo natural, fruta de temporada, pan artesanal, café o té ilimitado" onchange="updateBreakfastField(\'descripcion\',this.value)" style="padding:8px;font-size:12px;resize:vertical;width:100%;box-sizing:border-box;font-family:inherit">' + (promo.descripcion || '') + '</textarea>';
+      h += '<textarea id="bfDescripcion" class="login-input" rows="3" placeholder="Ej: Desayuno continental: jugo natural, fruta de temporada, pan artesanal, café o té ilimitado" oninput="updateBreakfastField(\'descripcion\',this.value)" style="padding:8px;font-size:12px;resize:vertical;width:100%;box-sizing:border-box;font-family:inherit">' + (promo.descripcion || '') + '</textarea>';
       h += '<div style="font-size:10px;color:var(--text2);margin-top:2px">Aparece en cotizaciones y tickets de desayuno para el huésped</div></div>';
 
       // Price per person
       h += '<div style="margin-bottom:12px"><label class="form-label" style="font-size:11px">Precio real del desayuno por persona (MXN)</label>';
       h += '<div style="display:flex;align-items:center;gap:8px;">';
-      h += '<input type="number" id="bfPrecio" class="login-input" value="' + (promo.precioPorPersona || 0) + '" min="0" step="10" onchange="updateBreakfastField(\'precioPorPersona\',parseFloat(this.value)||0)" style="padding:8px;font-size:12px;width:100px;text-align:center">';
+      h += '<input type="number" id="bfPrecio" class="login-input" value="' + (promo.precioPorPersona || 0) + '" min="0" step="10" oninput="updateBreakfastField(\'precioPorPersona\',parseFloat(this.value)||0)" style="padding:8px;font-size:12px;width:100px;text-align:center">';
       h += '<span style="font-size:11px;color:var(--text2)">Este valor se muestra en la cotización como ahorro para el huésped</span>';
       h += '</div></div>';
 
@@ -8279,19 +8335,25 @@
       h += '<div style="margin-bottom:12px"><div class="form-label" style="font-size:11px;margin-bottom:8px">Reglas por tipo de habitación</div>';
       (promo.rules || []).forEach(function(rule, i) {
         h += '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;background:var(--surface3);padding:8px 10px;border-radius:8px">';
-        h += '<input type="text" value="' + rule.tipo + '" onchange="updateBreakfastRule(' + i + ',\'tipo\',this.value)" style="flex:1;background:var(--surface2);border:1px solid var(--surface3);border-radius:6px;padding:6px 8px;font-size:12px;color:var(--text)" placeholder="Tipo de hab.">';
+        h += '<input type="text" value="' + rule.tipo + '" oninput="updateBreakfastRule(' + i + ',\'tipo\',this.value)" style="flex:1;background:var(--surface2);border:1px solid var(--surface3);border-radius:6px;padding:6px 8px;font-size:12px;color:var(--text)" placeholder="Tipo de hab.">';
         h += '<span style="font-size:11px;color:var(--text2);white-space:nowrap">máx. personas:</span>';
-        h += '<input type="number" value="' + rule.personas + '" min="1" max="10" onchange="updateBreakfastRule(' + i + ',\'personas\',parseInt(this.value))" style="width:50px;background:var(--surface2);border:1px solid var(--surface3);border-radius:6px;padding:6px;font-size:12px;text-align:center;color:var(--text)">';
+        h += '<input type="number" value="' + rule.personas + '" min="1" max="10" oninput="updateBreakfastRule(' + i + ',\'personas\',parseInt(this.value)||1)" style="width:50px;background:var(--surface2);border:1px solid var(--surface3);border-radius:6px;padding:6px;font-size:12px;text-align:center;color:var(--text)">';
         h += '<button onclick="removeBreakfastRule(' + i + ')" style="background:none;border:none;color:var(--red);font-size:16px;cursor:pointer;padding:2px">✕</button>';
         h += '</div>';
       });
       h += '<button class="form-button secondary" onclick="addBreakfastRule()" style="font-size:11px;padding:6px 12px;margin-top:4px">+ Agregar tipo</button>';
       h += '</div>';
 
+      // Save & sync buttons
+      h += '<div style="margin-top:16px;display:flex;flex-direction:column;gap:8px;">';
+      h += '<button class="form-button" onclick="saveBreakfastPromoAndSync()" style="width:100%;padding:12px;font-size:14px;font-weight:700;">💾 Guardar y sincronizar al Sheet</button>';
+      h += '<button class="form-button secondary" onclick="importBreakfastFromSheet()" style="width:100%;font-size:12px;">📥 Importar configuración del Sheet</button>';
+      h += '</div>';
+
       // Status
       var statusColor = isBreakfastPromoActive() ? 'var(--green)' : 'var(--text2)';
       var statusText = isBreakfastPromoActive() ? '✅ Promoción activa' : '⏸️ Promoción inactiva';
-      h += '<div style="text-align:center;padding:10px;background:var(--surface3);border-radius:var(--radius);font-size:12px;color:' + statusColor + ';font-weight:600">' + statusText + '</div>';
+      h += '<div style="text-align:center;padding:10px;margin-top:12px;background:var(--surface3);border-radius:var(--radius);font-size:12px;color:' + statusColor + ';font-weight:600">' + statusText + '</div>';
 
       // Validation link
       if (promo.active) {
@@ -8309,33 +8371,33 @@
     function toggleBreakfastPromo(active) {
       var promo = getBreakfastPromo();
       promo.active = active;
-      saveBreakfastPromo(promo);
+      saveBreakfastPromoLocal(promo);
       renderConfig();
     }
 
     function updateBreakfastField(field, value) {
       var promo = getBreakfastPromo();
       promo[field] = value;
-      saveBreakfastPromo(promo);
+      saveBreakfastPromoLocal(promo);
     }
 
     function updateBreakfastRule(idx, field, value) {
       var promo = getBreakfastPromo();
       promo.rules[idx][field] = value;
-      saveBreakfastPromo(promo);
+      saveBreakfastPromoLocal(promo);
     }
 
     function addBreakfastRule() {
       var promo = getBreakfastPromo();
       promo.rules.push({ tipo: '', personas: 1 });
-      saveBreakfastPromo(promo);
+      saveBreakfastPromoLocal(promo);
       renderConfig();
     }
 
     function removeBreakfastRule(idx) {
       var promo = getBreakfastPromo();
       promo.rules.splice(idx, 1);
-      saveBreakfastPromo(promo);
+      saveBreakfastPromoLocal(promo);
       renderConfig();
     }
 
