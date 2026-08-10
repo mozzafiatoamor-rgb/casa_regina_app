@@ -2436,6 +2436,7 @@
       startDate: '',
       endDate: '',
       partner: 'Restaurante Cafeteria Mozzafiato',
+      descripcion: '',
       precioPorPersona: 0,
       rules: [
         { tipo: 'Doble', personas: 2 },
@@ -3574,13 +3575,18 @@
         ? function(sh, rg) { return publicRead(S.scriptUrl, sh, rg); }
         : function(sh, rg) { return sheets.read(sh, rg); };
 
-      // Load breakfast promo config for partner name
+      // Load breakfast promo config
       var promoName = '';
+      var promoDesc = '';
       try {
         var cfgData = await _rd('⚙️ Config', 'A2:B50');
         for (var ci = 0; ci < cfgData.length; ci++) {
           if (cfgData[ci][0] === 'breakfastPromo') {
-            try { promoName = JSON.parse(cfgData[ci][1]).partner || ''; } catch(e) {}
+            try {
+              var _bp = JSON.parse(cfgData[ci][1]);
+              promoName = _bp.partner || '';
+              promoDesc = _bp.descripcion || '';
+            } catch(e) {}
           }
         }
       } catch(e) {}
@@ -3590,7 +3596,8 @@
           '<img src="' + LOGO_H_DARK + '" alt="Logo" style="max-width:200px;margin:0 auto 10px;" onerror="this.style.display=\'none\'">' +
         '</div>' +
         '<h2 style="text-align:center;margin-bottom:4px;">🍳 Validar Desayuno</h2>' +
-        (promoName ? '<p style="text-align:center;color:var(--text-secondary);margin-bottom:20px;font-size:14px;">' + promoName + '</p>' : '') +
+        (promoName ? '<p style="text-align:center;color:var(--text-secondary);margin-bottom:8px;font-size:14px;">' + promoName + '</p>' : '') +
+        (promoDesc ? '<div style="text-align:center;margin-bottom:20px;padding:8px 12px;background:rgba(46,125,50,0.08);border-radius:8px;border-left:3px solid #2e7d32;font-size:13px;color:#2e7d32;line-height:1.4;">🍽️ ' + promoDesc + '</div>' : '') +
         '<div id="validarForm">' +
           '<label style="display:block;margin-bottom:6px;font-weight:600;">Código de desayuno</label>' +
           '<input type="text" id="validarCode" placeholder="DES-XXXX" maxlength="8" ' +
@@ -3679,19 +3686,24 @@
           return;
         }
 
-        // Valid! Show confirmation
+        // Valid! Show confirmation — wow style
         resultDiv.innerHTML =
-          '<div style="text-align:center;padding:20px;background:#d4edda;border-radius:12px;">' +
-            '<div style="font-size:48px;margin-bottom:8px;">✅</div>' +
-            '<p style="font-size:20px;font-weight:700;color:#155724;">Código válido</p>' +
-            '<div style="margin-top:16px;text-align:left;padding:0 10px;">' +
-              '<p>👤 Huésped: <strong>' + huesped + '</strong></p>' +
-              '<p>🚪 Habitación: <strong>' + habitacion + '</strong></p>' +
-              '<p>👥 Personas: <strong>' + personas + '</strong></p>' +
-              '<p>📅 Fecha: <strong>' + formatDate(fecha) + '</strong></p>' +
+          '<div style="padding:20px;background:linear-gradient(135deg,#d4edda,#c8e6c9);border-radius:12px;border:2px solid #2e7d32;position:relative;overflow:hidden;">' +
+            '<div style="position:absolute;top:8px;right:-28px;background:#2e7d32;color:#fff;font-size:9px;font-weight:700;padding:3px 32px;transform:rotate(45deg);letter-spacing:1px;">GRATIS</div>' +
+            '<div style="text-align:center;">' +
+              '<div style="font-size:48px;margin-bottom:4px;">✅</div>' +
+              '<p style="font-size:22px;font-weight:800;color:#1b5e20;margin-bottom:2px;">Código válido</p>' +
+              '<p style="font-size:13px;color:#2e7d32;margin-bottom:12px;">Desayuno cortesía del hotel</p>' +
+            '</div>' +
+            (promoDesc ? '<div style="text-align:center;padding:8px 10px;background:rgba(255,255,255,0.6);border-radius:8px;margin-bottom:12px;font-size:13px;color:#2e7d32;border-left:3px solid #2e7d32;">🍽️ ' + promoDesc + '</div>' : '') +
+            '<div style="background:rgba(255,255,255,0.6);border-radius:8px;padding:12px;margin-bottom:12px;">' +
+              '<p style="margin:4px 0;">👤 Huésped: <strong>' + huesped + '</strong></p>' +
+              '<p style="margin:4px 0;">🚪 Habitación: <strong>' + habitacion + '</strong></p>' +
+              '<p style="margin:4px 0;">👥 Personas: <strong>' + personas + '</strong></p>' +
+              '<p style="margin:4px 0;">📅 Fecha: <strong>' + formatDate(fecha) + '</strong></p>' +
             '</div>' +
             '<button onclick="confirmarDesayuno(\'' + code + '\')" ' +
-              'style="width:100%;margin-top:16px;padding:14px;background:#28a745;color:white;border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;">' +
+              'style="width:100%;padding:14px;background:#1b5e20;color:white;border:none;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;letter-spacing:0.5px;">' +
               '🍳 Marcar como consumido</button>' +
           '</div>';
 
@@ -3746,11 +3758,12 @@
         if (!res.ok) throw new Error('Error del servidor');
 
         resultDiv.innerHTML =
-          '<div style="text-align:center;padding:20px;background:#d4edda;border-radius:12px;">' +
-            '<div style="font-size:64px;margin-bottom:12px;">🎉</div>' +
-            '<p style="font-size:20px;font-weight:700;color:#155724;">Desayuno registrado</p>' +
-            '<p style="margin-top:8px;color:#155724;">Código <strong>' + code + '</strong> marcado como consumido</p>' +
-            '<p style="margin-top:4px;font-size:13px;color:var(--text-secondary);">' + nowStr + '</p>' +
+          '<div style="text-align:center;padding:24px;background:linear-gradient(135deg,#c8e6c9,#a5d6a7);border-radius:12px;border:2px solid #2e7d32;">' +
+            '<div style="font-size:64px;margin-bottom:8px;">🎉</div>' +
+            '<p style="font-size:22px;font-weight:800;color:#1b5e20;">¡Desayuno registrado!</p>' +
+            '<p style="margin-top:6px;color:#2e7d32;font-size:14px;">Código <strong style="font-family:monospace;letter-spacing:2px;">' + code + '</strong> consumido</p>' +
+            '<p style="margin-top:8px;font-size:12px;color:#388e3c;">🍽️ ¡Buen provecho!</p>' +
+            '<p style="margin-top:4px;font-size:11px;color:var(--text-secondary);">' + nowStr + '</p>' +
           '</div>';
 
       } catch(err) {
@@ -5710,7 +5723,7 @@
         anticipo_pct: anticipo_pct, anticipoMonto: anticipoMonto,
         mostrarHorarios: mostrarHorarios,
         incluyeDesayuno: incluyeDesayuno,
-        bfPartner: promo.partner, bfPrecio: bfPrecio, bfAhorroTotal: bfAhorroTotal,
+        bfPartner: promo.partner, bfDescripcion: promo.descripcion || '', bfPrecio: bfPrecio, bfAhorroTotal: bfAhorroTotal,
         notas: (document.getElementById('cotNotas').value || '').trim()
       };
 
@@ -5753,7 +5766,10 @@
         p += '<div style="position:absolute;top:10px;right:-28px;background:#2e7d32;color:#fff;font-size:9px;font-weight:700;padding:3px 32px;transform:rotate(45deg);letter-spacing:1px;">GRATIS</div>';
         // Header
         p += '<div style="font-size:15px;font-weight:800;color:#2e7d32;margin-bottom:2px;">🍳 DESAYUNO INCLUIDO</div>';
-        p += '<div style="font-size:12px;color:var(--text2);margin-bottom:10px;">' + promo.partner + '</div>';
+        p += '<div style="font-size:12px;color:var(--text2);margin-bottom:4px;">' + promo.partner + '</div>';
+        if (promo.descripcion) {
+          p += '<div style="font-size:12px;color:var(--text1);margin-bottom:10px;padding:8px 10px;background:rgba(255,255,255,0.5);border-radius:6px;border-left:3px solid #2e7d32;line-height:1.4;">🍽️ ' + promo.descripcion + '</div>';
+        }
         // Value comparison
         p += '<div style="background:rgba(255,255,255,0.6);border-radius:8px;padding:10px;margin-bottom:8px;">';
         p += '<div style="font-size:11px;color:var(--text2);margin-bottom:4px;">Valor real del desayuno por su estadía:</div>';
@@ -5933,7 +5949,15 @@
       // Breakfast promo — high impact
       if (d.incluyeDesayuno && d.bfAhorroTotal > 0) {
         var bfLines = d.roomLines.filter(function(r){return r.bfAhorro > 0;});
-        var bfH = 28 + bfLines.length * 5;
+        // Calculate description height
+        var bfDescLines = [];
+        var bfDescH = 0;
+        if (d.bfDescripcion) {
+          doc.setFont('helvetica', 'italic'); doc.setFontSize(8);
+          bfDescLines = doc.splitTextToSize(d.bfDescripcion, contentW - 16);
+          bfDescH = bfDescLines.length * 3.5 + 4;
+        }
+        var bfH = 28 + bfDescH + bfLines.length * 5;
         if (y + bfH > 270) { doc.addPage(); y = 20; }
         // Green background box
         doc.setFillColor(232, 245, 233); doc.roundedRect(marginX, y, contentW, bfH, 3, 3, 'F');
@@ -5944,8 +5968,14 @@
         doc.text('DESAYUNO INCLUIDO SIN COSTO', marginX + 6, y + 7);
         doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(100, 100, 100);
         doc.text(d.bfPartner, marginX + 6, y + 12);
-        // Detail lines with strikethrough value
+        // Description
         var bfY = y + 18;
+        if (bfDescLines.length > 0) {
+          doc.setFont('helvetica', 'italic'); doc.setFontSize(8); doc.setTextColor(46, 100, 50);
+          doc.text(bfDescLines, marginX + 8, bfY);
+          bfY += bfDescH;
+        }
+        // Detail lines with strikethrough value
         bfLines.forEach(function(rl) {
           doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(80, 80, 80);
           doc.text(rl.tipo + ': ' + rl.bfPersonas + ' pers. x ' + rl.cantidad + ' hab. x ' + d.nights + ' dias x $' + _fmt(d.bfPrecio), marginX + 6, bfY);
@@ -6019,7 +6049,9 @@
         if (d.incluyeDesayuno && d.bfAhorroTotal > 0) {
           msg += '\n━━━━━━━━━━━━━━━━━\n';
           msg += '🍳 *DESAYUNO INCLUIDO SIN COSTO*\n';
-          msg += '📍 ' + d.bfPartner + '\n\n';
+          msg += '📍 ' + d.bfPartner + '\n';
+          if (d.bfDescripcion) msg += '🍽️ _' + d.bfDescripcion + '_\n';
+          msg += '\n';
           d.roomLines.forEach(function(rl) {
             if (rl.bfAhorro > 0) {
               msg += '• ' + rl.tipo + ': ' + rl.bfPersonas + ' pers. × ' + rl.cantidad + ' hab. × ' + d.nights + ' días\n';
@@ -6145,7 +6177,7 @@
         anticipo_pct: anticipo_pct, anticipoMonto: anticipo_pct > 0 ? Math.ceil(total * getAnticipoFraction()) : 0,
         mostrarHorarios: cot.opciones.mostrarHorarios || false,
         incluyeDesayuno: cot.opciones.incluyeDesayuno || false,
-        bfPartner: promo.partner, bfPrecio: bfPrecio, bfAhorroTotal: bfAhorroTotal,
+        bfPartner: promo.partner, bfDescripcion: promo.descripcion || '', bfPrecio: bfPrecio, bfAhorroTotal: bfAhorroTotal,
         notas: cot.opciones.notas || ''
       };
       // Use existing cotización number, don't increment counter
@@ -8122,6 +8154,11 @@
       h += '<div style="margin-bottom:12px"><label class="form-label" style="font-size:11px">Restaurante asociado</label>';
       h += '<input type="text" id="bfPartner" class="login-input" value="' + (promo.partner || '') + '" onchange="updateBreakfastField(\'partner\',this.value)" style="padding:8px;font-size:12px"></div>';
 
+      // Descripción del platillo/bebida
+      h += '<div style="margin-bottom:12px"><label class="form-label" style="font-size:11px">Descripción del desayuno incluido</label>';
+      h += '<textarea id="bfDescripcion" class="login-input" rows="3" placeholder="Ej: Desayuno continental: jugo natural, fruta de temporada, pan artesanal, café o té ilimitado" onchange="updateBreakfastField(\'descripcion\',this.value)" style="padding:8px;font-size:12px;resize:vertical;width:100%;box-sizing:border-box;font-family:inherit">' + (promo.descripcion || '') + '</textarea>';
+      h += '<div style="font-size:10px;color:var(--text2);margin-top:2px">Aparece en cotizaciones y tickets de desayuno para el huésped</div></div>';
+
       // Price per person
       h += '<div style="margin-bottom:12px"><label class="form-label" style="font-size:11px">Precio real del desayuno por persona (MXN)</label>';
       h += '<div style="display:flex;align-items:center;gap:8px;">';
@@ -9430,24 +9467,50 @@
         document.getElementById('reservaModalContent').insertAdjacentHTML('beforeend', regSection);
       }
 
-      // Breakfast codes section
+      // Breakfast codes section — wow style
       var resBf = (S.desayunos || []).filter(function(d) { return d.reservaId === resId; });
       if (resBf.length > 0) {
-        var bfSection = '<div style="background:var(--surface3);padding:12px;border-radius:var(--radius);margin-bottom:12px;">';
-        bfSection += '<div style="font-size:12px;color:var(--text2);margin-bottom:8px">🍳 DESAYUNOS INCLUIDOS (' + resBf.length + ')</div>';
+        var _bfPromo = getBreakfastPromo();
+        var _bfPendientes = resBf.filter(function(d) { return d.estado === 'Pendiente'; });
+        var _bfConsumidos = resBf.filter(function(d) { return d.estado === 'Consumido'; });
+        var _bfTotalPersonas = resBf.reduce(function(s, d) { return s + d.personas; }, 0);
+        var _bfValorReal = _bfTotalPersonas * (_bfPromo.precioPorPersona || 0);
+
+        var bfSection = '<div style="background:linear-gradient(135deg,rgba(46,125,50,0.1),rgba(76,175,80,0.05));padding:14px;border-radius:var(--radius);margin-bottom:12px;border:1px solid rgba(76,175,80,0.3);position:relative;overflow:hidden;">';
+        // Ribbon
+        bfSection += '<div style="position:absolute;top:8px;right:-30px;background:#2e7d32;color:#fff;font-size:8px;font-weight:700;padding:2px 34px;transform:rotate(45deg);letter-spacing:1px;">GRATIS</div>';
+        bfSection += '<div style="font-size:14px;font-weight:800;color:#2e7d32;margin-bottom:2px;">🍳 DESAYUNO INCLUIDO SIN COSTO</div>';
+        bfSection += '<div style="font-size:12px;color:var(--text2);margin-bottom:4px;">' + _bfPromo.partner + '</div>';
+        if (_bfPromo.descripcion) {
+          bfSection += '<div style="font-size:11px;color:var(--text1);margin-bottom:8px;padding:6px 8px;background:rgba(255,255,255,0.5);border-radius:6px;border-left:3px solid #2e7d32;line-height:1.3;">🍽️ ' + _bfPromo.descripcion + '</div>';
+        }
+        // Value callout
+        if (_bfValorReal > 0) {
+          bfSection += '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:#2e7d32;border-radius:8px;color:#fff;margin-bottom:10px;font-size:12px;">';
+          bfSection += '<span>Valor real:</span>';
+          bfSection += '<span><span style="text-decoration:line-through;opacity:.7;">$' + _fmt(_bfValorReal) + '</span> → <span style="font-size:15px;font-weight:800;">$0</span></span>';
+          bfSection += '</div>';
+        }
+        // Stats
+        bfSection += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px;text-align:center;">';
+        bfSection += '<div style="background:rgba(255,255,255,0.5);border-radius:6px;padding:6px;"><div style="font-size:18px;font-weight:800;color:var(--accent);">' + resBf.length + '</div><div style="font-size:9px;color:var(--text2);">Total</div></div>';
+        bfSection += '<div style="background:rgba(255,255,255,0.5);border-radius:6px;padding:6px;"><div style="font-size:18px;font-weight:800;color:var(--green);">' + _bfConsumidos.length + '</div><div style="font-size:9px;color:var(--text2);">Usados</div></div>';
+        bfSection += '<div style="background:rgba(255,255,255,0.5);border-radius:6px;padding:6px;"><div style="font-size:18px;font-weight:800;color:var(--yellow);">' + _bfPendientes.length + '</div><div style="font-size:9px;color:var(--text2);">Pendientes</div></div>';
+        bfSection += '</div>';
+        // Code list
         resBf.forEach(function(bf) {
           var stColor = bf.estado === 'Consumido' ? 'var(--green)' : bf.estado === 'Cancelado' ? 'var(--red)' : bf.estado === 'Expirado' ? 'var(--text2)' : 'var(--accent)';
           var stIcon = bf.estado === 'Consumido' ? '✅' : bf.estado === 'Cancelado' ? '❌' : bf.estado === 'Expirado' ? '⏰' : '🎟️';
-          bfSection += '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--surface2);font-size:12px">';
+          bfSection += '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(0,0,0,0.06);font-size:12px">';
           bfSection += '<div><span style="font-family:Space Mono,monospace;font-weight:700;color:' + stColor + '">' + bf.codigo + '</span>';
           bfSection += '<span style="color:var(--text2);margin-left:6px">' + formatDate(bf.fecha) + '</span>';
           bfSection += '<span style="color:var(--text2);margin-left:4px">(' + bf.personas + ' pers.)</span></div>';
           bfSection += '<span style="font-size:11px">' + stIcon + ' ' + bf.estado + '</span>';
           bfSection += '</div>';
         });
-        bfSection += '<div style="display:flex;gap:6px;margin-top:8px">';
-        bfSection += '<button onclick="shareBreakfastCodes(\'' + resId + '\')" style="flex:1;background:#25D366;color:white;border:none;border-radius:8px;padding:6px;font-size:11px;cursor:pointer">📲 Enviar códigos</button>';
-        bfSection += '<button onclick="cancelBreakfastCodes(\'' + resId + '\')" style="background:var(--surface2);border:1px solid var(--surface3);border-radius:8px;padding:6px 10px;font-size:11px;cursor:pointer;color:var(--red)">Cancelar</button>';
+        bfSection += '<div style="display:flex;gap:6px;margin-top:10px">';
+        bfSection += '<button onclick="shareBreakfastCodes(\'' + resId + '\')" style="flex:1;background:#25D366;color:white;border:none;border-radius:8px;padding:8px;font-size:12px;cursor:pointer;font-weight:600">📲 Enviar códigos</button>';
+        bfSection += '<button onclick="cancelBreakfastCodes(\'' + resId + '\')" style="background:var(--surface2);border:1px solid var(--surface3);border-radius:8px;padding:8px 12px;font-size:11px;cursor:pointer;color:var(--red)">Cancelar</button>';
         bfSection += '</div></div>';
         document.getElementById('reservaModalContent').insertAdjacentHTML('beforeend', bfSection);
       }
@@ -9500,14 +9563,27 @@
       var codes = (S.desayunos || []).filter(function(d) { return d.reservaId === resId && d.estado === 'Pendiente'; });
       if (codes.length === 0) { toast('No hay códigos pendientes', true); return; }
       var promo = getBreakfastPromo();
-      var msg = '🍳 *Desayunos incluidos*\n\n';
+      var totalPers = codes.reduce(function(s, c) { return s + c.personas; }, 0);
+      var valorReal = totalPers * (promo.precioPorPersona || 0);
+      var msg = '━━━━━━━━━━━━━━━━━\n';
+      msg += '🍳 *DESAYUNO INCLUIDO SIN COSTO*\n';
+      msg += '━━━━━━━━━━━━━━━━━\n\n';
       msg += 'Hola *' + res.huesped + '* 👋\n\n';
-      msg += 'Tu estancia incluye desayuno continental en *' + promo.partner + '*.\n\n';
-      msg += 'Tus códigos:\n';
+      msg += '¡Tu estancia incluye desayuno en *' + promo.partner + '*!\n';
+      if (promo.descripcion) msg += '\n🍽️ _' + promo.descripcion + '_\n';
+      msg += '\n🎟️ *Tus códigos de desayuno:*\n\n';
       codes.forEach(function(c) {
-        msg += '📅 ' + formatDate(c.fecha) + ' → *' + c.codigo + '* (' + c.personas + ' persona' + (c.personas > 1 ? 's' : '') + ')\n';
+        msg += '📅 ' + formatDate(c.fecha) + '\n';
+        msg += '    🔑 *' + c.codigo + '* (' + c.personas + ' persona' + (c.personas > 1 ? 's' : '') + ')\n\n';
       });
-      msg += '\nMuestra el código al llegar al restaurante.\n\n_' + HOTEL_NAME + '_ 🌿';
+      if (valorReal > 0) {
+        msg += '━━━━━━━━━━━━━━━━━\n';
+        msg += '💰 Valor real: ~$' + _fmt(valorReal) + '~\n';
+        msg += '🎁 *Su costo: $0.00 — CORTESÍA*\n';
+        msg += '✨ _¡Se ahorra $' + _fmt(valorReal) + ' en desayunos!_\n';
+        msg += '━━━━━━━━━━━━━━━━━\n\n';
+      }
+      msg += '📌 Muestra el código al llegar al restaurante.\n\n_' + HOTEL_NAME + '_ 🌿';
       var phone = (res.telefono || '').replace(/\D/g, '');
       window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(msg), '_blank');
     }
@@ -10289,9 +10365,15 @@
     }
 
     function promptBreakfastPromo(res, room) {
-      if (!isBreakfastPromoActive()) return;
+      if (!isBreakfastPromoActive()) {
+        showPartnerRecommendation(res);
+        return;
+      }
       var personas = getBreakfastPersonas(room.tipo);
-      if (personas <= 0) return;
+      if (personas <= 0) {
+        showPartnerRecommendation(res);
+        return;
+      }
 
       var promo = getBreakfastPromo();
       var nights = daysUntil(res.fechaEntrada, res.fechaSalida);
@@ -10314,7 +10396,7 @@
 
       h += '<div style="display:flex;flex-direction:column;gap:10px;">';
       h += '<button class="form-button" onclick="activateBreakfastForRes(\'' + res.id + '\',\'' + room.tipo + '\')" style="background:var(--green);">✅ Sí, activar desayunos</button>';
-      h += '<button class="form-button secondary" onclick="closeModal()">No, gracias</button>';
+      h += '<button class="form-button secondary" onclick="closeModal();showPartnerRecommendation(S.reservas.find(function(r){return r.id===\'' + res.id + '\'}))">No, gracias</button>';
       h += '</div>';
 
       document.getElementById('taskDetailContent').innerHTML = h;
@@ -10348,7 +10430,95 @@
         S.desayunos = (S.desayunos || []).concat(_bfCodes);
         toast('🍳 ' + _bfCodes.length + ' desayuno(s) activado(s)');
         render();
+        // Chain to partner recommendation
+        showPartnerRecommendation(res);
       }, 'Generando códigos de desayuno...');
+    }
+
+    // ============ PARTNER RECOMMENDATION (post check-in) ============
+    function showPartnerRecommendation(res) {
+      if (!res) return;
+      var promo = getBreakfastPromo();
+      var partnerName = promo.partner || 'Mozzafiato';
+      var partnerDesc = promo.descripcion || '';
+      var mozzFB = 'https://www.facebook.com/share/1DjnHqK2HF/';
+      var mozzMenu = 'https://mozzafiatoamor-rgb.github.io/mozzafiato-menu/index.html';
+      var mozzWhats = '9984088897';
+
+      var h = '';
+      // Header with gradient
+      h += '<div style="text-align:center;margin-bottom:16px;padding:20px;background:linear-gradient(135deg,#3e2723,#5d4037);border-radius:var(--radius);color:#fff;position:relative;overflow:hidden;">';
+      h += '<div style="position:absolute;top:0;left:0;right:0;bottom:0;background:url(\'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2280%22 opacity=%220.1%22>☕</text></svg>\') repeat;opacity:0.3;"></div>';
+      h += '<div style="position:relative;z-index:1;">';
+      h += '<div style="font-size:36px;margin-bottom:6px;">☕</div>';
+      h += '<div style="font-size:18px;font-weight:800;letter-spacing:0.5px;">Mozzafiato</div>';
+      h += '<div style="font-size:12px;opacity:0.85;font-style:italic;margin-top:2px;">El placer del buen café</div>';
+      h += '</div></div>';
+
+      // Recommendation text
+      h += '<div style="text-align:center;margin-bottom:14px;">';
+      h += '<div style="font-size:14px;font-weight:600;margin-bottom:4px;">¡Recomienda a ' + res.huesped + '!</div>';
+      h += '<div style="font-size:12px;color:var(--text2);">Invita al huésped a conocer nuestro restaurante asociado</div>';
+      h += '</div>';
+
+      // Description if available
+      if (partnerDesc) {
+        h += '<div style="padding:10px 12px;background:linear-gradient(135deg,rgba(62,39,35,0.08),rgba(93,64,55,0.04));border-radius:8px;margin-bottom:14px;border-left:3px solid #5d4037;font-size:12px;color:var(--text1);line-height:1.4;">🍽️ ' + partnerDesc + '</div>';
+      }
+
+      // Action cards
+      h += '<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;">';
+
+      // Menu digital
+      h += '<a href="' + mozzMenu + '" target="_blank" style="display:flex;align-items:center;gap:12px;padding:12px;background:var(--surface3);border-radius:var(--radius);text-decoration:none;color:var(--text1);border:1px solid var(--surface3);transition:all .2s;">';
+      h += '<div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#ff6f00,#ff8f00);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">📖</div>';
+      h += '<div style="flex:1;"><div style="font-weight:700;font-size:13px;">Menú Digital</div><div style="font-size:11px;color:var(--text2);">Ver carta completa de platillos y bebidas</div></div>';
+      h += '<div style="font-size:16px;color:var(--text2);">→</div>';
+      h += '</a>';
+
+      // Facebook
+      h += '<a href="' + mozzFB + '" target="_blank" style="display:flex;align-items:center;gap:12px;padding:12px;background:var(--surface3);border-radius:var(--radius);text-decoration:none;color:var(--text1);border:1px solid var(--surface3);">';
+      h += '<div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#1877f2,#42a5f5);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;color:#fff;">f</div>';
+      h += '<div style="flex:1;"><div style="font-weight:700;font-size:13px;">Facebook</div><div style="font-size:11px;color:var(--text2);">Síguenos y conoce nuestras promociones</div></div>';
+      h += '<div style="font-size:16px;color:var(--text2);">→</div>';
+      h += '</a>';
+
+      // WhatsApp directo
+      h += '<a href="https://wa.me/52' + mozzWhats + '" target="_blank" style="display:flex;align-items:center;gap:12px;padding:12px;background:var(--surface3);border-radius:var(--radius);text-decoration:none;color:var(--text1);border:1px solid var(--surface3);">';
+      h += '<div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#25D366,#128C7E);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;color:#fff;">📱</div>';
+      h += '<div style="flex:1;"><div style="font-weight:700;font-size:13px;">WhatsApp Mozzafiato</div><div style="font-size:11px;color:var(--text2);">Reservaciones y pedidos directos</div></div>';
+      h += '<div style="font-size:16px;color:var(--text2);">→</div>';
+      h += '</a>';
+      h += '</div>';
+
+      // Share with guest button
+      h += '<div style="display:flex;flex-direction:column;gap:8px;">';
+      h += '<button class="form-button" onclick="shareMozzafiatoWithGuest(\'' + res.id + '\')" style="background:#25D366;width:100%;">📲 Compartir con ' + res.huesped + ' por WhatsApp</button>';
+      h += '<button class="form-button secondary" onclick="closeModal()" style="width:100%;">Listo ✓</button>';
+      h += '</div>';
+
+      document.getElementById('taskDetailContent').innerHTML = h;
+      document.getElementById('taskDetailModal').querySelector('.modal-title').textContent = '☕ Recomendación para el huésped';
+      document.getElementById('taskDetailActions').innerHTML = '';
+      openModal('taskDetailModal');
+    }
+
+    function shareMozzafiatoWithGuest(resId) {
+      var res = S.reservas.find(function(r) { return r.id === resId; });
+      if (!res) return;
+      var hi = getHotelInfo();
+      var promo = getBreakfastPromo();
+      var msg = '¡Hola *' + res.huesped + '*! 👋\n\n';
+      msg += '¡Bienvenido(a) a *' + hi.nombre + '*! 🌿\n\n';
+      msg += 'Te recomendamos visitar ☕ *Mozzafiato — El placer del buen café*\n';
+      if (promo.descripcion) msg += '\n🍽️ _' + promo.descripcion + '_\n';
+      msg += '\n📖 *Menú digital:*\nhttps://mozzafiatoamor-rgb.github.io/mozzafiato-menu/index.html\n';
+      msg += '\n📱 *WhatsApp Mozzafiato:*\nhttps://wa.me/529984088897\n';
+      msg += '\n👍 *Facebook:*\nhttps://www.facebook.com/share/1DjnHqK2HF/\n';
+      msg += '\n¡Que disfrute su estadía! 😊\n\n_' + hi.nombre + '_ 🌿';
+      var phone = (res.telefono || '').replace(/\D/g, '');
+      window.open('https://wa.me/' + (phone || '') + '?text=' + encodeURIComponent(msg), '_blank');
+      closeModal();
     }
 
     async function doCheckin(res, room) {
