@@ -2877,11 +2877,16 @@
         showGuestMode(guestRegId);
         return;
       }
+      // Detect in-app browsers (Facebook, Instagram, etc.) that have issues with Google Apps Script
+      var _isInAppBrowser = /FBAN|FBAV|Instagram|Line\/|Twitter|Snapchat/i.test(navigator.userAgent);
+
       if (guestBooking && (S._publicMode || (S.sheetId && S.apiKey))) {
+        if (_isInAppBrowser) { _showOpenInBrowserBanner(); }
         showBookingMode();
         return;
       }
       if (guestValidar && (S._publicMode || (S.sheetId && S.apiKey))) {
+        if (_isInAppBrowser) { _showOpenInBrowserBanner(); }
         showValidarMode();
         return;
       }
@@ -3141,6 +3146,24 @@
       openModal('taskDetailModal');
     }
 
+    // ============ IN-APP BROWSER BANNER ============
+    function _showOpenInBrowserBanner() {
+      // Show a sticky banner suggesting to open in real browser
+      var banner = document.createElement('div');
+      banner.id = 'inAppBrowserBanner';
+      banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#1a1a2e;color:#fff;padding:14px 16px;font-size:13px;display:flex;align-items:center;gap:10px;justify-content:space-between;box-shadow:0 2px 8px rgba(0,0,0,0.3);';
+      var isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+      var isAndroid = /Android/i.test(navigator.userAgent);
+      var browserIcon = isIOS ? '🧭' : '🌐';
+      var browserName = isIOS ? 'Safari' : (isAndroid ? 'Chrome' : 'tu navegador');
+      banner.innerHTML = '<div style="flex:1;"><div style="font-weight:700;margin-bottom:2px;">⚠️ Abre en ' + browserName + '</div><div style="font-size:11px;opacity:0.8;">Esta página funciona mejor fuera de esta app.</div></div>'
+        + '<button onclick="window.open(window.location.href,\'_system\')||window.open(window.location.href,\'_blank\');void(0);" style="background:#fff;color:#1a1a2e;border:none;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">' + browserIcon + ' Abrir</button>'
+        + '<button onclick="this.parentElement.remove()" style="background:none;border:none;color:#fff;font-size:18px;cursor:pointer;padding:0 4px;opacity:0.6;">✕</button>';
+      document.body.prepend(banner);
+      // Add top padding so content isn't hidden behind banner
+      document.body.style.paddingTop = '60px';
+    }
+
     // ============ PUBLIC BOOKING MODE ============
     var _bookingRooms = [];
     var _bookingReservas = [];
@@ -3197,7 +3220,19 @@
         renderBookingDatePicker();
       } catch(e) {
         console.error('Booking mode error:', e);
-        container.innerHTML = '<div style="text-align:center;padding:40px 0;"><div style="font-size:28px;margin-bottom:8px;">⚠️</div><div style="color:var(--red);">Error al cargar disponibilidad.</div><div style="font-size:11px;color:var(--text2);margin-top:8px;">' + (e.message || '') + '</div></div>';
+        var _inApp = /FBAN|FBAV|Instagram|Line\/|Twitter|Snapchat/i.test(navigator.userAgent);
+        var _errHtml = '<div style="text-align:center;padding:40px 20px;"><div style="font-size:28px;margin-bottom:8px;">⚠️</div><div style="color:var(--red);font-weight:600;">Error al cargar disponibilidad</div>';
+        if (_inApp) {
+          var _isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+          _errHtml += '<div style="font-size:13px;color:var(--text2);margin-top:12px;">Este navegador integrado no es compatible.</div>';
+          _errHtml += '<div style="margin-top:16px;"><button onclick="window.open(window.location.href,\'_system\')||window.open(window.location.href,\'_blank\')" style="background:var(--accent);color:#fff;border:none;border-radius:10px;padding:12px 24px;font-size:14px;font-weight:700;cursor:pointer;">' + (_isIOS ? '🧭 Abrir en Safari' : '🌐 Abrir en navegador') + '</button></div>';
+          _errHtml += '<div style="font-size:11px;color:var(--text2);margin-top:10px;">Toca los 3 puntos (⋮) arriba y selecciona "Abrir en navegador"</div>';
+        } else {
+          _errHtml += '<div style="font-size:11px;color:var(--text2);margin-top:8px;">' + (e.message || '') + '</div>';
+          _errHtml += '<div style="margin-top:14px;"><button onclick="location.reload()" style="background:var(--accent);color:#fff;border:none;border-radius:8px;padding:10px 20px;font-size:13px;cursor:pointer;">🔄 Reintentar</button></div>';
+        }
+        _errHtml += '</div>';
+        container.innerHTML = _errHtml;
       }
     }
 
@@ -3837,11 +3872,33 @@
 
     // ============ SHEETS API ============
     // Read via Apps Script doGet (for public pages — no API key needed)
+    function _xhrFallback(url) {
+      return new Promise(function(resolve, reject) {
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', url, true);
+        xhr.onload = function() {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try { resolve(JSON.parse(xhr.responseText)); } catch(e) { reject(new Error('JSON parse error')); }
+          } else { reject(new Error('XHR error: ' + xhr.status)); }
+        };
+        xhr.onerror = function() { reject(new Error('Network error')); };
+        xhr.timeout = 15000;
+        xhr.ontimeout = function() { reject(new Error('Timeout')); };
+        xhr.send();
+      });
+    }
+
     async function publicRead(scriptUrl, sheetName, range) {
       var url = scriptUrl + '?action=read&sheet=' + encodeURIComponent(sheetName) + '&range=' + encodeURIComponent(range);
-      var res = await fetch(url);
-      if (!res.ok) throw new Error('Script read error: ' + res.status);
-      return await res.json();
+      // Try fetch first, fallback to XHR (more reliable in some WebViews like Facebook)
+      try {
+        var res = await fetch(url, { redirect: 'follow' });
+        if (!res.ok) throw new Error('Script read error: ' + res.status);
+        return await res.json();
+      } catch(fetchErr) {
+        console.warn('publicRead fetch failed, trying XHR fallback:', fetchErr.message);
+        return _xhrFallback(url);
+      }
     }
 
     const sheets = {
