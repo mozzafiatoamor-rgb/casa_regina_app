@@ -501,7 +501,7 @@
       border-left-color: var(--green);
     }
 
-    .room-timeline-item.pendiente {
+    .room-timeline-item.reservada {
       border-left-color: var(--yellow);
     }
 
@@ -652,7 +652,7 @@
     }
     .cal-block.ocupada { background: rgba(107,165,207,.25); color: var(--blue); }
     .cal-block.confirmada { background: rgba(196,168,77,.25); color: var(--yellow); }
-    .cal-block.pendiente { background: rgba(138,154,128,.25); color: var(--text2); }
+    .cal-block.reservada { background: rgba(138,154,128,.25); color: var(--text2); }
     .cal-block.limpieza { background: rgba(196,168,77,.15); color: var(--yellow); }
     .cal-block.mantenimiento { background: rgba(207,107,107,.25); color: var(--red); }
     .cal-block.disponible { background: rgba(107,191,123,.1); color: rgba(107,191,123,.5); }
@@ -1865,7 +1865,7 @@
               <span class="cal-legend-item"><span class="cal-dot" style="background:var(--green)"></span> Disponible</span>
               <span class="cal-legend-item"><span class="cal-dot" style="background:var(--blue)"></span> Ocupada</span>
               <span class="cal-legend-item"><span class="cal-dot" style="background:var(--yellow)"></span> Confirmada</span>
-              <span class="cal-legend-item"><span class="cal-dot" style="background:var(--text2)"></span> Pendiente</span>
+              <span class="cal-legend-item"><span class="cal-dot" style="background:var(--text2)"></span> Reservada</span>
               <span class="cal-legend-item"><span class="cal-dot" style="background:var(--red)"></span> Mantenimiento</span>
             </div>
           </div>
@@ -2371,7 +2371,9 @@
       reviewLink: '',
       checkin_hora: '15:00',
       checkout_hora: '12:00',
-      anticipo_pct: 50
+      anticipo_pct: 50,
+      wifi_red: '',
+      wifi_pass: ''
     };
 
     function getHotelInfo() {
@@ -2579,7 +2581,7 @@
       instrucciones: {
         nombre: 'Instrucciones de Llegada',
         icon: '📍',
-        texto: '🏨 *{hotel}*\n_Instrucciones de llegada_\n\nHola *{huesped}* 👋\n\n¡Bienvenido(a)! Aquí tienes la info para tu llegada:\n\n📍 *Ubicación:* {direccion}\n🕐 *Check-in:* {checkin_hora}\n🔑 *Check-out:* {checkout_hora}\n\n📶 *WiFi:*\nRed: CasaRegina\nContraseña: [tu contraseña]\n\n📋 *Políticas:*\n• No fumar en habitaciones\n• Horario de silencio: 10 PM - 8 AM\n• Mascotas: consultar disponibilidad\n\nCualquier duda estamos para servirte 😊\n\n_{hotel}_ 🌿'
+        texto: '🏨 *{hotel}*\n_Instrucciones de llegada_\n\nHola *{huesped}* 👋\n\n¡Bienvenido(a)! Aquí tienes la info para tu llegada:\n\n📍 *Ubicación:* {direccion}\n🕐 *Check-in:* {checkin_hora}\n🔑 *Check-out:* {checkout_hora}\n\n📶 *WiFi:*\nRed: {wifi_red}\nContraseña: {wifi_pass}\n\n📋 *Políticas:*\n• No fumar en habitaciones\n• Horario de silencio: 10 PM - 8 AM\n• Mascotas: consultar disponibilidad\n\nCualquier duda estamos para servirte 😊\n\n_{hotel}_ 🌿'
       },
       despedida: {
         nombre: 'Despedida + Reseña',
@@ -2727,6 +2729,8 @@
       text = text.replace(/\{checkin_hora\}/g, hi.checkin_hora || '3:00 PM');
       text = text.replace(/\{checkout_hora\}/g, hi.checkout_hora || '12:00 PM');
       text = text.replace(/\{reviewLink\}/g, hi.reviewLink || '[Configura tu link de reseñas en Ajustes]');
+      text = text.replace(/\{wifi_red\}/g, hi.wifi_red || '[Configura WiFi en Ajustes]');
+      text = text.replace(/\{wifi_pass\}/g, hi.wifi_pass || '[Configura WiFi en Ajustes]');
       return text;
     }
 
@@ -3387,7 +3391,7 @@
       var ts = now();
 
       try {
-        var resRow = [resId, roomNum, nombre, telefono, email, checkin, checkout, adultos, ninos, room.tarifa, total, 'Pendiente', observaciones, 'Web', ts];
+        var resRow = [resId, roomNum, nombre, telefono, email, checkin, checkout, adultos, ninos, room.tarifa, total, 'Reservada', observaciones, 'Web', ts];
         var regRow = [regId, resId, nombre, roomNum, today, tipoId, numId, nacionalidad, '', '', observaciones, ts];
         var logRow = [today, ts.split(' ')[1], 'Web', 'Reserva Web', nombre + ' Hab.' + roomNum + ' ' + formatDate(checkin) + '-' + formatDate(checkout), 'info'];
 
@@ -3433,7 +3437,7 @@
       waText += '📅 ' + formatDate(checkin) + ' → ' + formatDate(checkout) + ' (' + nights + ' noches)\n';
       waText += '💰 Total: $' + total + '\n';
       waText += '📋 Ref: ' + resId + '\n\n';
-      waText += '⏳ Pendiente de confirmación por el hotel.\n';
+      waText += '⏳ Reservada — pendiente de confirmación por el hotel.\n';
       waText += '¡Gracias por elegir ' + HOTEL_NAME + '! 🌟';
 
       var cleanPhone = telefono.replace(/[^0-9]/g, '');
@@ -3954,7 +3958,7 @@
           niños: r[8],
           tarifa: parseFloat(r[9]) || 0,
           tarifaTotal: parseFloat(r[10]) || 0,
-          estado: r[11],
+          estado: r[11] === 'Pendiente' ? 'Reservada' : r[11],
           notas: r[12] || '',
           creadoPor: r[13] || '',
           fechaCreacion: r[14] || ''
@@ -4087,19 +4091,19 @@
 
       // --- MENSAJERÍA ---
       // Reservas que llegan mañana: enviar recordatorio
-      S.reservas.filter(function(r){ return r.fechaEntrada === tomorrowStr && (r.estado === 'Confirmada' || r.estado === 'Pendiente'); }).forEach(function(r){
+      S.reservas.filter(function(r){ return r.fechaEntrada === tomorrowStr && (r.estado === 'Confirmada' || r.estado === 'Reservada'); }).forEach(function(r){
         tasks.push({ id:'msg_recordatorio_'+r.id, cat:'msg', icon:'🔔', priority:1,
           text:'Enviar recordatorio a '+r.huesped+' (llega mañana, Hab.'+r.habitacionNum+')',
           action:'previewTemplate(\'recordatorio\',\''+r.id+'\')', actionLabel:'Enviar', actionIcon:'📱' });
       });
       // Reservas que llegan hoy: enviar instrucciones
-      S.reservas.filter(function(r){ return r.fechaEntrada === today && r.estado === 'Confirmada'; }).forEach(function(r){
+      S.reservas.filter(function(r){ return r.fechaEntrada === today && (r.estado === 'Confirmada' || r.estado === 'Reservada'); }).forEach(function(r){
         tasks.push({ id:'msg_instrucciones_'+r.id, cat:'msg', icon:'📍', priority:0,
           text:'Enviar instrucciones de llegada a '+r.huesped+' (Hab.'+r.habitacionNum+')',
           action:'previewTemplate(\'instrucciones\',\''+r.id+'\')', actionLabel:'Enviar', actionIcon:'📱' });
       });
-      // Reservas Pendientes (online) sin confirmar
-      S.reservas.filter(function(r){ return r.estado === 'Pendiente'; }).forEach(function(r){
+      // Reservas sin confirmar
+      S.reservas.filter(function(r){ return r.estado === 'Reservada'; }).forEach(function(r){
         tasks.push({ id:'msg_confirmar_'+r.id, cat:'msg', icon:'🌐', priority:0,
           text:'Confirmar reserva online de '+r.huesped+' ('+formatDate(r.fechaEntrada)+', Hab.'+r.habitacionNum+')',
           action:'confirmarReserva(\''+r.id+'\')', actionLabel:'Confirmar', actionIcon:'✅' });
@@ -4124,7 +4128,7 @@
       });
       // Reservas confirmadas sin anticipo mínimo
       var _taskAPct = getAnticipoPct();
-      S.reservas.filter(function(r){ return (r.estado === 'Confirmada' || r.estado === 'Pendiente') && r.fechaEntrada >= today; }).forEach(function(r){
+      S.reservas.filter(function(r){ return (r.estado === 'Confirmada' || r.estado === 'Reservada') && r.fechaEntrada >= today; }).forEach(function(r){
         var paid = S.cobros.filter(function(c){return c.reservaId===r.id}).reduce(function(s,c){return s+c.monto},0);
         var minReq = Math.ceil(r.tarifaTotal * getAnticipoFraction());
         if (paid < minReq) {
@@ -4148,9 +4152,9 @@
 
       // --- CHECK-IN / CHECK-OUT ---
       // Llegadas hoy
-      S.reservas.filter(function(r){ return r.fechaEntrada === today && r.estado === 'Confirmada'; }).forEach(function(r){
+      S.reservas.filter(function(r){ return r.fechaEntrada === today && (r.estado === 'Confirmada' || r.estado === 'Reservada'); }).forEach(function(r){
         tasks.push({ id:'checkin_'+r.id, cat:'checkinout', icon:'🔑', priority:1,
-          text:'Hacer check-in de '+r.huesped+' (Hab.'+r.habitacionNum+')',
+          text:'Hacer check-in de '+r.huesped+' (Hab.'+r.habitacionNum+')' + (r.estado === 'Reservada' ? ' ⚠️ sin confirmar' : ''),
           action:'openReservaModal(\''+r.id+'\')', actionLabel:'Abrir reserva', actionIcon:'📋' });
       });
       // Salidas hoy
@@ -4277,7 +4281,7 @@
       const maintCount = S.rooms.filter(r => r.estado === 'Mantenimiento').length;
 
       // Llegadas esperadas = Confirmadas con entrada hoy que AÚN no hicieron check-in
-      const arrivals = S.reservas.filter(r => r.fechaEntrada === today && r.estado === 'Confirmada');
+      const arrivals = S.reservas.filter(r => r.fechaEntrada === today && (r.estado === 'Confirmada' || r.estado === 'Reservada'));
       // Salidas esperadas = Ya hospedados (Check-in) con salida hoy
       const departures = S.reservas.filter(r => r.fechaSalida === today && r.estado === 'Check-in');
 
@@ -4369,7 +4373,7 @@
       // 3. Reservations confirmed for today without minimum deposit (can't check in)
       var _daPct = getAnticipoPct();
       if (_daPct > 0) {
-        var noDeposit = S.reservas.filter(function(r) { return r.fechaEntrada === today && r.estado === 'Confirmada'; });
+        var noDeposit = S.reservas.filter(function(r) { return r.fechaEntrada === today && (r.estado === 'Confirmada' || r.estado === 'Reservada'); });
         noDeposit.forEach(function(r) {
           var paid = S.cobros.filter(function(c){return c.reservaId===r.id}).reduce(function(s,c){return s+c.monto},0);
           var minReq = Math.ceil(r.tarifaTotal * getAnticipoFraction());
@@ -4445,7 +4449,7 @@
       document.getElementById('alerts').innerHTML = alertsHtml;
 
       // Pending online reservations alert
-      var pendientes = S.reservas.filter(function(r) { return r.estado === 'Pendiente'; });
+      var pendientes = S.reservas.filter(function(r) { return r.estado === 'Reservada'; });
       if (pendientes.length > 0) {
         var pIdx = alertItems.length; // insert at top of alerts
         var pendHtml = '<div class="item" style="border-left-color:var(--accent);cursor:pointer" onclick="switchTab(\'reservas\')">' +
@@ -4567,7 +4571,7 @@
         const currentRes = S.reservas.find(r => r.habitacionNum === room.numero && r.estado === 'Check-in');
         const futureRes = S.reservas.filter(r =>
           r.habitacionNum === room.numero &&
-          (r.estado === 'Confirmada' || r.estado === 'Pendiente') &&
+          (r.estado === 'Confirmada' || r.estado === 'Reservada') &&
           r.fechaEntrada >= today
         ).sort((a,b) => a.fechaEntrada.localeCompare(b.fechaEntrada)).slice(0, 3);
 
@@ -4720,7 +4724,7 @@
           } else if (room.estado === 'Limpieza' && dateStr === today) {
             html += '<td class="' + cellClass + '"><div class="cal-block limpieza">🧹</div></td>';
           } else if (res) {
-            var blockClass = res.estado === 'Check-in' ? 'ocupada' : res.estado === 'Confirmada' ? 'confirmada' : 'pendiente';
+            var blockClass = res.estado === 'Check-in' ? 'ocupada' : res.estado === 'Confirmada' ? 'confirmada' : 'reservada';
             var isStart = dateStr === res.fechaEntrada;
             var guestShort = res.huesped.split(' ')[0];
             html += '<td class="' + cellClass + '" onclick="openReservaModal(\'' + res.id + '\')">' +
@@ -4766,9 +4770,9 @@
 
       // Apply filter based on selected pill
       if (S.filterReservas === 'activas') {
-        allFiltered = allFiltered.filter(r => r.estado === 'Check-in' || r.estado === 'Confirmada' || r.estado === 'Pendiente');
+        allFiltered = allFiltered.filter(r => r.estado === 'Check-in' || r.estado === 'Confirmada' || r.estado === 'Reservada');
       } else if (S.filterReservas === 'proximas') {
-        allFiltered = allFiltered.filter(r => (r.estado === 'Confirmada' || r.estado === 'Pendiente') && r.fechaEntrada >= today);
+        allFiltered = allFiltered.filter(r => (r.estado === 'Confirmada' || r.estado === 'Reservada') && r.fechaEntrada >= today);
       } else if (S.filterReservas === 'historial') {
         allFiltered = allFiltered.filter(r => r.estado === 'Check-out' || r.estado === 'Cancelada');
       }
@@ -4782,7 +4786,7 @@
       const groups = {
         'Check-in': allFiltered.filter(r => r.estado === 'Check-in'),
         'Confirmada': allFiltered.filter(r => r.estado === 'Confirmada'),
-        'Pendiente': allFiltered.filter(r => r.estado === 'Pendiente'),
+        'Reservada': allFiltered.filter(r => r.estado === 'Reservada'),
         'Check-out': allFiltered.filter(r => r.estado === 'Check-out'),
         'Cancelada': allFiltered.filter(r => r.estado === 'Cancelada')
       };
@@ -4790,7 +4794,7 @@
       const statusIcons = {
         'Check-in': '🔵',
         'Confirmada': '🟢',
-        'Pendiente': '⏳',
+        'Reservada': '📋',
         'Check-out': '✅',
         'Cancelada': '❌'
       };
@@ -4802,7 +4806,7 @@
         const isCollapsed = _collapsedGroups[status];
         const borderClass = status === 'Check-in' ? 'check-in' :
                            status === 'Confirmada' ? 'confirmada' :
-                           status === 'Pendiente' ? 'pendiente' :
+                           status === 'Reservada' ? 'reservada' :
                            status === 'Check-out' ? 'check-out' : 'cancelada';
 
         listHtml += `
@@ -4810,7 +4814,7 @@
             <div class="res-group-header" onclick="toggleResGroup('${status}')" style="border-left: 4px solid ${
               status === 'Check-in' ? 'var(--blue)' :
               status === 'Confirmada' ? 'var(--green)' :
-              status === 'Pendiente' ? 'var(--yellow)' :
+              status === 'Reservada' ? 'var(--yellow)' :
               status === 'Check-out' ? 'var(--text2)' : 'var(--red)'
             }">
               <span>${statusIcons[status]} ${status}</span>
@@ -4820,13 +4824,13 @@
               ${items.map(r => {
                 const borderColor = r.estado === 'Check-in' ? 'var(--blue)' :
                                    r.estado === 'Confirmada' ? 'var(--green)' :
-                                   r.estado === 'Pendiente' ? 'var(--yellow)' :
+                                   r.estado === 'Reservada' ? 'var(--yellow)' :
                                    r.estado === 'Check-out' ? 'var(--text2)' : 'var(--red)';
                 return `
                   <div class="reservation-item" onclick="openReservaModal('${r.id}')" style="border-left-color: ${borderColor}">
                     <div class="res-header">
                       <div class="res-guest">${r.huesped}</div>
-                      <div class="status-badge" style="background: rgba(${r.estado === 'Confirmada' ? '107,191,123' : r.estado === 'Pendiente' ? '196,168,77' : r.estado === 'Check-in' ? '107,165,207' : r.estado === 'Check-out' ? '138,154,136' : '207,107,107'}, 0.2);">${r.estado}</div>
+                      <div class="status-badge" style="background: rgba(${r.estado === 'Confirmada' ? '107,191,123' : r.estado === 'Reservada' ? '196,168,77' : r.estado === 'Check-in' ? '107,165,207' : r.estado === 'Check-out' ? '138,154,136' : '207,107,107'}, 0.2);">${r.estado}</div>
                     </div>
                     <div class="res-room">Habitación ${r.habitacionNum}</div>
                     <div class="res-dates">${formatDate(r.fechaEntrada)} → ${formatDate(r.fechaSalida)}</div>
@@ -5806,7 +5810,7 @@
           return r.tarifaTotal-paid>0;
         });
       }else if(S.filterCobros==='proximas'){
-        filtered=S.reservas.filter(function(r){return r.estado==='Confirmada'||r.estado==='Pendiente'});
+        filtered=S.reservas.filter(function(r){return r.estado==='Confirmada'||r.estado==='Reservada'});
       }else{
         filtered=S.reservas.filter(function(r){return r.estado==='Check-out'});
       }
@@ -6468,7 +6472,7 @@
         y+=6;
         doc.setFontSize(6);doc.setFont('helvetica','bold');
         setC(100,140,80);
-        var cStat = res.estado==='Confirmada'?'RESERVACION CONFIRMADA':res.estado==='Check-in'?'HUESPED HOSPEDADO':res.estado==='Pendiente'?'PENDIENTE DE CONFIRMACION':'ESTADO: '+res.estado.toUpperCase();
+        var cStat = res.estado==='Confirmada'?'RESERVACION CONFIRMADA':res.estado==='Check-in'?'HUESPED HOSPEDADO':res.estado==='Reservada'?'RESERVADA — PENDIENTE CONFIRMACION':'ESTADO: '+res.estado.toUpperCase();
         if(render)doc.text(cStat,(pageW-doc.getTextWidth(cStat))/2,y);
         y+=11;
         doc.setFontSize(5.5);doc.setFont('helvetica','normal');
@@ -7207,6 +7211,10 @@
       h += '<input type="number" id="hi_anticipo_pct" class="login-input" value="' + (hi.anticipo_pct != null ? hi.anticipo_pct : 50) + '" min="0" max="100" step="5" style="width:80px;padding:10px;text-align:center;">';
       h += '<span style="font-size:12px;color:var(--text2);">% — Pon 0 para desactivar, 100 para pago completo</span>';
       h += '</div>';
+      h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">';
+      h += '<div><label class="form-label" style="font-size:12px;">📶 Red WiFi</label><input type="text" id="hi_wifi_red" class="login-input" value="' + (hi.wifi_red || '') + '" placeholder="Nombre de la red"></div>';
+      h += '<div><label class="form-label" style="font-size:12px;">🔑 Contraseña WiFi</label><input type="text" id="hi_wifi_pass" class="login-input" value="' + (hi.wifi_pass || '') + '" placeholder="Contraseña"></div>';
+      h += '</div>';
       h += '<label class="form-label" style="font-size:12px;">Link de Reseñas (Google, TripAdvisor)</label>';
       h += '<input type="url" id="hi_reviewLink" class="login-input" value="' + hi.reviewLink + '" placeholder="https://g.page/r/..." style="margin-bottom:10px;">';
       h += '<button class="form-button" onclick="saveHotelInfoFromForm()" style="width:100%;">Guardar Datos del Hotel</button>';
@@ -7249,7 +7257,9 @@
         checkin_hora: document.getElementById('hi_checkin_hora').value,
         checkout_hora: document.getElementById('hi_checkout_hora').value,
         reviewLink: document.getElementById('hi_reviewLink').value.trim(),
-        anticipo_pct: parseInt(document.getElementById('hi_anticipo_pct').value) || 0
+        anticipo_pct: parseInt(document.getElementById('hi_anticipo_pct').value) || 0,
+        wifi_red: document.getElementById('hi_wifi_red').value.trim(),
+        wifi_pass: document.getElementById('hi_wifi_pass').value.trim()
       };
       saveHotelInfo(info);
       HOTEL_NAME = info.nombre;
@@ -7544,7 +7554,9 @@
         doc.setFont('helvetica', 'bold');
         doc.text('WiFi:', marginX + 8, y);
         doc.setFont('helvetica', 'normal');
-        doc.text('Red: CasaRegina  |  Contraseña: [ver recepción]', marginX + 25, y); y += 6;
+        var _whi = getHotelInfo();
+        var _wifiText = (_whi.wifi_red ? 'Red: ' + _whi.wifi_red : 'Red: [ver recepción]') + '  |  ' + (_whi.wifi_pass ? 'Contraseña: ' + _whi.wifi_pass : 'Contraseña: [ver recepción]');
+        doc.text(_wifiText, marginX + 25, y); y += 6;
 
         // Horarios
         doc.setFont('helvetica', 'bold');
@@ -7982,11 +7994,21 @@
     ];
 
     function getTerms() {
+      var terms;
       var stored = localStorage.getItem('hotelTerms');
       if (stored) {
-        try { return JSON.parse(stored); } catch(e) {}
+        try { terms = JSON.parse(stored); } catch(e) {}
       }
-      return DEFAULT_TERMS.map(function(t) { return { title: t.title, text: t.text }; });
+      if (!terms) terms = DEFAULT_TERMS.map(function(t) { return { title: t.title, text: t.text }; });
+      // Always inject current hotel hours into the Check-in/Check-out term
+      var hi = getHotelInfo();
+      terms = terms.map(function(t) {
+        if (t.title === 'Check-in / Check-out') {
+          return { title: t.title, text: 'La hora de entrada es a las ' + formatHoraDisplay(hi.checkin_hora) + ' y la hora de salida es a las ' + formatHoraDisplay(hi.checkout_hora) + '. El early check-in y late check-out están sujetos a disponibilidad y pueden generar cargos adicionales.' };
+        }
+        return t;
+      });
+      return terms;
     }
 
     function renderTermsEditor() {
@@ -8361,10 +8383,10 @@
       if (res.estado !== 'Cancelada') {
         buttons += '<button class="form-button" onclick="closeModal();showReservaConfirmation(\'' + resId + '\')" style="background:var(--blue)">📄 Confirmación de Reserva</button>';
       }
-      if (res.estado === 'Pendiente') {
+      if (res.estado === 'Reservada') {
         buttons += '<button class="form-button" onclick="confirmarReserva(\'' + resId + '\')" style="background:var(--green);color:white;">✅ Confirmar Reserva</button>';
       }
-      if (res.estado === 'Confirmada' || res.estado === 'Pendiente') {
+      if (res.estado === 'Confirmada' || res.estado === 'Reservada') {
         buttons += '<button class="form-button secondary" onclick="cancelReserva(\'' + resId + '\')">Cancelar Reserva</button>';
         if (balance > 0) {
           buttons += '<button class="form-button" onclick="closeModal();goToCobros(\'' + resId + '\')">💰 Ir a Cobros ($' + balance + ' pendiente)</button>';
@@ -8751,7 +8773,16 @@
         const fecha = normDate(new Date());
         const hora = n.split(' ')[1];
 
-        const row = [id, roomNum, huesped, tel, email, checkin, checkout, adultos, niños, tarifa, total, 'Confirmada', notas, S.user.usuario, n];
+        // Determine initial state: if anticipo is configured and payment covers it, or no anticipo required → Confirmada; otherwise → Reservada
+        var _aPctNew = getAnticipoPct();
+        var _initEstado = 'Reservada';
+        if (_aPctNew === 0) {
+          _initEstado = 'Confirmada'; // No anticipo required → auto-confirm
+        } else if (wantsPay && payMonto > 0) {
+          var _minReqNew = Math.ceil(total * getAnticipoFraction());
+          if (payMonto >= _minReqNew) _initEstado = 'Confirmada';
+        }
+        const row = [id, roomNum, huesped, tel, email, checkin, checkout, adultos, niños, tarifa, total, _initEstado, notas, S.user.usuario, n];
         const logRow = [fecha, hora, S.user.usuario, 'Nueva Reserva', huesped + ' en Hab. ' + roomNum, 'info'];
 
         var operations = [
@@ -8774,7 +8805,7 @@
 
         S.reservas.push({
           id, habitacionNum: roomNum, huesped, telefono: tel, email, fechaEntrada: checkin, fechaSalida: checkout,
-          adultos, niños, tarifa, tarifaTotal: total, estado: 'Confirmada', notas, creadoPor: S.user.usuario, fechaCreacion: n
+          adultos, niños, tarifa, tarifaTotal: total, estado: _initEstado, notas, creadoPor: S.user.usuario, fechaCreacion: n
         });
 
         // Add payment to local state
@@ -8850,7 +8881,7 @@
     function openCheckinModal() {
       const select = document.getElementById('checkinReservaId');
       const today = normDate(new Date());
-      const available = S.reservas.filter(r => r.fechaEntrada === today && r.estado === 'Confirmada');
+      const available = S.reservas.filter(r => r.fechaEntrada === today && (r.estado === 'Confirmada' || r.estado === 'Reservada'));
 
       select.innerHTML = '<option value="">Seleccionar reserva</option>';
       available.forEach(res => {
@@ -8985,10 +9016,10 @@
       h += '</div>';
 
       for (var i = 0; i < items.length; i++) {
-        h += '<label style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--surface2);cursor:pointer;" onclick="toggleProcessChecklist(' + i + ')">';
+        h += '<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--surface2);cursor:pointer;" onclick="toggleProcessChecklist(' + i + ')">';
         h += '<input type="checkbox" id="pcl_' + i + '" style="margin-top:2px;accent-color:var(--accent);pointer-events:none;" />';
         h += '<span id="pcl_label_' + i + '" style="font-size:13px;">' + items[i] + '</span>';
-        h += '</label>';
+        h += '</div>';
       }
 
       h += '<div style="margin-top:16px;">';
@@ -9381,7 +9412,7 @@
     }
 
     function quickCheckin(roomNum) {
-      const res = S.reservas.find(r => r.habitacionNum === roomNum && r.estado === 'Confirmada');
+      const res = S.reservas.find(r => r.habitacionNum === roomNum && (r.estado === 'Confirmada' || r.estado === 'Reservada'));
       if (!res) {
         toast('No hay reserva disponible para esta habitación', true);
         return;
