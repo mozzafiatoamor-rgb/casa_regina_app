@@ -1940,6 +1940,13 @@
         </div>
       </div>
 
+      <!-- Cotizaciones Tab -->
+      <div class="tab-content" id="tabCotizaciones">
+        <div class="tab-scroll">
+          <div id="cotizacionContent"></div>
+        </div>
+      </div>
+
       <!-- Config Tab -->
       <div class="tab-content" id="tabConfig">
         <div class="tab-scroll">
@@ -2207,6 +2214,13 @@
             <option value="Liquidación">Liquidación total</option>
             <option value="Cargo extra">Cargo extra</option>
           </select>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;margin:10px 0 14px;padding:12px;background:var(--surface2);border-radius:var(--radius);">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;flex:1;">
+            <input type="checkbox" id="payFactura" onchange="togglePayIVA()" style="accent-color:var(--accent);width:18px;height:18px;" />
+            <div><div style="font-size:13px;font-weight:600;">¿Requiere factura?</div><div style="font-size:11px;color:var(--text2);">Agrega IVA 16% al monto</div></div>
+          </label>
+          <div id="payIVAInfo" style="font-size:12px;font-weight:700;color:var(--accent);display:none;"></div>
         </div>
         <div class="form-group">
           <label class="form-label">Notas (opcional)</label>
@@ -4094,6 +4108,7 @@
       renderReports();
       renderCobros();
       renderClientes();
+      renderCotizaciones();
       renderConfig();
       updateUserBadge();
     }
@@ -5255,6 +5270,376 @@
         closeModal();
         render();
       }, 'Eliminando...');
+    }
+
+    // ============ COTIZACIONES ============
+    var _cotizacionData = null;
+    var _cotizacionCounter = parseInt(localStorage.getItem('cotizacionCounter') || '0');
+
+    function renderCotizaciones() {
+      var h = '';
+      h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">';
+      h += '<div class="section-title" style="margin-bottom:0">Cotización de Habitaciones</div>';
+      h += '</div>';
+
+      // Form
+      h += '<div style="background:var(--surface2);border-radius:var(--radius);padding:16px;margin-bottom:16px;">';
+
+      h += '<div class="form-group"><label class="form-label">Nombre del huésped</label>';
+      h += '<input type="text" id="cotNombre" class="form-input" placeholder="Nombre completo" value="' + (_cotizacionData ? _cotizacionData.nombre : '') + '" oninput="calcCotizacion()" /></div>';
+
+      h += '<div class="form-group"><label class="form-label">Teléfono</label>';
+      h += '<input type="tel" id="cotTelefono" class="form-input" placeholder="+52 999 123 4567" value="' + (_cotizacionData ? _cotizacionData.telefono : '') + '" /></div>';
+
+      h += '<div class="form-group"><label class="form-label">Email (opcional)</label>';
+      h += '<input type="email" id="cotEmail" class="form-input" placeholder="correo@ejemplo.com" value="' + (_cotizacionData ? _cotizacionData.email : '') + '" /></div>';
+
+      h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">';
+      var _tomorrow = normDate(new Date(Date.now() + 86400000));
+      var _pasado = normDate(new Date(Date.now() + 172800000));
+      h += '<div class="form-group"><label class="form-label">Check-in</label>';
+      h += '<input type="date" id="cotCheckin" class="form-input" value="' + (_cotizacionData ? _cotizacionData.checkin : _tomorrow) + '" onchange="calcCotizacion()" style="padding:10px;" /></div>';
+      h += '<div class="form-group"><label class="form-label">Check-out</label>';
+      h += '<input type="date" id="cotCheckout" class="form-input" value="' + (_cotizacionData ? _cotizacionData.checkout : _pasado) + '" onchange="calcCotizacion()" style="padding:10px;" /></div>';
+      h += '</div>';
+
+      h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">';
+      h += '<div class="form-group"><label class="form-label">Adultos</label>';
+      h += '<input type="number" id="cotAdultos" class="form-input" value="' + (_cotizacionData ? _cotizacionData.adultos : 2) + '" min="1" max="10" style="padding:10px;" /></div>';
+      h += '<div class="form-group"><label class="form-label">Niños</label>';
+      h += '<input type="number" id="cotNinos" class="form-input" value="' + (_cotizacionData ? _cotizacionData.ninos : 0) + '" min="0" max="10" style="padding:10px;" /></div>';
+      h += '</div>';
+
+      // Room type selection
+      h += '<div class="form-group"><label class="form-label">Tipo de habitación</label>';
+      h += '<select id="cotRoomTipo" class="form-input" onchange="calcCotizacion()">';
+      var _tipos = {};
+      S.rooms.forEach(function(r) {
+        if (!_tipos[r.tipo]) _tipos[r.tipo] = r.tarifa;
+      });
+      Object.keys(_tipos).forEach(function(tipo) {
+        var sel = _cotizacionData && _cotizacionData.roomTipo === tipo ? ' selected' : '';
+        h += '<option value="' + tipo + '" data-tarifa="' + _tipos[tipo] + '"' + sel + '>' + tipo + ' — $' + _tipos[tipo].toLocaleString() + '/noche</option>';
+      });
+      h += '</select></div>';
+
+      // Custom rate override
+      h += '<div class="form-group"><label class="form-label">Tarifa por noche (editable)</label>';
+      h += '<input type="number" id="cotTarifa" class="form-input" step="0.01" min="0" oninput="calcCotizacion()" style="padding:10px;" /></div>';
+
+      // IVA toggle
+      h += '<div style="display:flex;align-items:center;gap:10px;margin:12px 0;padding:12px;background:var(--surface3);border-radius:var(--radius);">';
+      h += '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;flex:1;">';
+      h += '<input type="checkbox" id="cotIVA" onchange="calcCotizacion()" ' + (_cotizacionData && _cotizacionData.conIVA ? 'checked' : '') + ' style="accent-color:var(--accent);width:18px;height:18px;" />';
+      h += '<div><div style="font-size:13px;font-weight:600;">Incluir IVA 16%</div><div style="font-size:11px;color:var(--text2);">Marcar si el huésped requiere factura</div></div>';
+      h += '</label></div>';
+
+      // Observations
+      h += '<div class="form-group"><label class="form-label">Observaciones (opcional)</label>';
+      h += '<textarea id="cotNotas" class="form-input" rows="2" placeholder="Solicitudes especiales, notas..." style="resize:vertical;">' + (_cotizacionData ? _cotizacionData.notas : '') + '</textarea></div>';
+
+      h += '</div>'; // close form card
+
+      // Preview card
+      h += '<div id="cotPreview"></div>';
+
+      // Action buttons
+      h += '<div id="cotActions" style="display:flex;gap:8px;margin-top:12px;"></div>';
+
+      document.getElementById('cotizacionContent').innerHTML = h;
+      calcCotizacion();
+    }
+
+    function calcCotizacion() {
+      var checkin = document.getElementById('cotCheckin').value;
+      var checkout = document.getElementById('cotCheckout').value;
+      var nombre = (document.getElementById('cotNombre').value || '').trim();
+
+      if (!checkin || !checkout || checkin >= checkout) {
+        document.getElementById('cotPreview').innerHTML = '';
+        document.getElementById('cotActions').innerHTML = '';
+        return;
+      }
+
+      var nights = daysUntil(checkin, checkout);
+      if (nights <= 0) {
+        document.getElementById('cotPreview').innerHTML = '';
+        document.getElementById('cotActions').innerHTML = '';
+        return;
+      }
+
+      // Get tarifa: custom field or from room type select
+      var tarifaInput = document.getElementById('cotTarifa');
+      var roomSelect = document.getElementById('cotRoomTipo');
+      var selectedOpt = roomSelect.options[roomSelect.selectedIndex];
+      var tarifaBase = parseFloat(selectedOpt.getAttribute('data-tarifa')) || 0;
+
+      if (!tarifaInput.value && !_cotizacionData) {
+        tarifaInput.value = tarifaBase;
+      }
+      var tarifa = parseFloat(tarifaInput.value) || tarifaBase;
+
+      var subtotal = tarifa * nights;
+      var conIVA = document.getElementById('cotIVA').checked;
+      var iva = conIVA ? Math.round(subtotal * 0.16 * 100) / 100 : 0;
+      var total = subtotal + iva;
+      var anticipo_pct = getAnticipoPct();
+      var anticipoMonto = anticipo_pct > 0 ? Math.ceil(total * getAnticipoFraction()) : 0;
+
+      var roomTipo = roomSelect.value;
+      var adultos = parseInt(document.getElementById('cotAdultos').value) || 1;
+      var ninos = parseInt(document.getElementById('cotNinos').value) || 0;
+      var hi = getHotelInfo();
+
+      // Save state
+      _cotizacionData = {
+        nombre: nombre,
+        telefono: (document.getElementById('cotTelefono').value || '').trim(),
+        email: (document.getElementById('cotEmail').value || '').trim(),
+        checkin: checkin,
+        checkout: checkout,
+        adultos: adultos,
+        ninos: ninos,
+        roomTipo: roomTipo,
+        tarifa: tarifa,
+        nights: nights,
+        subtotal: subtotal,
+        conIVA: conIVA,
+        iva: iva,
+        total: total,
+        anticipo_pct: anticipo_pct,
+        anticipoMonto: anticipoMonto,
+        notas: (document.getElementById('cotNotas').value || '').trim()
+      };
+
+      // Preview
+      var p = '';
+      p += '<div style="background:var(--surface2);border-radius:var(--radius);padding:16px;border:1px solid var(--accent);border-opacity:0.3;">';
+      p += '<div style="font-weight:700;font-size:15px;margin-bottom:12px;color:var(--accent);">📋 Resumen de Cotización</div>';
+
+      p += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:13px;margin-bottom:12px;">';
+      p += '<div style="color:var(--text2);">Huésped:</div><div style="font-weight:600;">' + (nombre || '—') + '</div>';
+      p += '<div style="color:var(--text2);">Habitación:</div><div style="font-weight:600;">' + roomTipo + '</div>';
+      p += '<div style="color:var(--text2);">Check-in:</div><div>' + formatDate(checkin) + '</div>';
+      p += '<div style="color:var(--text2);">Check-out:</div><div>' + formatDate(checkout) + '</div>';
+      p += '<div style="color:var(--text2);">Noches:</div><div>' + nights + '</div>';
+      p += '<div style="color:var(--text2);">Huéspedes:</div><div>' + adultos + ' adulto' + (adultos > 1 ? 's' : '') + (ninos > 0 ? ' + ' + ninos + ' niño' + (ninos > 1 ? 's' : '') : '') + '</div>';
+      p += '</div>';
+
+      p += '<div style="border-top:1px solid var(--surface3);padding-top:10px;font-size:13px;">';
+      p += '<div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>Tarifa por noche:</span><span>$' + tarifa.toLocaleString('es-MX', {minimumFractionDigits:2}) + '</span></div>';
+      p += '<div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>' + nights + ' noche' + (nights > 1 ? 's' : '') + ':</span><span>$' + subtotal.toLocaleString('es-MX', {minimumFractionDigits:2}) + '</span></div>';
+      if (conIVA) {
+        p += '<div style="display:flex;justify-content:space-between;margin-bottom:4px;color:var(--text2);"><span>IVA (16%):</span><span>$' + iva.toLocaleString('es-MX', {minimumFractionDigits:2}) + '</span></div>';
+      }
+      p += '<div style="display:flex;justify-content:space-between;font-weight:700;font-size:16px;margin-top:8px;padding-top:8px;border-top:2px solid var(--accent);">';
+      p += '<span>TOTAL:</span><span style="color:var(--accent);">$' + total.toLocaleString('es-MX', {minimumFractionDigits:2}) + '</span></div>';
+
+      if (anticipo_pct > 0) {
+        p += '<div style="display:flex;justify-content:space-between;margin-top:6px;font-size:12px;color:var(--yellow);"><span>Anticipo requerido (' + anticipo_pct + '%):</span><span>$' + anticipoMonto.toLocaleString('es-MX', {minimumFractionDigits:2}) + '</span></div>';
+      }
+      p += '</div></div>';
+
+      document.getElementById('cotPreview').innerHTML = p;
+
+      // Actions
+      var a = '';
+      a += '<button class="form-button" onclick="generateCotizacionPDF(\'download\')" style="flex:1;">📄 Descargar PDF</button>';
+      a += '<button class="form-button" onclick="generateCotizacionPDF(\'whatsapp\')" style="flex:1;background:#25D366;">📱 WhatsApp</button>';
+      a += '<button class="form-button secondary" onclick="resetCotizacion()" style="flex:0;">🗑️</button>';
+      document.getElementById('cotActions').innerHTML = a;
+    }
+
+    function resetCotizacion() {
+      _cotizacionData = null;
+      renderCotizaciones();
+    }
+
+    function generateCotizacionPDF(mode) {
+      if (!_cotizacionData) { toast('Completa la cotización primero', true); return; }
+      var d = _cotizacionData;
+      if (!d.nombre) { toast('Ingresa el nombre del huésped', true); return; }
+
+      _cotizacionCounter++;
+      localStorage.setItem('cotizacionCounter', _cotizacionCounter);
+      var cotNum = 'COT-' + String(_cotizacionCounter).padStart(4, '0');
+
+      var { jsPDF } = window.jspdf;
+      var doc = new jsPDF({ unit: 'mm', format: 'a4' });
+      var pageW = 210, marginX = 20;
+      var contentW = pageW - marginX * 2;
+      var hi = getHotelInfo();
+      var y = 20;
+
+      // Header with logo
+      var logoW = 50;
+      try { doc.addImage(LOGO_H_DARK_B64 || LOGO_H_DARK, 'PNG', marginX, y, logoW, logoW / LOGO_H_RATIO); } catch(e) {}
+      // Cotización info on the right
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(18); doc.setTextColor(55, 71, 79);
+      doc.text('COTIZACIÓN', pageW - marginX, y + 5, { align: 'right' });
+      doc.setFontSize(10); doc.setFont('helvetica', 'normal'); doc.setTextColor(120, 120, 120);
+      doc.text(cotNum, pageW - marginX, y + 12, { align: 'right' });
+      doc.text('Fecha: ' + formatDate(normDate(new Date())), pageW - marginX, y + 18, { align: 'right' });
+      doc.text('Vigencia: 7 días', pageW - marginX, y + 24, { align: 'right' });
+      y += Math.max(logoW / LOGO_H_RATIO, 28) + 10;
+
+      // Divider
+      doc.setDrawColor(200, 200, 200); doc.setLineWidth(0.3);
+      doc.line(marginX, y, pageW - marginX, y); y += 8;
+
+      // Hotel info
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(100, 100, 100);
+      doc.text(hi.nombre + (hi.subtitulo ? ' — ' + hi.subtitulo : ''), marginX, y);
+      y += 5;
+      if (hi.direccion) { doc.text(hi.direccion, marginX, y, { maxWidth: contentW }); y += 5; }
+      var contactLine = '';
+      if (hi.telefono) contactLine += 'Tel: ' + hi.telefono;
+      if (hi.email) contactLine += (contactLine ? '  |  ' : '') + hi.email;
+      if (hi.whatsapp) contactLine += (contactLine ? '  |  ' : '') + 'WhatsApp: ' + hi.whatsapp;
+      if (contactLine) { doc.text(contactLine, marginX, y); y += 5; }
+      y += 6;
+
+      // Guest info box
+      doc.setFillColor(245, 247, 250); doc.roundedRect(marginX, y, contentW, 22, 2, 2, 'F');
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(55, 71, 79);
+      doc.text('DATOS DEL HUÉSPED', marginX + 6, y + 7);
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(80, 80, 80);
+      doc.text('Nombre: ' + d.nombre, marginX + 6, y + 14);
+      var guestContact = '';
+      if (d.telefono) guestContact += 'Tel: ' + d.telefono;
+      if (d.email) guestContact += (guestContact ? '  |  ' : '') + d.email;
+      if (guestContact) doc.text(guestContact, marginX + 6, y + 19);
+      y += 28;
+
+      // Stay details table header
+      doc.setFillColor(55, 71, 79); doc.rect(marginX, y, contentW, 8, 'F');
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(255, 255, 255);
+      doc.text('DETALLE DE ESTANCIA', marginX + 6, y + 5.5);
+      y += 8;
+
+      // Table rows
+      var rows = [
+        ['Tipo de habitación', d.roomTipo],
+        ['Fecha de entrada', formatDate(d.checkin) + ' — ' + formatHoraDisplay(hi.checkin_hora)],
+        ['Fecha de salida', formatDate(d.checkout) + ' — ' + formatHoraDisplay(hi.checkout_hora)],
+        ['Noches', String(d.nights)],
+        ['Huéspedes', d.adultos + ' adulto' + (d.adultos > 1 ? 's' : '') + (d.ninos > 0 ? ', ' + d.ninos + ' niño' + (d.ninos > 1 ? 's' : '') : '')]
+      ];
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
+      rows.forEach(function(row, i) {
+        var bg = i % 2 === 0;
+        if (bg) { doc.setFillColor(250, 250, 252); doc.rect(marginX, y, contentW, 7, 'F'); }
+        doc.setTextColor(100, 100, 100); doc.text(row[0], marginX + 6, y + 5);
+        doc.setTextColor(55, 71, 79); doc.setFont('helvetica', 'bold');
+        doc.text(row[1], pageW - marginX - 6, y + 5, { align: 'right' });
+        doc.setFont('helvetica', 'normal');
+        y += 7;
+      });
+      y += 6;
+
+      // Pricing table header
+      doc.setFillColor(55, 71, 79); doc.rect(marginX, y, contentW, 8, 'F');
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(255, 255, 255);
+      doc.text('CONCEPTO', marginX + 6, y + 5.5);
+      doc.text('IMPORTE', pageW - marginX - 6, y + 5.5, { align: 'right' });
+      y += 8;
+
+      // Pricing rows
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
+      doc.setFillColor(250, 250, 252); doc.rect(marginX, y, contentW, 7, 'F');
+      doc.setTextColor(80, 80, 80);
+      doc.text('Hospedaje — ' + d.roomTipo + ' × ' + d.nights + ' noche' + (d.nights > 1 ? 's' : '') + ' ($' + d.tarifa.toLocaleString('es-MX', {minimumFractionDigits:2}) + '/noche)', marginX + 6, y + 5);
+      doc.setTextColor(55, 71, 79); doc.text('$' + d.subtotal.toLocaleString('es-MX', {minimumFractionDigits:2}), pageW - marginX - 6, y + 5, { align: 'right' });
+      y += 7;
+
+      if (d.conIVA) {
+        doc.setTextColor(100, 100, 100);
+        doc.text('IVA (16%)', marginX + 6, y + 5);
+        doc.text('$' + d.iva.toLocaleString('es-MX', {minimumFractionDigits:2}), pageW - marginX - 6, y + 5, { align: 'right' });
+        y += 7;
+      }
+
+      // Total
+      doc.setDrawColor(55, 71, 79); doc.setLineWidth(0.5);
+      doc.line(marginX, y, pageW - marginX, y); y += 2;
+      doc.setFillColor(55, 71, 79); doc.rect(marginX, y, contentW, 10, 'F');
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.setTextColor(255, 255, 255);
+      doc.text('TOTAL', marginX + 6, y + 7);
+      doc.text('$' + d.total.toLocaleString('es-MX', {minimumFractionDigits:2}) + ' MXN', pageW - marginX - 6, y + 7, { align: 'right' });
+      y += 16;
+
+      // Anticipo
+      if (d.anticipo_pct > 0) {
+        doc.setFillColor(255, 248, 225); doc.roundedRect(marginX, y, contentW, 12, 2, 2, 'F');
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(180, 140, 20);
+        doc.text('💰 Anticipo requerido para confirmar (' + d.anticipo_pct + '%): $' + d.anticipoMonto.toLocaleString('es-MX', {minimumFractionDigits:2}) + ' MXN', marginX + 6, y + 8);
+        y += 18;
+      }
+
+      // Terms
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(55, 71, 79);
+      doc.text('POLÍTICAS Y CONDICIONES', marginX, y); y += 6;
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(100, 100, 100);
+
+      var terms = getTerms();
+      terms.forEach(function(t) {
+        if (y > 270) return;
+        var line = '• ' + t.title + ': ' + t.text;
+        var lines = doc.splitTextToSize(line, contentW - 4);
+        if (y + lines.length * 4 > 275) return;
+        doc.text(lines, marginX + 2, y);
+        y += lines.length * 4 + 1;
+      });
+
+      // Notes
+      if (d.notas) {
+        y += 4;
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(55, 71, 79);
+        doc.text('OBSERVACIONES', marginX, y); y += 5;
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(100, 100, 100);
+        var noteLines = doc.splitTextToSize(d.notas, contentW - 4);
+        doc.text(noteLines, marginX + 2, y);
+        y += noteLines.length * 4;
+      }
+
+      // Footer
+      doc.setFont('helvetica', 'italic'); doc.setFontSize(7); doc.setTextColor(160, 160, 160);
+      doc.text('Esta cotización tiene una vigencia de 7 días a partir de la fecha de emisión. Precios sujetos a disponibilidad.', pageW / 2, 285, { align: 'center' });
+      doc.text(hi.nombre + ' — ' + cotNum, pageW / 2, 290, { align: 'center' });
+
+      var fileName = 'Cotizacion_' + d.nombre.replace(/\s+/g, '_') + '_' + cotNum + '.pdf';
+
+      if (mode === 'whatsapp') {
+        var pdfBlob = doc.output('blob');
+        var pdfUrl = URL.createObjectURL(pdfBlob);
+        window.open(pdfUrl, '_blank');
+
+        var msg = '📝 *COTIZACIÓN ' + cotNum + '*\n\n';
+        msg += '🏨 *' + hi.nombre + '*\n\n';
+        msg += 'Hola *' + d.nombre + '* 👋\n\n';
+        msg += 'Aquí tienes tu cotización:\n\n';
+        msg += '🛏️ *' + d.roomTipo + '*\n';
+        msg += '📅 ' + formatDate(d.checkin) + ' → ' + formatDate(d.checkout) + '\n';
+        msg += '🌙 ' + d.nights + ' noche' + (d.nights > 1 ? 's' : '') + '\n';
+        msg += '👥 ' + d.adultos + ' adulto' + (d.adultos > 1 ? 's' : '') + (d.ninos > 0 ? ' + ' + d.ninos + ' niño' + (d.ninos > 1 ? 's' : '') : '') + '\n\n';
+        msg += '💰 *Tarifa:* $' + d.tarifa.toLocaleString('es-MX', {minimumFractionDigits:2}) + '/noche\n';
+        if (d.conIVA) {
+          msg += '📦 Subtotal: $' + d.subtotal.toLocaleString('es-MX', {minimumFractionDigits:2}) + '\n';
+          msg += '🧾 IVA (16%): $' + d.iva.toLocaleString('es-MX', {minimumFractionDigits:2}) + '\n';
+        }
+        msg += '✅ *Total: $' + d.total.toLocaleString('es-MX', {minimumFractionDigits:2}) + ' MXN*\n';
+        if (d.anticipo_pct > 0) {
+          msg += '\n💳 Anticipo para confirmar (' + d.anticipo_pct + '%): *$' + d.anticipoMonto.toLocaleString('es-MX', {minimumFractionDigits:2}) + '*\n';
+        }
+        msg += '\n📌 _Vigencia: 7 días. Sujeto a disponibilidad._\n';
+        msg += '\n¿Deseas reservar? ¡Con gusto te ayudamos! 😊\n\n_' + hi.nombre + '_ 🌿';
+
+        var phone = (d.telefono || '').replace(/\D/g, '');
+        window.open('https://wa.me/' + (phone || '') + '?text=' + encodeURIComponent(msg), '_blank');
+      } else {
+        doc.save(fileName);
+      }
+      toast('Cotización ' + cotNum + ' generada ✅');
     }
 
     // ============ REPORTS STATE ============
@@ -8579,32 +8964,55 @@
       document.getElementById('payMonto').value = balance > 0 ? balance : '';
       document.getElementById('payMetodo').value = '';
       document.getElementById('payNotas').value = '';
+      document.getElementById('payFactura').checked = false;
+      document.getElementById('payIVAInfo').style.display = 'none';
       openModal('paymentModal');
+    }
+
+    function togglePayIVA() {
+      var checked = document.getElementById('payFactura').checked;
+      var montoInput = document.getElementById('payMonto');
+      var infoEl = document.getElementById('payIVAInfo');
+      var monto = parseFloat(montoInput.value) || 0;
+      if (checked && monto > 0) {
+        var iva = Math.round(monto * 0.16 * 100) / 100;
+        infoEl.textContent = '+IVA: $' + iva.toLocaleString('es-MX', {minimumFractionDigits:2}) + ' = $' + (monto + iva).toLocaleString('es-MX', {minimumFractionDigits:2});
+        infoEl.style.display = 'block';
+      } else {
+        infoEl.style.display = 'none';
+      }
     }
 
     async function savePayment(event) {
       event.preventDefault();
       var resId = document.getElementById('payResId').value;
-      var monto = parseFloat(document.getElementById('payMonto').value);
+      var montoBase = parseFloat(document.getElementById('payMonto').value);
+      var requiereFactura = document.getElementById('payFactura').checked;
+      var ivaAmount = requiereFactura ? Math.round(montoBase * 0.16 * 100) / 100 : 0;
+      var monto = montoBase + ivaAmount;
       var metodo = document.getElementById('payMetodo').value;
       var concepto = document.getElementById('payConcepto').value;
       var notas = document.getElementById('payNotas').value;
+      if (requiereFactura) {
+        notas = (notas ? notas + ' | ' : '') + 'FACTURA — Subtotal: $' + montoBase.toLocaleString('es-MX', {minimumFractionDigits:2}) + ' + IVA: $' + ivaAmount.toLocaleString('es-MX', {minimumFractionDigits:2});
+      }
 
-      if (!monto || monto <= 0 || !metodo) {
+      if (!montoBase || montoBase <= 0 || !metodo) {
         toast('Completa monto y método de pago', true);
         return;
       }
 
       var res = S.reservas.find(r => r.id === resId);
       var existingPaid = S.cobros.filter(function(c){return c.reservaId===resId}).reduce(function(s,c){return s+c.monto},0);
-      var currentBalance = res.tarifaTotal - existingPaid;
+      var tarifaConIVA = requiereFactura ? res.tarifaTotal * 1.16 : res.tarifaTotal;
+      var currentBalance = tarifaConIVA - existingPaid;
       if (currentBalance <= 0) {
         toast('Esta reserva ya está pagada', false);
         closeModal();
         return;
       }
-      if (monto > currentBalance) {
-        toast('El monto ($' + monto + ') excede el saldo pendiente ($' + currentBalance + ')', true);
+      if (monto > currentBalance + 0.01) {
+        toast('El monto ($' + monto.toFixed(2) + ') excede el saldo pendiente ($' + currentBalance.toFixed(2) + ')', true);
         return;
       }
       await busy(async () => {
@@ -9801,6 +10209,7 @@
       { id: 'clientes', icon: '👥', label: 'Clientes' },
       { id: 'housekeeping', icon: '🧹', label: 'Limpieza' },
       { id: 'inventario', icon: '📦', label: 'Inventario' },
+      { id: 'cotizaciones', icon: '📝', label: 'Cotización' },
       { id: 'reports', icon: '📊', label: 'Reportes' }
     ];
 
