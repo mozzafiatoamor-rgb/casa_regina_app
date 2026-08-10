@@ -8495,7 +8495,11 @@
       { title: 'Cargos adicionales', text: 'Servicios como minibar, room service, lavandería, estacionamiento y daños a la habitación se cargarán a la cuenta del huésped y deberán liquidarse antes del check-out.' },
       { title: 'Identificación', text: 'Al momento del check-in se solicitará una identificación oficial vigente con fotografía del titular de la reservación.' },
       { title: 'Menores de edad', text: 'Los menores de edad deberán estar acompañados en todo momento por un adulto responsable registrado en la reservación.' },
-      { title: 'Responsabilidad', text: 'El hotel no se hace responsable por objetos de valor no depositados en la caja de seguridad de la habitación. Se recomienda su uso durante la estancia.' }
+      { title: 'Responsabilidad', text: 'El hotel no se hace responsable por objetos de valor no depositados en la caja de seguridad de la habitación. Se recomienda su uso durante la estancia.' },
+      { title: 'Ocupación base', text: 'La tarifa base publicada ampara la estadía de un máximo de dos (2) personas. Habitación Doble Matrimonial (1 Cama Matrimonial): hasta 2 personas. Habitación Doble Twin (2 Camas Individuales): hasta 2 personas en camas independientes. Habitación Queen Size (1 Cama Queen): hasta 2 personas.' },
+      { title: 'Cargo por persona adicional', text: 'Toda persona extra que pernocte o haga uso de la habitación superando la ocupación base de dos (2) personas estará sujeta a un cargo adicional obligatorio de $' + (getHotelInfo().persona_extra || 150) + '.00 MXN + IVA por persona, por noche. El pago de esta tarifa no garantiza automáticamente la instalación de una cama supletoria, la cual estará sujeta a disponibilidad y al espacio físico asignado en la habitación.' },
+      { title: 'Política de menores (persona extra)', text: 'Niños menores de 11 años pueden hospedarse sin costo adicional compartiendo las camas existentes con sus padres o tutores (máximo 1 menor gratis por habitación en categorías Matrimonial o Queen). A partir de los 12 años, todo huésped será considerado como adulto para efectos de la tarifa y aplicará el cargo por persona extra.' },
+      { title: 'Capacidad máxima por habitación', text: 'Por disposiciones legales y normativas de seguridad e incendios: Habitación Doble Matrimonial: máximo 4 personas (cargo por persona extra a partir de la 3.ª). Habitación Doble Twin: máximo 3 personas (sujeto a cama supletoria). Habitación Queen Size: máximo 3 personas. El hotel se reserva el derecho de rechazar el ingreso o requerir una habitación adicional si se supera la capacidad máxima.' }
     ];
 
     function getTerms() {
@@ -8507,9 +8511,16 @@
       if (!terms) terms = DEFAULT_TERMS.map(function(t) { return { title: t.title, text: t.text }; });
       // Always inject current hotel hours into the Check-in/Check-out term
       var hi = getHotelInfo();
+      var peCargoStr = '$' + (hi.persona_extra || 150) + '.00 MXN + IVA';
       terms = terms.map(function(t) {
         if (t.title === 'Check-in / Check-out') {
           return { title: t.title, text: 'La hora de entrada es a las ' + formatHoraDisplay(hi.checkin_hora) + ' y la hora de salida es a las ' + formatHoraDisplay(hi.checkout_hora) + '. El early check-in y late check-out están sujetos a disponibilidad y pueden generar cargos adicionales.' };
+        }
+        if (t.title === 'Cargo por persona adicional') {
+          return { title: t.title, text: 'Toda persona extra que pernocte o haga uso de la habitación superando la ocupación base de dos (2) personas estará sujeta a un cargo adicional obligatorio de ' + peCargoStr + ' por persona, por noche. El pago de esta tarifa no garantiza automáticamente la instalación de una cama supletoria, la cual estará sujeta a disponibilidad y al espacio físico asignado en la habitación.' };
+        }
+        if (t.title === 'Política de menores (persona extra)') {
+          return { title: t.title, text: 'Niños menores de 11 años pueden hospedarse sin costo adicional compartiendo las camas existentes con sus padres o tutores (máximo 1 menor gratis por habitación en categorías Matrimonial o Queen). A partir de los 12 años, todo huésped será considerado como adulto para efectos de la tarifa y aplicará el cargo por persona extra de ' + peCargoStr + ' por noche.' };
         }
         return t;
       });
