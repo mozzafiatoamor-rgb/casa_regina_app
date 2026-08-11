@@ -2439,12 +2439,12 @@
 
     // ============ BREAKFAST PROMO ============
     var DEFAULT_BREAKFAST_PROMO = {
-      active: false,
+      active: true,
       startDate: '',
       endDate: '',
       partner: 'Restaurante Cafeteria Mozzafiato',
-      descripcion: '',
-      precioPorPersona: 0,
+      descripcion: 'Desayuno continental: jugo natural, fruta de temporada, pan artesanal, café o té ilimitado',
+      precioPorPersona: 150,
       rules: [
         { tipo: 'Doble', personas: 2 },
         { tipo: 'Queen Size', personas: 1 }
@@ -2480,6 +2480,21 @@
 
     async function saveBreakfastPromoAndSync() {
       var promo = getBreakfastPromo();
+      // Validate — don't allow saving blank config
+      if (!promo.partner || !promo.partner.trim()) {
+        toast('⚠️ No se puede guardar: falta el nombre del restaurante', true);
+        return;
+      }
+      if (!promo.precioPorPersona || promo.precioPorPersona <= 0) {
+        toast('⚠️ No se puede guardar: falta el precio por persona', true);
+        return;
+      }
+      if (!promo.rules || promo.rules.length === 0) {
+        toast('⚠️ No se puede guardar: agrega al menos una regla', true);
+        return;
+      }
+      // Confirm before syncing
+      if (!confirm('¿Guardar y sincronizar la configuración de desayunos al Sheet?\n\nEsto actualizará la configuración en todos los dispositivos.')) return;
       localStorage.setItem('breakfastPromo', JSON.stringify(promo));
       if (!S.scriptUrl) { toast('Guardado localmente (sin conexión a Sheet)', true); return; }
       try {
@@ -5876,11 +5891,25 @@
       }
       p += '</div>';
 
-      // Terms & conditions
+      // Key policies — always visible
+      var _hi = getHotelInfo();
+      p += '<div style="margin-top:14px;background:linear-gradient(135deg,rgba(55,71,79,0.06),rgba(55,71,79,0.02));border:1px solid rgba(55,71,79,0.2);border-radius:var(--radius);padding:14px;">';
+      p += '<div style="font-weight:800;font-size:13px;color:var(--text);margin-bottom:10px;">📌 Políticas Importantes</div>';
+      if (anticipo_pct > 0) {
+        p += '<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;font-size:12px;"><span>💳</span><div><span style="font-weight:700;">Anticipo:</span> Se requiere el ' + anticipo_pct + '% ($' + _fmt(anticipoMonto) + ') para confirmar la reservación. El ' + (100 - anticipo_pct) + '% restante al check-in.</div></div>';
+      }
+      if (peRate > 0) {
+        p += '<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;font-size:12px;"><span>👥</span><div><span style="font-weight:700;">Persona extra:</span> $' + _fmt(peRate) + ' MXN + IVA por persona adicional, por noche.</div></div>';
+      }
+      p += '<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;font-size:12px;"><span>❌</span><div><span style="font-weight:700;">Cancelación:</span> +7 días: reembolso 100% · 3-7 días: retención 50% · -3 días/No Show: sin reembolso.</div></div>';
+      p += '<div style="display:flex;align-items:flex-start;gap:8px;font-size:12px;"><span>🕐</span><div><span style="font-weight:700;">Horarios:</span> Check-in: ' + formatHoraDisplay(_hi.checkin_hora) + ' · Check-out: ' + formatHoraDisplay(_hi.checkout_hora) + '</div></div>';
+      p += '</div>';
+
+      // Terms & conditions (full, collapsible)
       var cotTerms = getTerms();
-      p += '<div style="margin-top:14px;background:var(--surface2);border-radius:var(--radius);border:1px solid var(--surface3);overflow:hidden;">';
+      p += '<div style="margin-top:10px;background:var(--surface2);border-radius:var(--radius);border:1px solid var(--surface3);overflow:hidden;">';
       p += '<div onclick="this.parentElement.classList.toggle(\'cot-terms-open\')" style="padding:12px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;">';
-      p += '<span style="font-weight:700;font-size:13px;color:var(--text);">📋 Políticas y Condiciones</span>';
+      p += '<span style="font-weight:700;font-size:13px;color:var(--text);">📋 Términos y Condiciones completos</span>';
       p += '<span class="cot-terms-arrow" style="font-size:11px;color:var(--text2);transition:transform .2s;">▼</span>';
       p += '</div>';
       p += '<div class="cot-terms-body" style="max-height:0;overflow:hidden;transition:max-height .3s ease;">';
@@ -8344,9 +8373,24 @@
 
     function renderDesayunosConfig() {
       var promo = getBreakfastPromo();
+      // Auto-import from Sheet if localStorage has no saved value (new device)
+      var rawStored = localStorage.getItem('breakfastPromo');
+      if (!rawStored && S.scriptUrl) {
+        importBreakfastFromSheet();
+        return; // importBreakfastFromSheet calls renderConfig() which re-renders this
+      }
       var h = '<div style="margin-bottom:16px">';
       h += '<div class="section-title">Promoción de Desayunos</div>';
       h += '<div style="font-size:12px;color:var(--text2);margin-bottom:16px">Configura el convenio con el restaurante. Al hacer check-in se le pregunta al recepcionista si el huésped desea activar la promoción.</div>';
+
+      // Warning if data looks empty/incomplete
+      var dataIncomplete = !promo.partner || !promo.partner.trim() || !promo.precioPorPersona || promo.precioPorPersona <= 0;
+      if (dataIncomplete) {
+        h += '<div style="background:rgba(255,152,0,0.12);border:1px solid rgba(255,152,0,0.4);border-radius:var(--radius);padding:12px;margin-bottom:14px;">';
+        h += '<div style="font-weight:700;color:#e65100;font-size:12px;margin-bottom:4px;">⚠️ Configuración incompleta</div>';
+        h += '<div style="font-size:11px;color:#bf360c;">Completa los campos obligatorios (restaurante y precio) antes de guardar. Si ya tenías datos configurados, usa el botón "📥 Importar del Sheet" para recuperarlos.</div>';
+        h += '</div>';
+      }
       h += '</div>';
 
       // Active toggle
