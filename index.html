@@ -2631,8 +2631,22 @@
 
     function getBreakfastPersonas(roomTipo) {
       var p = getBreakfastPromo();
+      if (!roomTipo) return 0;
+      var tipo = roomTipo.trim().toLowerCase();
+      // Exact match first
       var rule = p.rules.find(function(r) { return r.tipo === roomTipo; });
-      return rule ? rule.personas : 0;
+      if (rule) return rule.personas;
+      // Case-insensitive match
+      rule = p.rules.find(function(r) { return r.tipo.trim().toLowerCase() === tipo; });
+      if (rule) return rule.personas;
+      // Partial match (room type contains rule or rule contains room type)
+      rule = p.rules.find(function(r) {
+        var rt = r.tipo.trim().toLowerCase();
+        return tipo.indexOf(rt) !== -1 || rt.indexOf(tipo) !== -1;
+      });
+      if (rule) return rule.personas;
+      // No match — return 0 (caller can use fallback)
+      return 0;
     }
 
     function generateBreakfastCode() {
@@ -11728,13 +11742,29 @@
       });
 
       // Breakfast activation section
-      if (promoActive && personas > 0 && !hasBf) {
+      if (promoActive && !hasBf) {
         mh += '<div style="background:linear-gradient(135deg,rgba(46,125,50,0.1),rgba(76,175,80,0.05));border:1px solid #2e7d32;border-radius:var(--radius);padding:12px;margin-bottom:14px;">';
-        mh += '<div style="display:flex;align-items:center;gap:10px;">';
+        mh += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:' + (personas > 0 ? '0' : '8') + 'px;">';
         mh += '<input type="checkbox" id="mp_activateBreakfast" style="accent-color:#2e7d32;width:18px;height:18px;" />';
         mh += '<div style="flex:1;"><div style="font-size:13px;font-weight:700;color:#2e7d32;">🍳 Activar desayunos para esta estancia</div>';
-        mh += '<div style="font-size:11px;color:var(--text2);">' + nights + ' código(s) · ' + personas + ' persona(s) · ' + (promo.partner || 'Restaurante') + '</div></div>';
+        if (personas > 0) {
+          mh += '<div style="font-size:11px;color:var(--text2);">' + nights + ' código(s) · ' + personas + ' persona(s) · ' + (promo.partner || 'Restaurante') + '</div>';
+        } else {
+          mh += '<div style="font-size:11px;color:#e65100;">⚠️ Sin regla para tipo "' + (room ? room.tipo : '?') + '" — selecciona personas manualmente</div>';
+        }
         mh += '</div></div>';
+        if (personas === 0) {
+          mh += '<div style="display:flex;align-items:center;gap:8px;margin-top:4px;">';
+          mh += '<span style="font-size:12px;color:var(--text2);">Personas por desayuno:</span>';
+          mh += '<select id="mp_bfPersonasManual" style="padding:6px 10px;border-radius:6px;border:1px solid var(--surface3);background:var(--surface2);color:var(--text);font-size:13px;">';
+          for (var _pi = 1; _pi <= 6; _pi++) {
+            mh += '<option value="' + _pi + '"' + (_pi === parseInt(res.adultos) || 0 ? ' selected' : '') + '>' + _pi + '</option>';
+          }
+          mh += '</select>';
+          mh += '<span style="font-size:11px;color:var(--text2);">' + nights + ' noche(s) · ' + (promo.partner || 'Restaurante') + '</span>';
+          mh += '</div>';
+        }
+        mh += '</div>';
       } else if (hasBf) {
         var pendBf = existingBf.filter(function(d) { return d.estado === 'Pendiente'; });
         mh += '<div style="background:rgba(46,125,50,0.06);border:1px solid rgba(46,125,50,0.3);border-radius:var(--radius);padding:10px;margin-bottom:14px;font-size:12px;color:#2e7d32;">';
@@ -11801,15 +11831,22 @@
       var wantRecibo = document.getElementById('mp_recibo') && document.getElementById('mp_recibo').checked;
       var wantVoucher = document.getElementById('mp_voucher_bf') && document.getElementById('mp_voucher_bf').checked;
 
-      // Breakfast activation
+      // Breakfast activation — read values BEFORE closing modal
       var bfCb = document.getElementById('mp_activateBreakfast');
       var wantBreakfast = bfCb && bfCb.checked && room;
+      var _bfPersonas = 0;
+      if (wantBreakfast) {
+        _bfPersonas = getBreakfastPersonas(room.tipo);
+        if (_bfPersonas === 0) {
+          var _manualSel = document.getElementById('mp_bfPersonasManual');
+          _bfPersonas = _manualSel ? parseInt(_manualSel.value) || 1 : 1;
+        }
+      }
 
       closeModal();
 
       // Activate breakfast codes
       if (wantBreakfast) {
-        var _bfPersonas = getBreakfastPersonas(room.tipo);
         var _bfNights = daysUntil(res.fechaEntrada, res.fechaSalida);
         if (_bfPersonas > 0 && _bfNights > 0) {
           await busy(async function() {
