@@ -2953,7 +2953,7 @@
     function sendTemplateWhatsApp(templateKey, resId) {
       var res = S.reservas.find(function(r) { return r.id === resId; });
       var text = renderMsgTemplate(templateKey, resId);
-      var phone = (res.telefono || '').replace(/\D/g, '');
+      var phone = getGuestPhone(res).replace(/\D/g, '');
       var url = 'https://wa.me/' + (phone ? phone : '') + '?text=' + encodeURIComponent(text);
       window.open(url, '_blank');
     }
@@ -2963,7 +2963,7 @@
       var templates = getMsgTemplates();
       var tpl = templates[templateKey];
       var res = S.reservas.find(function(r) { return r.id === resId; });
-      var phone = (res.telefono || '').replace(/\D/g, '');
+      var phone = getGuestPhone(res).replace(/\D/g, '');
 
       var h = '<div style="background:var(--surface3);padding:14px;border-radius:var(--radius);margin-bottom:14px;">';
       h += '<div style="font-size:12px;color:var(--text2);margin-bottom:6px;">VISTA PREVIA</div>';
@@ -3340,7 +3340,7 @@
       var res = S.reservas.find(function(r) { return r.id === resId; });
       var link = getGuestRegistrationLink(resId);
       var text = '¡Hola ' + res.huesped + '! 🏨\n\nPara agilizar tu check-in en *' + HOTEL_NAME + '*, por favor completa tu pre-registro en este enlace:\n\n' + link + '\n\n¡Te esperamos! 🌟';
-      var phone = (res.telefono || '').replace(/[^0-9]/g, '');
+      var phone = getGuestPhone(res).replace(/[^0-9]/g, '');
       if (phone.length === 10) phone = '52' + phone;
       window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(text), '_blank');
     }
@@ -6966,6 +6966,49 @@
         });
       }
 
+      // Codes grouped by guest
+      var activeRes = S.reservas.filter(function(r) { return r.estado === 'Check-in'; });
+      var guestsWithCodes = [];
+      activeRes.forEach(function(r) {
+        var codes = des.filter(function(d) { return d.reservaId === r.id; });
+        if (codes.length > 0) guestsWithCodes.push({ res: r, codes: codes });
+      });
+
+      if (guestsWithCodes.length > 0) {
+        h += '<div class="section-title" style="font-size:13px;margin:14px 0 8px;">👤 Códigos por huésped</div>';
+        guestsWithCodes.forEach(function(g) {
+          var pend = g.codes.filter(function(d) { return d.estado === 'Pendiente'; }).length;
+          var used = g.codes.filter(function(d) { return d.estado === 'Consumido'; }).length;
+          h += '<div style="background:var(--surface2);border-radius:var(--radius);margin-bottom:8px;overflow:hidden;">';
+          // Guest header
+          h += '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;cursor:pointer;" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\'">';
+          h += '<div><div style="font-weight:700;font-size:13px;">' + g.res.huesped + '</div>';
+          h += '<div style="font-size:11px;color:var(--text2);">Hab. ' + g.res.habitacionNum + ' · ' + formatDate(g.res.fechaEntrada) + ' → ' + formatDate(g.res.fechaSalida) + '</div></div>';
+          h += '<div style="display:flex;gap:6px;align-items:center;">';
+          if (pend > 0) h += '<span style="background:var(--yellow);color:#000;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;">' + pend + ' pend.</span>';
+          if (used > 0) h += '<span style="background:var(--green);color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;">' + used + ' usados</span>';
+          h += '<span style="font-size:14px;color:var(--text2);">▾</span>';
+          h += '</div></div>';
+          // Codes list (collapsed by default)
+          h += '<div style="display:none;border-top:1px solid var(--surface3);padding:8px 12px;">';
+          g.codes.sort(function(a, b) { return a.fecha.localeCompare(b.fecha); }).forEach(function(c) {
+            var stColor = c.estado === 'Pendiente' ? 'var(--yellow)' : c.estado === 'Consumido' ? 'var(--green)' : 'var(--red)';
+            var stIcon = c.estado === 'Pendiente' ? '🟡' : c.estado === 'Consumido' ? '✅' : '❌';
+            h += '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--surface3);font-size:12px;">';
+            h += '<div><span style="font-family:Space Mono,monospace;font-weight:600;color:var(--accent);">' + c.codigo + '</span>';
+            h += '<span style="color:var(--text2);margin-left:8px;">' + formatDate(c.fecha) + ' · ' + c.personas + ' pers.</span></div>';
+            h += '<span style="font-size:10px;">' + stIcon + ' ' + c.estado + '</span>';
+            h += '</div>';
+          });
+          // Action buttons
+          h += '<div style="display:flex;gap:6px;margin-top:8px;padding-bottom:4px;">';
+          h += '<button class="form-button secondary" onclick="openMessagingPanel(\'' + g.res.id + '\')" style="flex:1;font-size:11px;padding:6px;">📨 Enviar códigos</button>';
+          h += '<button class="form-button secondary" onclick="generateBreakfastVoucherPDF(\'' + g.res.id + '\',\'download\')" style="flex:1;font-size:11px;padding:6px;">🎟️ Voucher PDF</button>';
+          h += '</div>';
+          h += '</div></div>';
+        });
+      }
+
       // Export button
       h += '<div style="margin-top:16px;display:flex;gap:8px;">';
       h += '<button class="form-button secondary" onclick="switchTab(\'reports\');S.filterReports=\'desayunos\';renderReports();" style="flex:1;font-size:12px;">📊 Reporte completo</button>';
@@ -7741,7 +7784,7 @@
       drawReceipt(doc,true);
 
       var fileName='Recibo_'+res.huesped.replace(/\s+/g,'_')+'_Hab'+res.habitacionNum+'.pdf';
-      var phone = (res.telefono || '').replace(/\D/g, '');
+      var phone = getGuestPhone(res).replace(/\D/g, '');
 
       if(mode==='share'){
         doc.save(fileName);
@@ -7756,7 +7799,7 @@
     function shareReceiptWhatsApp(resId) {
       var res = S.reservas.find(function(r){return r.id===resId});
       var text = getReceiptText(resId);
-      var phone = (res.telefono || '').replace(/\D/g, '');
+      var phone = getGuestPhone(res).replace(/\D/g, '');
       var url = 'https://wa.me/' + (phone ? phone : '') + '?text=' + encodeURIComponent(text);
       window.open(url, '_blank');
     }
@@ -8144,7 +8187,7 @@
       drawConfirm(doc, true);
 
       var fileName='Confirmacion_'+res.huesped.replace(/\s+/g,'_')+'_Hab'+res.habitacionNum+'.pdf';
-      var phone = (res.telefono || '').replace(/\D/g, '');
+      var phone = getGuestPhone(res).replace(/\D/g, '');
 
       if(mode==='share'){
         // Download PDF then open WhatsApp to client's number
@@ -8160,7 +8203,7 @@
     function shareReservaWhatsApp(resId) {
       var res = S.reservas.find(function(r){return r.id===resId});
       var text = getReservaConfirmText(resId);
-      var phone = (res.telefono || '').replace(/\D/g, '');
+      var phone = getGuestPhone(res).replace(/\D/g, '');
       var url = 'https://wa.me/' + (phone ? phone : '') + '?text=' + encodeURIComponent(text);
       window.open(url, '_blank');
     }
@@ -10169,7 +10212,7 @@
         msg += '━━━━━━━━━━━━━━━━━\n\n';
       }
       msg += '📌 Muestra el código al llegar al restaurante.\n\n_' + HOTEL_NAME + '_ 🌿';
-      var phone = (res.telefono || '').replace(/\D/g, '');
+      var phone = getGuestPhone(res).replace(/\D/g, '');
       window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(msg), '_blank');
     }
 
@@ -10268,7 +10311,7 @@
         if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
           navigator.share({ files: [file], title: 'Tarjeta de Desayuno' }).catch(function(){});
         } else {
-          var phone = (res.telefono || '').replace(/\D/g, '');
+          var phone = getGuestPhone(res).replace(/\D/g, '');
           doc.save(fname);
           toast('PDF descargado — compártelo por WhatsApp');
           setTimeout(function() {
@@ -11160,9 +11203,8 @@
         toast('✅ Walk-in completado — ' + _walkin.nombre + ' en Hab. ' + _walkin.roomNum);
         render();
 
-        // Show post check-in messaging module
-        var res = S.reservas.find(function(r) { return r.id === resId; });
-        setTimeout(function() { showPostCheckinMessages(res, room); }, 400);
+        // Show messaging panel directly for the new reservation
+        setTimeout(function() { openMessagingPanel(resId); }, 400);
       }, 'Procesando walk-in...');
     }
 
@@ -11536,6 +11578,14 @@
     }
 
     // ============ POST CHECK-IN MESSAGING MODULE ============
+    // Get best phone for a guest: Clientes (updated) > Reservation (original)
+    function getGuestPhone(res) {
+      if (!res) return '';
+      var client = S.clientes.find(function(c) { return c.nombre.toLowerCase().trim() === res.huesped.toLowerCase().trim(); });
+      if (client && client.telefono && client.telefono.trim()) return client.telefono;
+      return res.telefono || '';
+    }
+
     // ============ MESSAGING PANEL ============
     function openMessagingPanel(preResId) {
       // Get active reservations (Reservada, Confirmada, Check-in)
@@ -11600,12 +11650,13 @@
       var existingBf = (S.desayunos || []).filter(function(d) { return d.reservaId === resId; });
       var hasBf = existingBf.length > 0;
 
-      // Guest info
+      // Guest info — use best phone from Clientes
+      var _guestPhone = getGuestPhone(res);
       var gi = '<div style="background:var(--surface3);padding:12px;border-radius:var(--radius);margin-bottom:14px;">';
       gi += '<div style="display:flex;justify-content:space-between;align-items:center;">';
       gi += '<div><div style="font-weight:700;">' + res.huesped + '</div>';
       gi += '<div style="font-size:11px;color:var(--text2);">Hab. ' + res.habitacionNum + ' · ' + res.estado + ' · ' + formatDate(res.fechaEntrada) + ' → ' + formatDate(res.fechaSalida) + '</div></div>';
-      gi += '<div style="font-size:11px;color:var(--text2);">' + (res.telefono || 'Sin tel') + '</div>';
+      gi += '<div style="font-size:11px;color:var(--text2);">' + (_guestPhone || 'Sin tel') + '</div>';
       gi += '</div></div>';
       document.getElementById('msgPanelGuestInfo').innerHTML = gi;
 
@@ -11814,7 +11865,7 @@
       var res = window._msgPanelRes;
       var room = window._msgPanelRoom;
       if (!res) return;
-      var phone = (res.telefono || '').replace(/\D/g, '');
+      var phone = getGuestPhone(res).replace(/\D/g, '');
       var msgs = window._msgPanelMsgs || {};
 
       // Collect selected non-document messages
@@ -11846,12 +11897,12 @@
       closeModal();
 
       // Activate breakfast codes
+      var _newBfCodes = [];
       if (wantBreakfast) {
         var _bfNights = daysUntil(res.fechaEntrada, res.fechaSalida);
         if (_bfPersonas > 0 && _bfNights > 0) {
           await busy(async function() {
             var multiOps = [];
-            var _bfCodes = [];
             for (var _di = 0; _di < _bfNights; _di++) {
               var _bfDate = new Date(res.fechaEntrada + 'T12:00:00');
               _bfDate.setDate(_bfDate.getDate() + _di + 1);
@@ -11859,14 +11910,34 @@
               var _bfCode = generateBreakfastCode();
               var _bfRow = [_bfCode, res.id, res.huesped, res.habitacionNum, _bfDateStr, _bfPersonas, 'Pendiente', '', ''];
               multiOps.push({ type: 'append', sheet: '🍳 Desayunos', values: _bfRow });
-              _bfCodes.push({ codigo: _bfCode, reservaId: res.id, huesped: res.huesped, habitacion: res.habitacionNum, fecha: _bfDateStr, personas: _bfPersonas, estado: 'Pendiente', validadoPor: '', horaValidacion: '' });
+              _newBfCodes.push({ codigo: _bfCode, reservaId: res.id, huesped: res.huesped, habitacion: res.habitacionNum, fecha: _bfDateStr, personas: _bfPersonas, estado: 'Pendiente', validadoPor: '', horaValidacion: '' });
             }
             await sheets.multi(multiOps);
-            S.desayunos = (S.desayunos || []).concat(_bfCodes);
-            toast('🍳 ' + _bfCodes.length + ' desayuno(s) activado(s)');
+            S.desayunos = (S.desayunos || []).concat(_newBfCodes);
+            toast('🍳 ' + _newBfCodes.length + ' desayuno(s) activado(s)');
             render();
           }, 'Generando códigos de desayuno...');
         }
+      }
+
+      // If codes were just created, build a codes message and add it to selectedTexts
+      if (_newBfCodes.length > 0) {
+        var _promo = getBreakfastPromo();
+        var _codesLines = '';
+        _newBfCodes.forEach(function(d) {
+          _codesLines += '🟢 *' + d.codigo + '* — ' + formatDate(d.fecha) + ' (' + d.personas + ' pers.)\n';
+        });
+        var _codesMsg = '🍳 *¡Tu reservación incluye desayuno!*\n\n¡Hola *' + res.huesped + '*! 🌿\n\nTu estancia en *' + getHotelInfo().nombre + '* incluye desayuno cortesía de:\n\n☕ *' + (_promo.partner || 'Restaurante') + '*\n🍽️ _' + (_promo.descripcion || 'Desayuno continental') + '_\n\n📋 *Tus códigos de desayuno:*\n' + _codesLines + '\n📌 *¿Cómo funciona?*\n1️⃣ Presenta tu código al mesero en *' + (_promo.partner || 'Restaurante') + '*\n2️⃣ El restaurante lo verifica en nuestro sistema\n3️⃣ ¡Disfruta tu desayuno sin costo adicional!\n\n⏰ Válido durante tu estancia\n💰 Valor por desayuno: $' + _fmt(_promo.precioPorPersona || 0) + ' por persona\n\n¡Buen provecho! 😊\n_' + getHotelInfo().nombre + '_ 🌿';
+        // Replace any generic desayuno info text, or add as new
+        var _replaced = false;
+        for (var _si = 0; _si < selectedTexts.length; _si++) {
+          if (selectedTexts[_si].indexOf('Tu reservación incluye desayuno') !== -1 || selectedTexts[_si].indexOf('incluye desayuno para') !== -1) {
+            selectedTexts[_si] = _codesMsg;
+            _replaced = true;
+            break;
+          }
+        }
+        if (!_replaced) selectedTexts.push(_codesMsg);
       }
 
       // Send text messages via WhatsApp
@@ -12035,7 +12106,7 @@
       var promoActive = isBreakfastPromoActive();
       var personas = room ? getBreakfastPersonas(room.tipo) : 0;
       var nights = daysUntil(res.fechaEntrada, res.fechaSalida);
-      var phone = (res.telefono || '').replace(/\D/g, '');
+      var phone = getGuestPhone(res).replace(/\D/g, '');
 
       // Build message categories
       var msgCategories = [
@@ -12174,7 +12245,7 @@
       var room = window._postCheckinRoom;
       if (!res) { closeModal(); return; }
 
-      var phone = (res.telefono || '').replace(/\D/g, '');
+      var phone = getGuestPhone(res).replace(/\D/g, '');
 
       // Collect selected messages BEFORE closing modal
       var selectedTexts = [];
@@ -12389,7 +12460,7 @@
       msg += '\n📱 *WhatsApp Mozzafiato:*\nhttps://wa.me/529984088897\n';
       msg += '\n👍 *Facebook:*\nhttps://www.facebook.com/share/1DjnHqK2HF/\n';
       msg += '\n¡Que disfrute su estadía! 😊\n\n_' + hi.nombre + '_ 🌿';
-      var phone = (res.telefono || '').replace(/\D/g, '');
+      var phone = getGuestPhone(res).replace(/\D/g, '');
       window.open('https://wa.me/' + (phone || '') + '?text=' + encodeURIComponent(msg), '_blank');
       closeModal();
     }
@@ -12522,7 +12593,7 @@
     function showPostStayOffer(res) {
       var reviewUrl = getReviewLink();
       var hotelWA = getHotelWhatsApp();
-      var phone = (res.telefono || '').replace(/[^0-9]/g, '');
+      var phone = getGuestPhone(res).replace(/[^0-9]/g, '');
       if (phone.length === 10) phone = '52' + phone;
 
       var h = '';
