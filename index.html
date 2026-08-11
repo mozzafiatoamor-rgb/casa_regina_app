@@ -2076,6 +2076,23 @@
           <label class="form-label">Notas</label>
           <textarea id="newResNotas" class="form-textarea" placeholder="Notas adicionales"></textarea>
         </div>
+        <div style="border-top:1px solid var(--surface3);margin:12px 0;padding-top:12px">
+          <div style="display:flex;align-items:center;gap:10px;padding:12px;background:var(--surface2);border-radius:var(--radius);margin-bottom:10px;">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;flex:1;">
+              <input type="checkbox" id="newResFactura" onchange="toggleNewResIVA()" style="accent-color:var(--accent);width:18px;height:18px;" />
+              <div><div style="font-size:13px;font-weight:600;">🧾 ¿Requiere factura?</div><div style="font-size:11px;color:var(--text2);">Agrega IVA 16% al total</div></div>
+            </label>
+          </div>
+          <div id="newResFacturaFields" style="display:none;">
+            <div class="form-row">
+              <div class="form-group"><label class="form-label">RFC *</label>
+              <input type="text" id="newResRFC" class="form-input" placeholder="XAXX010101000" style="text-transform:uppercase;" /></div>
+              <div class="form-group"><label class="form-label">Razón Social *</label>
+              <input type="text" id="newResRazonSocial" class="form-input" placeholder="Nombre o empresa" /></div>
+            </div>
+            <div id="newResIVAInfo" style="background:rgba(139,170,106,.1);border:1px solid var(--accent);border-radius:var(--radius);padding:10px;font-size:12px;color:var(--accent);margin-bottom:10px;"></div>
+          </div>
+        </div>
         <div style="border-top:1px solid var(--surface3);margin:16px 0;padding-top:16px">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
             <label class="form-label" style="margin-bottom:0">💰 Registrar Pago/Anticipo</label>
@@ -7263,13 +7280,17 @@
         var bc=balance<=0?'var(--green)':totalPaid>0?'var(--yellow)':'var(--red)';
         var methodIcons={'Efectivo':'💵','Tarjeta':'💳','Transferencia':'🏦','Depósito':'📥'};
 
+        var _ivaCobro = parseIVAData(r.notas);
         html+='<div class="cobro-card '+sc+'">';
-        html+='<div class="cobro-head"><div><div class="cobro-guest">'+r.huesped+'</div><div style="font-size:11px;color:var(--text2)">'+r.estado+' · '+formatDate(r.fechaEntrada)+' → '+formatDate(r.fechaSalida)+'</div></div><div class="cobro-room">'+r.habitacionNum+'</div></div>';
+        html+='<div class="cobro-head"><div><div class="cobro-guest">'+r.huesped+(_ivaCobro?' <span style="font-size:10px;background:#e8f5e9;color:#2e7d32;padding:1px 6px;border-radius:4px;font-weight:600">🧾 Factura</span>':'')+'</div><div style="font-size:11px;color:var(--text2)">'+r.estado+' · '+formatDate(r.fechaEntrada)+' → '+formatDate(r.fechaSalida)+'</div></div><div class="cobro-room">'+r.habitacionNum+'</div></div>';
         html+='<div class="cobro-amounts">'+
-          '<div class="cobro-amt"><div class="cobro-amt-val">$'+r.tarifaTotal+'</div><div class="cobro-amt-lbl">Total</div></div>'+
+          '<div class="cobro-amt"><div class="cobro-amt-val">$'+r.tarifaTotal+'</div><div class="cobro-amt-lbl">Total'+(_ivaCobro?' (c/IVA)':'')+'</div></div>'+
           '<div class="cobro-amt"><div class="cobro-amt-val" style="color:var(--green)">$'+totalPaid+'</div><div class="cobro-amt-lbl">Pagado</div></div>'+
           '<div class="cobro-amt"><div class="cobro-amt-val" style="color:'+(balance>0?'var(--red)':'var(--green)')+'">$'+balance+'</div><div class="cobro-amt-lbl">Saldo</div></div>'+
           '</div>';
+        if(_ivaCobro){
+          html+='<div style="font-size:10px;color:var(--text2);padding:4px 0;text-align:right">Subtotal: $'+_ivaCobro.subtotal.toLocaleString('es-MX')+' + IVA: $'+_ivaCobro.iva.toLocaleString('es-MX',{minimumFractionDigits:2})+' · RFC: '+_ivaCobro.rfc+'</div>';
+        }
         html+='<div class="cobro-bar"><div class="cobro-bar-fill" style="width:'+pct+'%;background:'+bc+'"></div></div>';
         html+='<div style="font-size:11px;text-align:right;color:var(--text2);margin-bottom:4px">'+sl+'</div>';
 
@@ -7464,7 +7485,17 @@
       h+='<div class="receipt-row"><span class="receipt-label">Noches</span><span class="receipt-value">'+nights+'</span></div>';
       h+='<div class="receipt-row"><span class="receipt-label">Tarifa/noche</span><span class="receipt-value">$'+res.tarifa+'</span></div>';
       h+='<div class="receipt-div"></div>';
-      h+='<div class="receipt-row"><span class="receipt-label">Total hospedaje</span><span class="receipt-value">$'+res.tarifaTotal+'</span></div>';
+      var _ivaRec = parseIVAData(res.notas);
+      if (_ivaRec) {
+        h+='<div class="receipt-row"><span class="receipt-label">Subtotal hospedaje</span><span class="receipt-value">$'+_ivaRec.subtotal.toLocaleString('es-MX')+'</span></div>';
+        h+='<div class="receipt-row"><span class="receipt-label">IVA (16%)</span><span class="receipt-value">$'+_ivaRec.iva.toLocaleString('es-MX',{minimumFractionDigits:2})+'</span></div>';
+        h+='<div class="receipt-row"><span class="receipt-label" style="font-weight:700">Total c/IVA</span><span class="receipt-value" style="font-weight:700">$'+res.tarifaTotal.toLocaleString('es-MX',{minimumFractionDigits:2})+'</span></div>';
+        h+='<div class="receipt-div"></div>';
+        h+='<div class="receipt-row"><span class="receipt-label">RFC</span><span class="receipt-value">'+_ivaRec.rfc+'</span></div>';
+        if(_ivaRec.razonSocial) h+='<div class="receipt-row"><span class="receipt-label">Razón Social</span><span class="receipt-value" style="font-size:10px;max-width:160px;text-align:right">'+_ivaRec.razonSocial+'</span></div>';
+      } else {
+        h+='<div class="receipt-row"><span class="receipt-label">Total hospedaje</span><span class="receipt-value">$'+res.tarifaTotal+'</span></div>';
+      }
 
       if(payments.length>0){
         h+='<div class="receipt-div"></div>';
@@ -7514,7 +7545,15 @@
       text += '*Noches:* ' + nights + '\n';
       text += '*Tarifa/noche:* $' + res.tarifa + '\n';
       text += '─────────────\n';
-      text += '*Total:* $' + res.tarifaTotal + '\n';
+      var _ivaRecWA = parseIVAData(res.notas);
+      if (_ivaRecWA) {
+        text += '*Subtotal:* $' + _ivaRecWA.subtotal.toLocaleString('es-MX') + '\n';
+        text += '*IVA (16%):* $' + _ivaRecWA.iva.toLocaleString('es-MX',{minimumFractionDigits:2}) + '\n';
+        text += '*Total c/IVA:* $' + res.tarifaTotal.toLocaleString('es-MX',{minimumFractionDigits:2}) + '\n';
+        text += '🧾 RFC: ' + _ivaRecWA.rfc + (_ivaRecWA.razonSocial ? ' — ' + _ivaRecWA.razonSocial : '') + '\n';
+      } else {
+        text += '*Total:* $' + res.tarifaTotal + '\n';
+      }
       if (payments.length > 0) {
         text += '\n_Pagos recibidos:_\n';
         payments.forEach(function(p) {
@@ -7593,7 +7632,17 @@
         row('Tarifa/noche','$'+res.tarifa);
         dash();
 
-        row('Total hospedaje','$'+res.tarifaTotal,17,17,17,true);
+        var _ivaRecPdf = parseIVAData(res.notas);
+        if (_ivaRecPdf) {
+          row('Subtotal hospedaje','$'+_ivaRecPdf.subtotal.toLocaleString('es-MX'));
+          row('IVA (16%)','$'+_ivaRecPdf.iva.toLocaleString('es-MX',{minimumFractionDigits:2}));
+          row('Total c/IVA','$'+res.tarifaTotal.toLocaleString('es-MX',{minimumFractionDigits:2}),17,17,17,true);
+          dash();
+          row('RFC',_ivaRecPdf.rfc,100,140,80,true);
+          if(_ivaRecPdf.razonSocial) row('Razon Social',_ivaRecPdf.razonSocial);
+        } else {
+          row('Total hospedaje','$'+res.tarifaTotal,17,17,17,true);
+        }
         dash();
 
         if(payments.length>0){
@@ -7714,8 +7763,18 @@
       h += '<div class="receipt-div"></div>';
 
       // Pricing
+      var _ivaConf = parseIVAData(res.notas);
       h += '<div class="receipt-row"><span class="receipt-label">Tarifa por noche</span><span class="receipt-value">$' + res.tarifa + '</span></div>';
-      h += '<div class="receipt-row"><span class="receipt-label" style="font-weight:700">Total estancia</span><span class="receipt-value" style="font-weight:700;font-size:15px">$' + res.tarifaTotal + '</span></div>';
+      if (_ivaConf) {
+        h += '<div class="receipt-row"><span class="receipt-label">Subtotal (' + nights + ' noches)</span><span class="receipt-value">$' + _ivaConf.subtotal.toLocaleString('es-MX') + '</span></div>';
+        h += '<div class="receipt-row"><span class="receipt-label">IVA (16%)</span><span class="receipt-value">$' + _ivaConf.iva.toLocaleString('es-MX',{minimumFractionDigits:2}) + '</span></div>';
+        h += '<div class="receipt-row"><span class="receipt-label" style="font-weight:700">Total c/IVA</span><span class="receipt-value" style="font-weight:700;font-size:15px">$' + res.tarifaTotal.toLocaleString('es-MX',{minimumFractionDigits:2}) + '</span></div>';
+        h += '<div class="receipt-div"></div>';
+        h += '<div class="receipt-row"><span class="receipt-label">RFC</span><span class="receipt-value">' + _ivaConf.rfc + '</span></div>';
+        if (_ivaConf.razonSocial) h += '<div class="receipt-row"><span class="receipt-label">Razón Social</span><span class="receipt-value" style="font-size:10px;max-width:180px;text-align:right">' + _ivaConf.razonSocial + '</span></div>';
+      } else {
+        h += '<div class="receipt-row"><span class="receipt-label" style="font-weight:700">Total estancia</span><span class="receipt-value" style="font-weight:700;font-size:15px">$' + res.tarifaTotal + '</span></div>';
+      }
 
       // Payment status
       if (totalPaid > 0) {
@@ -7725,6 +7784,21 @@
       } else {
         h += '<div class="receipt-div"></div>';
         if (_aPct > 0) h += '<div class="receipt-row"><span class="receipt-label" style="color:#ef4444;font-weight:600">Anticipo requerido (' + _aPct + '%)</span><span class="receipt-value" style="color:#ef4444;font-weight:700">$' + anticipoMin + '</span></div>';
+      }
+
+      // Breakfast section
+      var _bfTicket = (S.desayunos || []).filter(function(d) { return d.reservaId === resId; });
+      if (_bfTicket.length > 0) {
+        var _bfPromoT = getBreakfastPromo();
+        h += '<div class="receipt-div"></div>';
+        h += '<div style="font-size:10px;font-weight:700;color:#2e7d32;margin-bottom:6px">🍳 DESAYUNO INCLUIDO</div>';
+        h += '<div style="font-size:9px;color:#555;margin-bottom:4px">' + (_bfPromoT.partner || '') + '</div>';
+        if (_bfPromoT.descripcion) h += '<div style="font-size:8px;color:#666;margin-bottom:6px;font-style:italic">' + _bfPromoT.descripcion + '</div>';
+        _bfTicket.forEach(function(bf) {
+          h += '<div class="receipt-row"><span class="receipt-label">' + formatDate(bf.fecha) + ' (' + bf.personas + ' pers.)</span><span class="receipt-value" style="font-family:Space Mono,monospace;color:#2e7d32;font-weight:700">' + bf.codigo + '</span></div>';
+        });
+        var _bfValT = _bfTicket.reduce(function(s,d){return s+d.personas},0) * (_bfPromoT.precioPorPersona || 0);
+        if (_bfValT > 0) h += '<div style="font-size:8px;color:#2e7d32;text-align:right;margin-top:2px">Valor: <s>$' + _fmt(_bfValT) + '</s> → $0 Cortesía</div>';
       }
 
       // Terms and conditions (dynamic from config)
@@ -7780,8 +7854,16 @@
       t += '*Noches:* ' + nights + '\n';
       t += '*Huéspedes:* ' + res.adultos + ' adulto(s)' + (parseInt(res.niños) > 0 ? ', ' + res.niños + ' niño(s)' : '') + '\n';
       t += '─────────────\n';
+      var _ivaWA = parseIVAData(res.notas);
       t += '*Tarifa/noche:* $' + res.tarifa + '\n';
-      t += '*Total estancia:* $' + res.tarifaTotal + '\n';
+      if (_ivaWA) {
+        t += '*Subtotal:* $' + _ivaWA.subtotal.toLocaleString('es-MX') + '\n';
+        t += '*IVA (16%):* $' + _ivaWA.iva.toLocaleString('es-MX',{minimumFractionDigits:2}) + '\n';
+        t += '*Total c/IVA:* $' + res.tarifaTotal.toLocaleString('es-MX',{minimumFractionDigits:2}) + '\n';
+        t += '🧾 RFC: ' + _ivaWA.rfc + (_ivaWA.razonSocial ? ' — ' + _ivaWA.razonSocial : '') + '\n';
+      } else {
+        t += '*Total estancia:* $' + res.tarifaTotal + '\n';
+      }
       if (totalPaid > 0) {
         t += '*Anticipo recibido:* $' + totalPaid + '\n';
         t += '*Saldo pendiente:* $' + balance + '\n';
@@ -7789,6 +7871,21 @@
         if (_aPct > 0) t += '*Anticipo requerido (' + _aPct + '%):* $' + anticipoMin + '\n';
       }
       t += '─────────────\n';
+      // Breakfast codes
+      var _bfWA = (S.desayunos || []).filter(function(d) { return d.reservaId === resId; });
+      if (_bfWA.length > 0) {
+        var _bfPWA = getBreakfastPromo();
+        t += '\n🍳 *DESAYUNO INCLUIDO*\n';
+        t += '_' + (_bfPWA.partner || '') + '_\n';
+        if (_bfPWA.descripcion) t += '🍽️ _' + _bfPWA.descripcion + '_\n';
+        t += '\n';
+        _bfWA.forEach(function(bf) {
+          t += '📅 ' + formatDate(bf.fecha) + ' — 🔑 *' + bf.codigo + '* (' + bf.personas + ' pers.)\n';
+        });
+        var _bfVWA = _bfWA.reduce(function(s,d){return s+d.personas},0) * (_bfPWA.precioPorPersona || 0);
+        if (_bfVWA > 0) t += '💰 Valor: ~$' + _fmt(_bfVWA) + '~ → *$0 Cortesía*\n';
+        t += '─────────────\n';
+      }
       if (hi.direccion) t += '\n📍 *Dirección:* ' + hi.direccion + '\n';
       t += '\n📋 *Políticas importantes:*\n';
       var terms = getTerms();
@@ -7871,8 +7968,18 @@
         row('Huespedes',res.adultos+' adulto(s)'+(parseInt(res.niños)>0?', '+res.niños+' nino(s)':''));
         dash();
 
+        var _ivaPdf = parseIVAData(res.notas);
         row('Tarifa/noche','$'+res.tarifa);
-        row('Total estancia','$'+res.tarifaTotal,17,17,17,true);
+        if (_ivaPdf) {
+          row('Subtotal ('+nights+' noches)','$'+_ivaPdf.subtotal.toLocaleString('es-MX'));
+          row('IVA (16%)','$'+_ivaPdf.iva.toLocaleString('es-MX',{minimumFractionDigits:2}));
+          row('Total c/IVA','$'+res.tarifaTotal.toLocaleString('es-MX',{minimumFractionDigits:2}),17,17,17,true);
+          dash();
+          row('RFC',_ivaPdf.rfc,100,140,80,true);
+          if(_ivaPdf.razonSocial) row('Razon Social',_ivaPdf.razonSocial);
+        } else {
+          row('Total estancia','$'+res.tarifaTotal,17,17,17,true);
+        }
 
         if(totalPaid>0){
           dash();
@@ -7881,6 +7988,42 @@
         } else {
           dash();
           if(_aPct>0)row('Anticipo requerido ('+_aPct+'%)','$'+anticipoMin,239,68,68,true);
+        }
+
+        // Breakfast codes in PDF
+        var _bfPdf = (S.desayunos || []).filter(function(d) { return d.reservaId === resId; });
+        if (_bfPdf.length > 0) {
+          var _bfPPdf = getBreakfastPromo();
+          dash();
+          doc.setFont('helvetica','bold');doc.setFontSize(7);
+          setC(46,125,50);
+          if(render)doc.text('DESAYUNO INCLUIDO',x,y);
+          y+=8;
+          doc.setFont('helvetica','normal');doc.setFontSize(6);
+          setC(80,80,80);
+          if(render)doc.text((_bfPPdf.partner||'').normalize('NFD').replace(/[̀-ͯ]/g,''),x,y);
+          y+=7;
+          if(_bfPPdf.descripcion){
+            doc.setFont('helvetica','italic');doc.setFontSize(5.5);
+            var _bfDescL=doc.splitTextToSize(_bfPPdf.descripcion.normalize('NFD').replace(/[̀-ͯ]/g,''),pageW-2*x);
+            _bfDescL.forEach(function(ln){if(render)doc.text(ln,x,y);y+=6;});
+            y+=2;
+          }
+          _bfPdf.forEach(function(bf){
+            doc.setFont('helvetica','normal');doc.setFontSize(6);setC(80,80,80);
+            if(render)doc.text(formatDate(bf.fecha)+' ('+bf.personas+' pers.)',x,y);
+            doc.setFont('helvetica','bold');setC(46,125,50);
+            var cw=doc.getTextWidth(bf.codigo);
+            if(render)doc.text(bf.codigo,pageW-x-cw,y);
+            y+=lineH;
+          });
+          var _bfVPdf=_bfPdf.reduce(function(s,d){return s+d.personas},0)*(_bfPPdf.precioPorPersona||0);
+          if(_bfVPdf>0){
+            doc.setFont('helvetica','normal');doc.setFontSize(5.5);setC(46,125,50);
+            var valT='Valor: $'+_fmt(_bfVPdf)+' → $0 Cortesia';
+            if(render)doc.text(valT,pageW-x-doc.getTextWidth(valT),y);
+            y+=8;
+          }
         }
 
         // Address
@@ -9782,8 +9925,19 @@
           </div>
           <div style="background: var(--surface3); padding: 12px; border-radius: var(--radius); margin-bottom: 12px;">
             <div style="font-size: 12px; color: var(--text2); margin-bottom: 4px;">TARIFA</div>
-            <div style="font-size: 20px; font-weight: 700; font-family: 'Space Mono', monospace; color: var(--accent);">$${res.tarifaTotal}</div>
-            <div style="font-size: 11px; color: var(--text2); margin-top: 4px;">$${res.tarifa} × ${daysUntil(res.fechaEntrada, res.fechaSalida)} noches</div>
+            ${(function(){
+              var _iva = parseIVAData(res.notas);
+              if (_iva) {
+                return '<div style="font-size:11px;color:var(--text2);margin-bottom:2px">Subtotal: $' + _iva.subtotal.toLocaleString('es-MX') + '</div>' +
+                  '<div style="font-size:11px;color:var(--text2);margin-bottom:2px">IVA (16%): $' + _iva.iva.toLocaleString('es-MX',{minimumFractionDigits:2}) + '</div>' +
+                  '<div style="font-size:20px;font-weight:700;font-family:Space Mono,monospace;color:var(--accent)">$' + res.tarifaTotal.toLocaleString('es-MX',{minimumFractionDigits:2}) + '</div>' +
+                  '<div style="font-size:11px;color:var(--text2);margin-top:4px">$' + res.tarifa + ' × ' + daysUntil(res.fechaEntrada, res.fechaSalida) + ' noches + IVA</div>' +
+                  '<div style="margin-top:6px;padding:6px 8px;background:rgba(139,170,106,0.1);border:1px solid var(--accent);border-radius:6px;font-size:11px">' +
+                  '🧾 <strong>Factura</strong> — RFC: ' + _iva.rfc + ((_iva.razonSocial) ? ' — ' + _iva.razonSocial : '') + '</div>';
+              }
+              return '<div style="font-size:20px;font-weight:700;font-family:Space Mono,monospace;color:var(--accent)">$' + res.tarifaTotal + '</div>' +
+                '<div style="font-size:11px;color:var(--text2);margin-top:4px">$' + res.tarifa + ' × ' + daysUntil(res.fechaEntrada, res.fechaSalida) + ' noches</div>';
+            })()}
           </div>
           <div style="background: var(--surface3); padding: 12px; border-radius: var(--radius); margin-bottom: 12px;">
             <div style="font-size: 12px; color: var(--text2); margin-bottom: 4px;">PAGOS</div>
@@ -9800,7 +9954,7 @@
           <div style="background: var(--surface3); padding: 12px; border-radius: var(--radius);">
             <div style="font-size: 12px; color: var(--text2); margin-bottom: 4px;">ESTADO</div>
             <div style="font-weight: 700;">${res.estado}</div>
-            ${res.notas ? `<div style="font-size: 11px; color: var(--text2); margin-top: 8px;">Notas: ${res.notas}</div>` : ''}
+            ${(function(){ var _n = getNotasWithoutIVA(res.notas); return _n ? '<div style="font-size:11px;color:var(--text2);margin-top:8px">Notas: ' + _n + '</div>' : ''; })()}
           </div>
         </div>
       `;
@@ -9878,6 +10032,10 @@
         bfSection += '<div style="display:flex;gap:6px;margin-top:10px">';
         bfSection += '<button onclick="shareBreakfastCodes(\'' + resId + '\')" style="flex:1;background:#25D366;color:white;border:none;border-radius:8px;padding:8px;font-size:12px;cursor:pointer;font-weight:600">📲 Enviar códigos</button>';
         bfSection += '<button onclick="cancelBreakfastCodes(\'' + resId + '\')" style="background:var(--surface2);border:1px solid var(--surface3);border-radius:8px;padding:8px 12px;font-size:11px;cursor:pointer;color:var(--red)">Cancelar</button>';
+        bfSection += '</div>';
+        bfSection += '<div style="display:flex;gap:6px;margin-top:6px">';
+        bfSection += '<button onclick="generateBreakfastVoucherPDF(\'' + resId + '\',\'share\')" style="flex:1;background:#2e7d32;color:white;border:none;border-radius:8px;padding:8px;font-size:11px;cursor:pointer;font-weight:600">🎫 Voucher PDF WhatsApp</button>';
+        bfSection += '<button onclick="generateBreakfastVoucherPDF(\'' + resId + '\',\'download\')" style="flex:1;background:var(--surface2);border:1px solid #2e7d32;border-radius:8px;padding:8px;font-size:11px;cursor:pointer;color:#2e7d32;font-weight:600">📄 Descargar Voucher</button>';
         bfSection += '</div></div>';
         document.getElementById('reservaModalContent').insertAdjacentHTML('beforeend', bfSection);
       }
@@ -9890,6 +10048,8 @@
       // Reservation confirmation receipt — available for all active states
       if (res.estado !== 'Cancelada') {
         buttons += '<button class="form-button" onclick="closeModal();showReservaConfirmation(\'' + resId + '\')" style="background:var(--blue)">📄 Confirmación de Reserva</button>';
+        var _room = S.rooms.find(function(r){return r.numero===res.habitacionNum});
+        buttons += '<button class="form-button" onclick="closeModal();showPostCheckinMessages(S.reservas.find(function(r){return r.id===\'' + resId + '\'}), S.rooms.find(function(r){return r.numero===\'' + res.habitacionNum + '\'}))" style="background:#25D366;color:#fff;">📨 Enviar Mensajes al Huésped</button>';
       }
       if (res.estado === 'Reservada') {
         buttons += '<button class="form-button" onclick="confirmarReserva(\'' + resId + '\')" style="background:var(--green);color:white;">✅ Confirmar Reserva</button>';
@@ -9953,6 +10113,115 @@
       msg += '📌 Muestra el código al llegar al restaurante.\n\n_' + HOTEL_NAME + '_ 🌿';
       var phone = (res.telefono || '').replace(/\D/g, '');
       window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(msg), '_blank');
+    }
+
+    function generateBreakfastVoucherPDF(resId, mode) {
+      var res = S.reservas.find(function(r) { return r.id === resId; });
+      var codes = (S.desayunos || []).filter(function(d) { return d.reservaId === resId && d.estado === 'Pendiente'; });
+      if (codes.length === 0) { toast('No hay códigos pendientes', true); return; }
+      var promo = getBreakfastPromo();
+      var hi = getHotelInfo();
+      var totalPers = codes.reduce(function(s, c) { return s + c.personas; }, 0);
+      var valorReal = totalPers * (promo.precioPorPersona || 0);
+
+      var { jsPDF } = window.jspdf;
+      var cardW = 148, cardH = 105; // A6 landscape-ish
+      var doc = new jsPDF({ unit: 'mm', format: [cardW, cardH] });
+
+      codes.forEach(function(code, idx) {
+        if (idx > 0) doc.addPage([cardW, cardH]);
+        var y = 8;
+
+        // Green gradient header bar
+        doc.setFillColor(46, 125, 50); doc.rect(0, 0, cardW, 28, 'F');
+        doc.setFillColor(56, 142, 60); doc.rect(0, 24, cardW, 4, 'F');
+
+        // Logo on header
+        try { doc.addImage(LOGO_H_DARK_B64 || LOGO_H_DARK, 'PNG', 6, 3, 36, 36 / LOGO_H_RATIO); } catch(e) {}
+
+        // Title on header
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
+        doc.setTextColor(255, 255, 255);
+        doc.text('DESAYUNO INCLUIDO', cardW - 8, 11, { align: 'right' });
+        doc.setFontSize(8); doc.setFont('helvetica', 'normal');
+        doc.text('CORTESIA DEL HOTEL', cardW - 8, 17, { align: 'right' });
+        doc.setFontSize(6);
+        doc.text(promo.partner || '', cardW - 8, 23, { align: 'right' });
+
+        y = 34;
+
+        // Guest info
+        doc.setTextColor(80, 80, 80);
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(7);
+        doc.text('HUESPED', 8, y); doc.text('HABITACION', 80, y); doc.text('FECHA', 115, y);
+        y += 5;
+        doc.setTextColor(17, 17, 17);
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+        doc.text(res.huesped.normalize('NFD').replace(/[̀-ͯ]/g, ''), 8, y);
+        doc.text(res.habitacionNum, 80, y);
+        doc.text(formatDate(code.fecha), 115, y);
+        y += 4;
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(7);
+        doc.setTextColor(100, 100, 100);
+        doc.text(code.personas + ' persona' + (code.personas > 1 ? 's' : ''), 8, y);
+
+        y += 8;
+
+        // Code box — prominent
+        doc.setFillColor(245, 245, 245); doc.roundedRect(8, y, cardW - 16, 18, 3, 3, 'F');
+        doc.setDrawColor(46, 125, 50); doc.setLineWidth(0.5); doc.roundedRect(8, y, cardW - 16, 18, 3, 3, 'S');
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(7);
+        doc.setTextColor(100, 100, 100);
+        doc.text('CODIGO DE VERIFICACION', cardW / 2, y + 5, { align: 'center' });
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(18);
+        doc.setTextColor(46, 125, 50);
+        doc.text(code.codigo, cardW / 2, y + 14, { align: 'center' });
+
+        y += 22;
+
+        // Value callout
+        if (valorReal > 0) {
+          doc.setFont('helvetica', 'normal'); doc.setFontSize(6);
+          doc.setTextColor(100, 100, 100);
+          var valText = 'Valor: $' + _fmt(promo.precioPorPersona || 0) + '/persona — CORTESIA $0';
+          doc.text(valText, cardW / 2, y, { align: 'center' });
+          y += 4;
+        }
+
+        // Description
+        if (promo.descripcion) {
+          doc.setFont('helvetica', 'italic'); doc.setFontSize(6);
+          doc.setTextColor(80, 80, 80);
+          var descLines = doc.splitTextToSize(promo.descripcion.normalize('NFD').replace(/[̀-ͯ]/g, ''), cardW - 20);
+          descLines.forEach(function(ln) { doc.text(ln, cardW / 2, y, { align: 'center' }); y += 4; });
+        }
+
+        // Footer
+        doc.setFillColor(46, 125, 50); doc.rect(0, cardH - 10, cardW, 10, 'F');
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(5.5);
+        doc.setTextColor(255, 255, 255);
+        doc.text('Presente este codigo al llegar al restaurante', cardW / 2, cardH - 4, { align: 'center' });
+      });
+
+      var fname = 'Desayuno_' + res.huesped.replace(/\s+/g, '_') + '_' + res.id + '.pdf';
+      if (mode === 'share') {
+        var blob = doc.output('blob');
+        var file = new File([blob], fname, { type: 'application/pdf' });
+        if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+          navigator.share({ files: [file], title: 'Tarjeta de Desayuno' }).catch(function(){});
+        } else {
+          var phone = (res.telefono || '').replace(/\D/g, '');
+          doc.save(fname);
+          toast('PDF descargado — compártelo por WhatsApp');
+          setTimeout(function() {
+            var msg = '🍳 *TARJETA DE DESAYUNO* — ' + res.huesped + '\nTe envío tu voucher de desayuno cortesía. Presenta el código en el restaurante *' + (promo.partner || '') + '*.\n\n_' + HOTEL_NAME + '_ 🌿';
+            window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(msg), '_blank');
+          }, 500);
+        }
+      } else {
+        doc.save(fname);
+        toast('PDF descargado');
+      }
     }
 
     async function cancelBreakfastCodes(resId) {
@@ -10184,6 +10453,38 @@
       });
     }
 
+    function parseIVAData(notas) {
+      if (!notas) return null;
+      var match = notas.match(/\[IVA:(\{.*?\})\]/);
+      if (!match) return null;
+      try { return JSON.parse(match[1]); } catch(e) { return null; }
+    }
+
+    function getNotasWithoutIVA(notas) {
+      if (!notas) return '';
+      return notas.replace(/\s*\|\s*\[IVA:\{.*?\}\]/, '').replace(/\[IVA:\{.*?\}\]/, '').trim();
+    }
+
+    function toggleNewResIVA() {
+      var checked = document.getElementById('newResFactura').checked;
+      document.getElementById('newResFacturaFields').style.display = checked ? '' : 'none';
+      updateNewResIVAInfo();
+    }
+
+    function updateNewResIVAInfo() {
+      var checked = document.getElementById('newResFactura').checked;
+      var infoEl = document.getElementById('newResIVAInfo');
+      if (!infoEl || !checked) return;
+      var tarifa = parseFloat(document.getElementById('newResTarifa').value) || 0;
+      var checkin = document.getElementById('newResCheckIn').value;
+      var checkout = document.getElementById('newResCheckOut').value;
+      if (!checkin || !checkout || !tarifa) { infoEl.textContent = 'Llena tarifa y fechas para ver desglose IVA'; return; }
+      var days = daysUntil(checkin, checkout);
+      var subtotal = days * tarifa;
+      var iva = Math.round(subtotal * 0.16 * 100) / 100;
+      infoEl.innerHTML = '🧾 Subtotal: <strong>$' + subtotal.toLocaleString('es-MX') + '</strong> + IVA (16%): <strong>$' + iva.toLocaleString('es-MX', {minimumFractionDigits:2}) + '</strong> = Total: <strong>$' + (subtotal + iva).toLocaleString('es-MX', {minimumFractionDigits:2}) + '</strong>';
+    }
+
     function toggleNewResPayment() {
       var show = document.getElementById('newResPayToggle').checked;
       document.getElementById('newResPaySection').style.display = show ? '' : 'none';
@@ -10200,7 +10501,9 @@
       var checkout = document.getElementById('newResCheckOut').value;
       if (!checkin || !checkout || !tarifa) { toast('Llena tarifa y fechas primero', true); return; }
       var days = daysUntil(checkin, checkout);
-      var total = days * tarifa;
+      var subtotal = days * tarifa;
+      var factura = document.getElementById('newResFactura') && document.getElementById('newResFactura').checked;
+      var total = factura ? subtotal + Math.round(subtotal * 0.16 * 100) / 100 : subtotal;
       var monto = Math.ceil(total * (pct / 100));
       document.getElementById('newResPayMonto').value = monto;
     }
@@ -10218,6 +10521,12 @@
       document.getElementById('newResAdultos').value = '1';
       document.getElementById('newResNinos').value = '0';
       document.getElementById('newResNotas').value = '';
+      // Reset factura/IVA fields
+      document.getElementById('newResFactura').checked = false;
+      document.getElementById('newResFacturaFields').style.display = 'none';
+      document.getElementById('newResRFC').value = '';
+      document.getElementById('newResRazonSocial').value = '';
+      document.getElementById('newResIVAInfo').innerHTML = '';
       _acSelectedClient = null;
       document.getElementById('guestSelectedBadge').style.display = 'none';
       document.getElementById('guestAcDropdown').classList.remove('open');
@@ -10282,6 +10591,11 @@
         calculateReservaTotal();
       }
     });
+    document.addEventListener('input', (e) => {
+      if (e.target.id === 'newResTarifa') {
+        calculateReservaTotal();
+      }
+    });
 
     function calculateReservaTotal() {
       const checkin = document.getElementById('newResCheckIn').value;
@@ -10290,9 +10604,16 @@
 
       if (checkin && checkout) {
         const days = daysUntil(checkin, checkout);
-        const total = days * tarifa;
-        document.getElementById('newResTotal').textContent = `$${total}`;
+        const subtotal = days * tarifa;
+        var factura = document.getElementById('newResFactura') && document.getElementById('newResFactura').checked;
+        if (factura) {
+          var iva = Math.round(subtotal * 0.16 * 100) / 100;
+          document.getElementById('newResTotal').innerHTML = '<span style="font-size:11px;color:var(--text2)">Subtotal $' + subtotal.toLocaleString('es-MX') + ' + IVA $' + iva.toLocaleString('es-MX',{minimumFractionDigits:2}) + '</span><br>$' + (subtotal + iva).toLocaleString('es-MX',{minimumFractionDigits:2});
+        } else {
+          document.getElementById('newResTotal').textContent = '$' + subtotal;
+        }
       }
+      updateNewResIVAInfo();
     }
 
     // Verifica si hay solapamiento de fechas para una habitación
@@ -10320,7 +10641,12 @@
       const adultos = document.getElementById('newResAdultos').value;
       const niños = document.getElementById('newResNinos').value;
       const tarifa = parseFloat(document.getElementById('newResTarifa').value);
-      const notas = document.getElementById('newResNotas').value;
+      const notasText = document.getElementById('newResNotas').value;
+
+      // IVA / Factura fields
+      const wantsFactura = document.getElementById('newResFactura').checked;
+      const rfc = wantsFactura ? document.getElementById('newResRFC').value.trim().toUpperCase() : '';
+      const razonSocial = wantsFactura ? document.getElementById('newResRazonSocial').value.trim() : '';
 
       // Payment fields
       const wantsPay = document.getElementById('newResPayToggle').checked;
@@ -10360,10 +10686,22 @@
       await busy(async () => {
         const id = nextId('R', S.reservas);
         const days = daysUntil(checkin, checkout);
-        const total = days * tarifa;
+        const subtotal = days * tarifa;
+        var ivaAmount = 0;
+        if (wantsFactura) {
+          ivaAmount = Math.round(subtotal * 0.16 * 100) / 100;
+        }
+        const total = subtotal + ivaAmount;
         const n = now();
         const fecha = normDate(new Date());
         const hora = n.split(' ')[1];
+
+        // Build notas: combine user notes with IVA data if applicable
+        var notas = notasText;
+        if (wantsFactura) {
+          var ivaData = JSON.stringify({factura:true, rfc:rfc, razonSocial:razonSocial, subtotal:subtotal, iva:ivaAmount});
+          notas = (notasText ? notasText + ' | ' : '') + '[IVA:' + ivaData + ']';
+        }
 
         // Determine initial state: if anticipo is configured and payment covers it, or no anticipo required → Confirmada; otherwise → Reservada
         var _aPctNew = getAnticipoPct();
@@ -10375,7 +10713,7 @@
           if (payMonto >= _minReqNew) _initEstado = 'Confirmada';
         }
         const row = [id, roomNum, huesped, tel, email, checkin, checkout, adultos, niños, tarifa, total, _initEstado, notas, S.user.usuario, n];
-        const logRow = [fecha, hora, S.user.usuario, 'Nueva Reserva', huesped + ' en Hab. ' + roomNum, 'info'];
+        const logRow = [fecha, hora, S.user.usuario, 'Nueva Reserva', huesped + ' en Hab. ' + roomNum + (wantsFactura ? ' (Factura)' : ''), 'info'];
 
         var operations = [
           { type: 'append', sheet: '📋 Reservas', values: row },
@@ -10435,7 +10773,14 @@
       h += '<div style="font-size:16px;font-weight:700;color:#22c55e;margin-bottom:6px">Reserva Creada Exitosamente</div>';
       h += '<div style="font-size:13px;color:#666;margin-bottom:4px">' + huesped + ' — Hab. ' + roomNum + '</div>';
       h += '<div style="font-size:13px;color:#666;margin-bottom:4px">' + formatDate(res.fechaEntrada) + ' → ' + formatDate(res.fechaSalida) + '</div>';
-      h += '<div style="font-size:18px;font-weight:700;font-family:Space Mono,monospace;color:#333;margin:12px 0">Total: $' + res.tarifaTotal + '</div>';
+      var _ivaPost = parseIVAData(res.notas);
+      if (_ivaPost) {
+        h += '<div style="font-size:12px;color:#666;margin:4px 0">Subtotal: $' + _ivaPost.subtotal.toLocaleString('es-MX') + ' + IVA: $' + _ivaPost.iva.toLocaleString('es-MX',{minimumFractionDigits:2}) + '</div>';
+        h += '<div style="font-size:18px;font-weight:700;font-family:Space Mono,monospace;color:#333;margin:4px 0 12px">Total: $' + res.tarifaTotal.toLocaleString('es-MX',{minimumFractionDigits:2}) + '</div>';
+        h += '<div style="font-size:11px;color:#8b6914;background:#fff8e1;border-radius:6px;padding:6px;margin-bottom:10px">🧾 Factura — RFC: ' + _ivaPost.rfc + '</div>';
+      } else {
+        h += '<div style="font-size:18px;font-weight:700;font-family:Space Mono,monospace;color:#333;margin:12px 0">Total: $' + res.tarifaTotal + '</div>';
+      }
 
       if (totalPaid > 0) {
         h += '<div style="background:#e8f5e9;border:1px solid #66bb6a;border-radius:10px;padding:10px;margin-bottom:10px;font-size:12px;color:#2e7d32">✅ Anticipo registrado: <strong>$' + totalPaid + '</strong> (' + pctPaid + '%)</div>';
