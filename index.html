@@ -1788,6 +1788,10 @@
                 <div class="action-btn-icon">🔑</div>
                 <div>Check-in</div>
               </button>
+              <button class="action-btn" onclick="openWalkinWizard()">
+                <div class="action-btn-icon">🚶</div>
+                <div>Walk-in</div>
+              </button>
               <button class="action-btn" onclick="openNewReservaModal()">
                 <div class="action-btn-icon">📋</div>
                 <div>Reservar</div>
@@ -2128,6 +2132,24 @@
       <div id="checkinPreview"></div>
       <button class="form-button" onclick="executeCheckin()">Confirmar Check-in</button>
     </div>
+  </div>
+
+  <!-- Walk-in Wizard Modal -->
+  <div class="modal" id="walkinWizardModal" style="max-height:90vh;">
+    <div class="modal-header">
+      <div class="modal-title" id="walkinWizardTitle">🚶 Walk-in — Paso 1 de 3</div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body" id="walkinWizardContent" style="overflow-y:auto;max-height:70vh;"></div>
+  </div>
+
+  <!-- Post Check-in Messaging Modal -->
+  <div class="modal" id="postCheckinMsgModal" style="max-height:90vh;">
+    <div class="modal-header">
+      <div class="modal-title">📨 Mensajes al Huésped</div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body" id="postCheckinMsgContent" style="overflow-y:auto;max-height:70vh;"></div>
   </div>
 
   <!-- New Task Modal -->
