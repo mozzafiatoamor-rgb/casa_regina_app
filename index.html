@@ -6144,15 +6144,73 @@
         y += bfH + 6;
       }
 
-      // Terms — with auto page break
+      // === POLÍTICAS IMPORTANTES (highlighted box) ===
+      var _pdfHi = getHotelInfo();
+      var _pdfPeRate = _pdfHi.persona_extra || 0;
+      var polItems = [];
+      if (d.anticipo_pct > 0) {
+        polItems.push('Anticipo: Se requiere el ' + d.anticipo_pct + '% ($' + _fmt(d.anticipoMonto) + ' MXN) para confirmar. El ' + (100 - d.anticipo_pct) + '% restante al check-in.');
+      }
+      polItems.push('Cancelación: +7 días = reembolso 100%. Entre 3-7 días = retención 50%. Menos de 3 días o No Show = sin reembolso.');
+      polItems.push('Horarios: Check-in ' + formatHoraDisplay(_pdfHi.checkin_hora) + ' — Check-out ' + formatHoraDisplay(_pdfHi.checkout_hora) + '. Sujetos a disponibilidad.');
+
+      // Calculate box height
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
+      var polLinesSizes = polItems.map(function(item) { return doc.splitTextToSize('• ' + item, contentW - 16); });
+      var polBoxH = 10;
+      polLinesSizes.forEach(function(ls) { polBoxH += ls.length * 3.5 + 2; });
+
+      if (y + polBoxH > 270) { doc.addPage(); y = 20; }
+      doc.setFillColor(245, 247, 250); doc.roundedRect(marginX, y, contentW, polBoxH, 2, 2, 'F');
+      doc.setDrawColor(55, 71, 79); doc.setLineWidth(0.3); doc.roundedRect(marginX, y, contentW, polBoxH, 2, 2, 'S');
       doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(55, 71, 79);
-      doc.text('POLÍTICAS Y CONDICIONES', marginX, y); y += 6;
-      doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(100, 100, 100);
+      doc.text('POLÍTICAS IMPORTANTES', marginX + 6, y + 7);
+      var polY = y + 12;
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(80, 80, 80);
+      polLinesSizes.forEach(function(ls) {
+        doc.text(ls, marginX + 8, polY);
+        polY += ls.length * 3.5 + 2;
+      });
+      y += polBoxH + 4;
+
+      // === POLÍTICAS DE OCUPACIÓN (blue-tinted box) ===
+      var occItems = [
+        'Ocupación base: La tarifa publicada ampara máximo 2 personas por habitación.'
+      ];
+      if (_pdfPeRate > 0) {
+        occItems.push('Persona adicional: $' + _fmt(_pdfPeRate) + ' MXN + IVA por persona extra, por noche. Cama supletoria sujeta a disponibilidad.');
+      }
+      occItems.push('Menores: Niños menores de 11 años sin costo compartiendo cama (máx. 1 por hab.). A partir de 12 años = adulto con cargo de persona extra.');
+      occItems.push('Capacidad máxima: Doble Matrimonial: 4 pers. — Doble Twin: 3 pers. — Queen Size: 3 pers. El hotel puede requerir habitación adicional si se supera.');
+
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
+      var occLinesSizes = occItems.map(function(item) { return doc.splitTextToSize('• ' + item, contentW - 16); });
+      var occBoxH = 10;
+      occLinesSizes.forEach(function(ls) { occBoxH += ls.length * 3.5 + 2; });
+
+      if (y + occBoxH > 270) { doc.addPage(); y = 20; }
+      doc.setFillColor(227, 242, 253); doc.roundedRect(marginX, y, contentW, occBoxH, 2, 2, 'F');
+      doc.setDrawColor(33, 150, 243); doc.setLineWidth(0.3); doc.roundedRect(marginX, y, contentW, occBoxH, 2, 2, 'S');
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(21, 101, 192);
+      doc.text('POLÍTICAS DE OCUPACIÓN', marginX + 6, y + 7);
+      var occY = y + 12;
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(60, 60, 60);
+      occLinesSizes.forEach(function(ls) {
+        doc.text(ls, marginX + 8, occY);
+        occY += ls.length * 3.5 + 2;
+      });
+      y += occBoxH + 4;
+
+      // === TÉRMINOS Y CONDICIONES GENERALES ===
+      if (y + 10 > 270) { doc.addPage(); y = 20; }
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(55, 71, 79);
+      doc.text('TÉRMINOS Y CONDICIONES GENERALES', marginX, y); y += 6;
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(120, 120, 120);
       var terms = getTerms();
       terms.forEach(function(t) {
         var line = '• ' + t.title + ': ' + t.text;
         var lines = doc.splitTextToSize(line, contentW - 4);
-        var blockH = lines.length * 4 + 1;
+        var blockH = lines.length * 3.2 + 1;
         if (y + blockH > 278) { doc.addPage(); y = 20; }
         doc.text(lines, marginX + 2, y); y += blockH;
       });
