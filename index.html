@@ -2516,20 +2516,31 @@
     };
 
     function getBreakfastPromo() {
+      // 1. Try localStorage
       try {
         var stored = localStorage.getItem('breakfastPromo');
         if (stored) {
-          var parsed = JSON.parse(stored);
-          // If parsed is still a string (double-encoded), parse again
-          if (typeof parsed === 'string') { try { parsed = JSON.parse(parsed); } catch(e2) {} }
+          var parsed = _parseConfigVal(stored);
           if (typeof parsed === 'object' && parsed !== null) {
             var result = Object.assign({}, DEFAULT_BREAKFAST_PROMO, parsed);
-            // Ensure rules array exists
             if (!Array.isArray(result.rules)) result.rules = DEFAULT_BREAKFAST_PROMO.rules.slice();
             return result;
           }
         }
       } catch(e) { console.warn('getBreakfastPromo parse error:', e.message); }
+      // 2. Fallback: Sheet cache (loaded during loadData)
+      if (_sheetConfigCache['breakfastPromo']) {
+        try {
+          var fromSheet = _parseConfigVal(_sheetConfigCache['breakfastPromo']);
+          if (typeof fromSheet === 'object' && fromSheet !== null) {
+            // Restore to localStorage so future reads work
+            localStorage.setItem('breakfastPromo', JSON.stringify(fromSheet));
+            var result2 = Object.assign({}, DEFAULT_BREAKFAST_PROMO, fromSheet);
+            if (!Array.isArray(result2.rules)) result2.rules = DEFAULT_BREAKFAST_PROMO.rules.slice();
+            return result2;
+          }
+        } catch(e2) { console.warn('getBreakfastPromo sheet cache error:', e2.message); }
+      }
       return Object.assign({}, DEFAULT_BREAKFAST_PROMO);
     }
 
@@ -2777,29 +2788,33 @@
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
     var CONFIG_KEYS = ['hotelInfo', 'hotelTerms', 'dailyRoutine', 'msgTemplates', 'emergencyContacts', 'breakfastPromo'];
 
+    // Cache raw Sheet config so getBreakfastPromo can fallback to it
+    var _sheetConfigCache = {};
+
+    function _parseConfigVal(val) {
+      // Parse up to 3 levels of JSON encoding
+      var finalObj = val;
+      for (var _pi = 0; _pi < 3; _pi++) {
+        if (typeof finalObj === 'string') {
+          try { finalObj = JSON.parse(finalObj); } catch(e) { break; }
+        } else { break; }
+      }
+      return finalObj;
+    }
+
     function applyConfigFromSheet(configData) {
       if (!configData || !configData.length) return;
       configData.forEach(function(row) {
         var key = row[0];
         var val = row[1];
         if (CONFIG_KEYS.indexOf(key) !== -1 && val) {
+          // Cache raw value for fallback
+          _sheetConfigCache[key] = val;
           try {
-            // Goal: localStorage must end up with a JSON string of the config object
-            // val from Sheet can be: JSON string, double-encoded JSON, or raw string
-            var finalObj = val;
-            // Keep parsing until we get an object (or array), max 3 levels of nesting
-            for (var _pi = 0; _pi < 3; _pi++) {
-              if (typeof finalObj === 'string') {
-                try { finalObj = JSON.parse(finalObj); } catch(e) { break; }
-              } else {
-                break;
-              }
-            }
-            // finalObj should now be the actual config object
+            var finalObj = _parseConfigVal(val);
             if (typeof finalObj === 'object' && finalObj !== null) {
               localStorage.setItem(key, JSON.stringify(finalObj));
             } else if (typeof finalObj === 'string') {
-              // Couldn't parse, store as-is (might be a plain string value)
               localStorage.setItem(key, finalObj);
             }
           } catch(e) {
@@ -8633,11 +8648,10 @@
 
     function renderDesayunosConfig() {
       var promo = getBreakfastPromo();
-      // Auto-import from Sheet if localStorage has no saved value (new device)
+      // Auto-import from Sheet if localStorage has no saved value and no Sheet cache
       var rawStored = localStorage.getItem('breakfastPromo');
-      if (!rawStored && S.scriptUrl) {
-        importBreakfastFromSheet();
-        return; // importBreakfastFromSheet calls renderConfig() which re-renders this
+      if (!rawStored && !_sheetConfigCache['breakfastPromo'] && S.scriptUrl) {
+        importBreakfastFromSheet(); // will re-render when done
       }
       var h = '<div style="margin-bottom:16px">';
       h += '<div class="section-title">Promoción de Desayunos</div>';
@@ -8724,25 +8738,41 @@
       var promo = getBreakfastPromo();
       promo.active = active;
       saveBreakfastPromoLocal(promo);
+      _debouncedBfSync();
       renderConfig();
+    }
+
+    // Debounced auto-sync: saves to Sheet after 2s of inactivity
+    var _bfSyncTimer = null;
+    function _debouncedBfSync() {
+      if (_bfSyncTimer) clearTimeout(_bfSyncTimer);
+      _bfSyncTimer = setTimeout(function() {
+        var promo = getBreakfastPromo();
+        if (promo.partner && promo.precioPorPersona > 0) {
+          syncConfigToSheet('breakfastPromo', promo);
+        }
+      }, 2000);
     }
 
     function updateBreakfastField(field, value) {
       var promo = getBreakfastPromo();
       promo[field] = value;
       saveBreakfastPromoLocal(promo);
+      _debouncedBfSync();
     }
 
     function updateBreakfastRule(idx, field, value) {
       var promo = getBreakfastPromo();
       promo.rules[idx][field] = value;
       saveBreakfastPromoLocal(promo);
+      _debouncedBfSync();
     }
 
     function addBreakfastRule() {
       var promo = getBreakfastPromo();
       promo.rules.push({ tipo: '', personas: 1 });
       saveBreakfastPromoLocal(promo);
+      _debouncedBfSync();
       renderConfig();
     }
 
@@ -8750,6 +8780,7 @@
       var promo = getBreakfastPromo();
       promo.rules.splice(idx, 1);
       saveBreakfastPromoLocal(promo);
+      _debouncedBfSync();
       renderConfig();
     }
 
@@ -11626,19 +11657,52 @@
         }
       ];
 
-      // Add breakfast promo
-      if (promoActive && personas > 0) {
+      // Add breakfast promo messages
+      if (promoActive) {
+        var partnerName = promo.partner || 'Restaurante';
+        var bfDesc = promo.descripcion || 'Desayuno continental';
+        var bfPrecio = promo.precioPorPersona || 0;
+
+        if (hasBf) {
+          // Already has codes — send them with instructions
+          var pendBfCodes = existingBf.filter(function(d) { return d.estado === 'Pendiente'; });
+          var codesText = '';
+          existingBf.forEach(function(d) {
+            var statusIcon = d.estado === 'Pendiente' ? '🟢' : '✅';
+            codesText += statusIcon + ' *' + d.codigo + '* — ' + formatDate(d.fecha) + ' (' + d.personas + ' pers.) ' + (d.estado !== 'Pendiente' ? '_(usado)_' : '') + '\n';
+          });
+          msgCategories[3].messages.push({
+            id: 'mp_desayuno_codes', name: 'Códigos de Desayuno', icon: '🍳', checked: false,
+            text: '🍳 *¡Tu reservación incluye desayuno!*\n\n¡Hola *' + res.huesped + '*! 🌿\n\nTu estancia en *' + hi.nombre + '* incluye desayuno cortesía de:\n\n☕ *' + partnerName + '*\n🍽️ _' + bfDesc + '_\n\n📋 *Tus códigos de desayuno:*\n' + codesText + '\n📌 *¿Cómo funciona?*\n1️⃣ Presenta tu código al mesero en *' + partnerName + '*\n2️⃣ El restaurante lo verifica en nuestro sistema\n3️⃣ ¡Disfruta tu desayuno sin costo adicional!\n\n⏰ Válido durante tu estancia\n💰 Valor por desayuno: $' + _fmt(bfPrecio) + ' por persona\n\n¡Buen provecho! 😊\n_' + hi.nombre + '_ 🌿'
+          });
+        } else if (personas > 0) {
+          // No codes yet — promo available, inform and suggest
+          msgCategories[3].messages.push({
+            id: 'mp_desayuno_info', name: 'Info Desayuno Incluido', icon: '🍳', checked: false,
+            text: '🍳 *¡Tu reservación incluye desayuno!*\n\n¡Hola *' + res.huesped + '*! 🌿\n\nTu estancia en *' + hi.nombre + '* incluye desayuno para *' + personas + ' persona(s)* por noche en:\n\n☕ *' + partnerName + '*\n🍽️ _' + bfDesc + '_\n\n🌙 ' + nights + ' noche(s) = *' + nights + ' desayuno(s)*\n💰 Valor: $' + _fmt(bfPrecio * personas * nights) + ' MXN de ahorro\n\n📌 *En recepción te daremos tus códigos de verificación* para presentar en el restaurante.\n\n¡Buen provecho! 😊\n_' + hi.nombre + '_ 🌿'
+          });
+        }
+
+        // Voucher PDF (if codes exist)
+        if (hasBf) {
+          msgCategories[3].messages.push({
+            id: 'mp_voucher_bf', name: 'Voucher Desayuno (PDF)', icon: '🎟️', checked: false, formal: true, isDocument: true, docAction: 'voucher',
+            text: '🎟️ Voucher de desayuno con códigos (se genera como documento PDF)'
+          });
+        }
+
+        // Mozzafiato recommendation
         msgCategories[3].messages.push({
-          id: 'mp_desayuno', name: 'Promoción de Desayuno', icon: '🍳', checked: false,
-          text: '🍳 *Desayuno incluido*\n\n¡Hola *' + res.huesped + '*!\n\nTu habitación incluye desayuno en *' + (promo.partner || 'Restaurante') + '*\n\n🍽️ ' + (promo.descripcion || 'Desayuno continental') + '\n👥 ' + personas + ' persona(s) por desayuno\n🌙 ' + nights + ' noche(s) = ' + nights + ' desayuno(s)\n\n¡Buen provecho! 😊'
+          id: 'mp_mozzafiato', name: 'Recomendación ' + partnerName, icon: '☕', checked: false,
+          text: '☕ *' + partnerName + '*\n_El placer del buen café_\n\n¡Hola *' + res.huesped + '*!\n\nTe invitamos a conocer *' + partnerName + '*, nuestro restaurante asociado donde podrás disfrutar de:\n\n🍽️ _' + bfDesc + '_\n' + (hasBf ? '\n🍳 *Recuerda que tu estancia incluye desayuno* — presenta tu código al mesero.\n' : '') + '\n📖 *Menú digital:*\nhttps://mozzafiatoamor-rgb.github.io/mozzafiato-menu/index.html\n\n📱 *WhatsApp directo:*\nhttps://wa.me/529984088897\n\n¡Que disfrute su estadía! 😊\n_' + hi.nombre + '_ 🌿'
+        });
+      } else {
+        // Promo not active, just show Mozzafiato recommendation
+        msgCategories[3].messages.push({
+          id: 'mp_mozzafiato', name: 'Recomendación Mozzafiato', icon: '☕', checked: false,
+          text: '☕ *Mozzafiato — El placer del buen café*\n\n¡Hola *' + res.huesped + '*!\n\nTe recomendamos visitar nuestro restaurante asociado:\n\n📖 *Menú digital:*\nhttps://mozzafiatoamor-rgb.github.io/mozzafiato-menu/index.html\n\n📱 *WhatsApp:*\nhttps://wa.me/529984088897\n\n¡Que disfrute su estadía! 😊\n_' + hi.nombre + '_ 🌿'
         });
       }
-
-      // Add Mozzafiato
-      msgCategories[3].messages.push({
-        id: 'mp_mozzafiato', name: 'Recomendación Mozzafiato', icon: '☕', checked: false,
-        text: '☕ *Restaurante Mozzafiato*\n\n¡Hola *' + res.huesped + '*!\n\nTe recomendamos visitar nuestro restaurante asociado ☕ *Mozzafiato — El placer del buen café*\n' + (promo.descripcion ? '\n🍽️ _' + promo.descripcion + '_\n' : '') + '\n📖 *Menú digital:*\nhttps://mozzafiatoamor-rgb.github.io/mozzafiato-menu/index.html\n\n📱 *WhatsApp:*\nhttps://wa.me/529984088897\n\n¡Que disfrute su estadía! 😊\n_' + hi.nombre + '_ 🌿'
-      });
 
       // Render messages
       var mh = '';
@@ -11735,6 +11799,7 @@
       // Handle document actions
       var wantConfirmacion = document.getElementById('mp_confirmacion') && document.getElementById('mp_confirmacion').checked;
       var wantRecibo = document.getElementById('mp_recibo') && document.getElementById('mp_recibo').checked;
+      var wantVoucher = document.getElementById('mp_voucher_bf') && document.getElementById('mp_voucher_bf').checked;
 
       // Breakfast activation
       var bfCb = document.getElementById('mp_activateBreakfast');
@@ -11744,20 +11809,20 @@
 
       // Activate breakfast codes
       if (wantBreakfast) {
-        var personas = getBreakfastPersonas(room.tipo);
-        var nights = daysUntil(res.fechaEntrada, res.fechaSalida);
-        if (personas > 0 && nights > 0) {
+        var _bfPersonas = getBreakfastPersonas(room.tipo);
+        var _bfNights = daysUntil(res.fechaEntrada, res.fechaSalida);
+        if (_bfPersonas > 0 && _bfNights > 0) {
           await busy(async function() {
             var multiOps = [];
             var _bfCodes = [];
-            for (var _di = 0; _di < nights; _di++) {
+            for (var _di = 0; _di < _bfNights; _di++) {
               var _bfDate = new Date(res.fechaEntrada + 'T12:00:00');
               _bfDate.setDate(_bfDate.getDate() + _di + 1);
               var _bfDateStr = normDate(_bfDate);
               var _bfCode = generateBreakfastCode();
-              var _bfRow = [_bfCode, res.id, res.huesped, res.habitacionNum, _bfDateStr, personas, 'Pendiente', '', ''];
+              var _bfRow = [_bfCode, res.id, res.huesped, res.habitacionNum, _bfDateStr, _bfPersonas, 'Pendiente', '', ''];
               multiOps.push({ type: 'append', sheet: '🍳 Desayunos', values: _bfRow });
-              _bfCodes.push({ codigo: _bfCode, reservaId: res.id, huesped: res.huesped, habitacion: res.habitacionNum, fecha: _bfDateStr, personas: personas, estado: 'Pendiente', validadoPor: '', horaValidacion: '' });
+              _bfCodes.push({ codigo: _bfCode, reservaId: res.id, huesped: res.huesped, habitacion: res.habitacionNum, fecha: _bfDateStr, personas: _bfPersonas, estado: 'Pendiente', validadoPor: '', horaValidacion: '' });
             }
             await sheets.multi(multiOps);
             S.desayunos = (S.desayunos || []).concat(_bfCodes);
@@ -11775,14 +11840,21 @@
       }
 
       // Generate documents
+      var _docDelay = selectedTexts.length > 0 ? 1000 : 100;
       if (wantConfirmacion) {
-        setTimeout(function() { generateReservaConfirmPDF(res.id, 'share'); }, selectedTexts.length > 0 ? 1000 : 100);
+        setTimeout(function() { generateReservaConfirmPDF(res.id, 'share'); }, _docDelay);
+        _docDelay += 1500;
       }
       if (wantRecibo) {
-        setTimeout(function() { generateReceiptPDF(res.id, 'share'); }, (selectedTexts.length > 0 ? 1000 : 100) + (wantConfirmacion ? 1500 : 0));
+        setTimeout(function() { generateReceiptPDF(res.id, 'share'); }, _docDelay);
+        _docDelay += 1500;
+      }
+      if (wantVoucher) {
+        setTimeout(function() { generateBreakfastVoucherPDF(res.id, 'share'); }, _docDelay);
+        _docDelay += 1500;
       }
 
-      if (selectedTexts.length === 0 && !wantConfirmacion && !wantRecibo && !wantBreakfast) {
+      if (selectedTexts.length === 0 && !wantConfirmacion && !wantRecibo && !wantVoucher && !wantBreakfast) {
         toast('No se seleccionó ningún mensaje', true);
       }
     }
@@ -11813,27 +11885,35 @@
       // Also handle document selections
       var wantConfirmacion = document.getElementById('mp_confirmacion') && document.getElementById('mp_confirmacion').checked;
       var wantRecibo = document.getElementById('mp_recibo') && document.getElementById('mp_recibo').checked;
+      var wantVoucher2 = document.getElementById('mp_voucher_bf') && document.getElementById('mp_voucher_bf').checked;
 
-      if (pdfSections.length === 0 && !wantConfirmacion && !wantRecibo) {
+      if (pdfSections.length === 0 && !wantConfirmacion && !wantRecibo && !wantVoucher2) {
         toast('Selecciona al menos un mensaje para generar PDF', true);
         return;
       }
 
       closeModal();
 
-      // Generate formal documents first
+      // Generate formal documents
+      var _pdfDelay = 0;
       if (wantConfirmacion) {
         generateReservaConfirmPDF(res.id, 'download');
+        _pdfDelay += 500;
       }
       if (wantRecibo) {
-        setTimeout(function() { generateReceiptPDF(res.id, 'download'); }, wantConfirmacion ? 500 : 0);
+        setTimeout(function() { generateReceiptPDF(res.id, 'download'); }, _pdfDelay);
+        _pdfDelay += 500;
+      }
+      if (wantVoucher2) {
+        setTimeout(function() { generateBreakfastVoucherPDF(res.id, 'download'); }, _pdfDelay);
+        _pdfDelay += 500;
       }
 
       // Generate combined formal PDF for text messages
       if (pdfSections.length > 0) {
         setTimeout(function() {
           generateFormalMsgPDF(res, pdfSections);
-        }, (wantConfirmacion ? 500 : 0) + (wantRecibo ? 500 : 0));
+        }, _pdfDelay);
       }
     }
 
