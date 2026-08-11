@@ -2096,7 +2096,7 @@
               </div>
               <div class="form-group">
                 <label class="form-label">Método</label>
-                <select id="newResPayMetodo" class="form-select">
+                <select id="newResPayMetodo" class="form-select" onchange="toggleNewResPayCash()">
                   <option value="">Seleccionar...</option>
                   <option value="Efectivo">💵 Efectivo</option>
                   <option value="Tarjeta">💳 Tarjeta</option>
@@ -2104,6 +2104,12 @@
                   <option value="Depósito">📥 Depósito</option>
                 </select>
               </div>
+            </div>
+            <div id="newResPayCashCalc" style="display:none;background:linear-gradient(135deg,rgba(139,170,106,.1),rgba(139,170,106,.05));border:1px solid var(--accent);border-radius:var(--radius);padding:14px;margin-bottom:14px;">
+              <div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:10px;">💵 Calculadora de Cambio</div>
+              <div class="form-group"><label class="form-label">Monto recibido</label>
+              <input type="number" id="newResPayCashRecibido" class="form-input" placeholder="0.00" step="0.01" min="0" oninput="calcNewResPayCash()" style="font-size:18px;font-weight:700;text-align:center;" /></div>
+              <div id="newResPayCashCambio" style="text-align:center;font-size:20px;font-weight:800;font-family:Space Mono,monospace;padding:10px;border-radius:var(--radius);background:var(--surface2);color:var(--text2);">Ingresa monto recibido</div>
             </div>
             <div class="form-group">
               <label class="form-label">Referencia (opcional)</label>
@@ -2227,13 +2233,19 @@
         </div>
         <div class="form-group">
           <label class="form-label">Método de Pago</label>
-          <select id="payMetodo" class="form-input" required>
+          <select id="payMetodo" class="form-input" required onchange="togglePayCashCalc()">
             <option value="">Seleccionar...</option>
             <option value="Efectivo">💵 Efectivo</option>
             <option value="Tarjeta">💳 Tarjeta</option>
             <option value="Transferencia">🏦 Transferencia</option>
             <option value="Depósito">📥 Depósito</option>
           </select>
+        </div>
+        <div id="payCashCalcSection" style="display:none;background:linear-gradient(135deg,rgba(139,170,106,.1),rgba(139,170,106,.05));border:1px solid var(--accent);border-radius:var(--radius);padding:14px;margin-bottom:14px;">
+          <div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:10px;">💵 Calculadora de Cambio</div>
+          <div class="form-group"><label class="form-label">Monto recibido del huésped</label>
+          <input type="number" id="payCashRecibido" class="form-input" placeholder="0.00" step="0.01" min="0" oninput="calcPayCashCambio()" style="font-size:18px;font-weight:700;text-align:center;" /></div>
+          <div id="payCashCambio" style="text-align:center;font-size:20px;font-weight:800;font-family:Space Mono,monospace;padding:10px;border-radius:var(--radius);background:var(--surface2);color:var(--text2);">Ingresa monto recibido</div>
         </div>
         <div class="form-group">
           <label class="form-label">Concepto</label>
@@ -10050,6 +10062,54 @@
       }
     }
 
+    // Cash calculator for payment modal
+    function togglePayCashCalc() {
+      var metodo = document.getElementById('payMetodo').value;
+      var section = document.getElementById('payCashCalcSection');
+      if (section) section.style.display = metodo === 'Efectivo' ? 'block' : 'none';
+    }
+
+    function calcPayCashCambio() {
+      var recibido = parseFloat(document.getElementById('payCashRecibido').value) || 0;
+      var monto = parseFloat(document.getElementById('payMonto').value) || 0;
+      var el = document.getElementById('payCashCambio');
+      if (!el) return;
+      if (recibido <= 0) {
+        el.textContent = 'Ingresa monto recibido';
+        el.style.color = 'var(--text2)'; el.style.background = 'var(--surface2)';
+      } else if (recibido < monto) {
+        el.textContent = '⚠️ Faltan $' + (monto - recibido).toFixed(2);
+        el.style.color = 'var(--red)'; el.style.background = 'rgba(239,68,68,.1)';
+      } else {
+        el.textContent = '💰 Cambio: $' + (recibido - monto).toFixed(2);
+        el.style.color = 'var(--green)'; el.style.background = 'rgba(34,197,94,.1)';
+      }
+    }
+
+    // Cash calculator for new reservation payment
+    function toggleNewResPayCash() {
+      var metodo = document.getElementById('newResPayMetodo').value;
+      var section = document.getElementById('newResPayCashCalc');
+      if (section) section.style.display = metodo === 'Efectivo' ? 'block' : 'none';
+    }
+
+    function calcNewResPayCash() {
+      var recibido = parseFloat(document.getElementById('newResPayCashRecibido').value) || 0;
+      var monto = parseFloat(document.getElementById('newResPayMonto').value) || 0;
+      var el = document.getElementById('newResPayCashCambio');
+      if (!el) return;
+      if (recibido <= 0) {
+        el.textContent = 'Ingresa monto recibido';
+        el.style.color = 'var(--text2)'; el.style.background = 'var(--surface2)';
+      } else if (recibido < monto) {
+        el.textContent = '⚠️ Faltan $' + (monto - recibido).toFixed(2);
+        el.style.color = 'var(--red)'; el.style.background = 'rgba(239,68,68,.1)';
+      } else {
+        el.textContent = '💰 Cambio: $' + (recibido - monto).toFixed(2);
+        el.style.color = 'var(--green)'; el.style.background = 'rgba(34,197,94,.1)';
+      }
+    }
+
     async function savePayment(event) {
       event.preventDefault();
       var resId = document.getElementById('payResId').value;
@@ -10409,6 +10469,300 @@
       document.body.insertAdjacentHTML('beforeend', h);
     }
 
+    // ============ WALK-IN WIZARD ============
+    var _walkin = { step: 1, roomNum: '', roomTipo: '', tarifa: 0 };
+
+    function openWalkinWizard() {
+      _walkin = { step: 1, roomNum: '', roomTipo: '', tarifa: 0 };
+      walkinStep1();
+      openModal('walkinWizardModal');
+    }
+
+    function walkinStep1() {
+      _walkin.step = 1;
+      document.getElementById('walkinWizardTitle').textContent = '🚶 Walk-in — Paso 1 de 3';
+      var today = normDate(new Date());
+      var tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate()+1);
+      var tomorrowStr = normDate(tomorrow);
+      var avail = S.rooms.filter(function(r) {
+        if (r.estado !== 'Disponible') return false;
+        var overlap = S.reservas.some(function(res) {
+          return res.habitacionNum === r.numero && res.estado !== 'Cancelada' && res.estado !== 'Completada' && res.estado !== 'Check-out' && res.fechaEntrada < tomorrowStr && res.fechaSalida > today;
+        });
+        return !overlap;
+      });
+
+      var h = '<div style="font-size:13px;color:var(--text2);margin-bottom:14px;">Selecciona la habitación para el huésped</div>';
+      if (avail.length === 0) {
+        h += '<div style="text-align:center;padding:30px;color:var(--text2);">😔 No hay habitaciones disponibles</div>';
+      } else {
+        h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">';
+        avail.forEach(function(r) {
+          h += '<div onclick="walkinSelectRoom(\'' + r.numero + '\',\'' + r.tipo + '\',' + r.tarifa + ')" style="background:var(--surface3);border:2px solid var(--surface3);border-radius:var(--radius);padding:14px;cursor:pointer;text-align:center;transition:all .2s;" onmouseover="this.style.borderColor=\'var(--accent)\'" onmouseout="this.style.borderColor=\'var(--surface3)\'">';
+          h += '<div style="font-size:22px;margin-bottom:4px;">🛏️</div>';
+          h += '<div style="font-weight:700;font-size:15px;">Hab. ' + r.numero + '</div>';
+          h += '<div style="font-size:12px;color:var(--text2);">' + r.tipo + '</div>';
+          h += '<div style="font-size:14px;font-weight:700;color:var(--accent);margin-top:4px;font-family:Space Mono,monospace;">$' + r.tarifa + '/noche</div>';
+          h += '</div>';
+        });
+        h += '</div>';
+      }
+      document.getElementById('walkinWizardContent').innerHTML = h;
+    }
+
+    function walkinSelectRoom(num, tipo, tarifa) {
+      _walkin.roomNum = num;
+      _walkin.roomTipo = tipo;
+      _walkin.tarifa = tarifa;
+      walkinStep2();
+    }
+
+    function walkinStep2() {
+      _walkin.step = 2;
+      document.getElementById('walkinWizardTitle').textContent = '🚶 Walk-in — Paso 2 de 3';
+      var h = '';
+      h += '<div style="background:var(--surface3);padding:10px 14px;border-radius:var(--radius);margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;">';
+      h += '<div><span style="font-weight:700;">Hab. ' + _walkin.roomNum + '</span> · ' + _walkin.roomTipo + '</div>';
+      h += '<button onclick="walkinStep1()" style="background:none;border:none;color:var(--accent);font-size:12px;cursor:pointer;font-weight:600;">← Cambiar</button>';
+      h += '</div>';
+
+      h += '<div style="font-size:12px;color:var(--text2);margin-bottom:12px;">Datos del huésped y registro (requerido por ley)</div>';
+      h += '<form id="walkinRegForm">';
+
+      h += '<div class="form-group"><label class="form-label">Nombre completo *</label>';
+      h += '<input type="text" id="wiNombre" class="form-input" placeholder="Nombre completo" required /></div>';
+
+      h += '<div class="form-row"><div class="form-group"><label class="form-label">Teléfono</label>';
+      h += '<input type="tel" id="wiTel" class="form-input" placeholder="Teléfono" /></div>';
+      h += '<div class="form-group"><label class="form-label">Email</label>';
+      h += '<input type="email" id="wiEmail" class="form-input" placeholder="Email" /></div></div>';
+
+      h += '<div class="form-row"><div class="form-group"><label class="form-label">Adultos</label>';
+      h += '<input type="number" id="wiAdultos" class="form-input" value="1" min="1" /></div>';
+      h += '<div class="form-group"><label class="form-label">Niños</label>';
+      h += '<input type="number" id="wiNinos" class="form-input" value="0" min="0" /></div></div>';
+
+      h += '<div class="form-row"><div class="form-group"><label class="form-label">Noches *</label>';
+      h += '<input type="number" id="wiNoches" class="form-input" value="1" min="1" oninput="walkinCalcTotal()" /></div>';
+      h += '<div class="form-group"><label class="form-label">Tarifa/noche</label>';
+      h += '<input type="number" id="wiTarifa" class="form-input" value="' + _walkin.tarifa + '" oninput="walkinCalcTotal()" /></div></div>';
+
+      h += '<div class="form-group"><label class="form-label">Total</label>';
+      h += '<div id="wiTotal" style="background:var(--surface2);padding:12px;border-radius:var(--radius);font-weight:700;font-family:Space Mono,monospace;color:var(--accent);font-size:16px;">$' + _walkin.tarifa + '</div></div>';
+
+      h += '<div style="border-top:1px solid var(--surface3);padding-top:14px;margin-top:8px;">';
+      h += '<div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">📋 Registro Legal</div>';
+
+      h += '<div class="form-row"><div class="form-group"><label class="form-label">Tipo de ID *</label>';
+      h += '<select id="wiTipoID" class="form-select" required>';
+      h += '<option value="">Seleccionar</option>';
+      ['INE / IFE','Pasaporte','Licencia de Conducir','Cédula Profesional','Otro'].forEach(function(t) { h += '<option value="' + t + '">' + t + '</option>'; });
+      h += '</select></div>';
+      h += '<div class="form-group"><label class="form-label">No. ID *</label>';
+      h += '<input type="text" id="wiNumID" class="form-input" placeholder="Número" required /></div></div>';
+
+      h += '<div class="form-row"><div class="form-group"><label class="form-label">Nacionalidad *</label>';
+      h += '<select id="wiNacion" class="form-select" required>';
+      h += '<option value="">Seleccionar</option>';
+      ['Mexicana','Estadounidense','Canadiense','Colombiana','Argentina','Española','Brasileña','Otra'].forEach(function(n) { h += '<option value="' + n + '">' + n + '</option>'; });
+      h += '</select></div>';
+      h += '<div class="form-group"><label class="form-label">Procedencia</label>';
+      h += '<input type="text" id="wiProced" class="form-input" placeholder="Ciudad/Estado" /></div></div>';
+
+      h += '<div class="form-group"><label class="form-label">Motivo de viaje</label>';
+      h += '<select id="wiMotivo" class="form-select">';
+      ['Turismo','Negocios','Familia','Evento','Otro'].forEach(function(m) { h += '<option value="' + m + '">' + m + '</option>'; });
+      h += '</select></div>';
+      h += '</div>';
+
+      h += '<button type="button" class="form-button" onclick="walkinStep3()" style="width:100%;margin-top:14px;">Continuar al Pago →</button>';
+      h += '</form>';
+      document.getElementById('walkinWizardContent').innerHTML = h;
+    }
+
+    function walkinCalcTotal() {
+      var noches = parseInt(document.getElementById('wiNoches').value) || 1;
+      var tarifa = parseFloat(document.getElementById('wiTarifa').value) || 0;
+      document.getElementById('wiTotal').textContent = '$' + (noches * tarifa);
+    }
+
+    function walkinStep3() {
+      // Validate step 2
+      var nombre = (document.getElementById('wiNombre').value || '').trim();
+      var tipoID = document.getElementById('wiTipoID').value;
+      var numID = (document.getElementById('wiNumID').value || '').trim();
+      var nacion = document.getElementById('wiNacion').value;
+      if (!nombre) { toast('Ingresa el nombre del huésped', true); return; }
+      if (!tipoID || !numID || !nacion) { toast('Completa los datos de identificación', true); return; }
+
+      _walkin.step = 3;
+      _walkin.nombre = nombre;
+      _walkin.tel = (document.getElementById('wiTel').value || '').trim();
+      _walkin.email = (document.getElementById('wiEmail').value || '').trim();
+      _walkin.adultos = document.getElementById('wiAdultos').value || '1';
+      _walkin.ninos = document.getElementById('wiNinos').value || '0';
+      _walkin.noches = parseInt(document.getElementById('wiNoches').value) || 1;
+      _walkin.tarifaFinal = parseFloat(document.getElementById('wiTarifa').value) || _walkin.tarifa;
+      _walkin.total = _walkin.noches * _walkin.tarifaFinal;
+      _walkin.tipoID = tipoID;
+      _walkin.numID = numID;
+      _walkin.nacion = nacion;
+      _walkin.proced = (document.getElementById('wiProced').value || '').trim();
+      _walkin.motivo = document.getElementById('wiMotivo').value || 'Turismo';
+
+      document.getElementById('walkinWizardTitle').textContent = '🚶 Walk-in — Paso 3 de 3';
+
+      var h = '';
+      h += '<div style="background:var(--surface3);padding:10px 14px;border-radius:var(--radius);margin-bottom:14px;">';
+      h += '<div style="font-weight:700;">' + _walkin.nombre + '</div>';
+      h += '<div style="font-size:12px;color:var(--text2);">Hab. ' + _walkin.roomNum + ' · ' + _walkin.roomTipo + ' · ' + _walkin.noches + ' noche(s)</div>';
+      h += '<div style="font-size:15px;font-weight:700;color:var(--accent);font-family:Space Mono,monospace;margin-top:4px;">Total: $' + _walkin.total + '</div>';
+      h += '</div>';
+
+      h += '<div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">💰 Pago</div>';
+
+      h += '<div class="form-row"><div class="form-group"><label class="form-label">Monto a pagar</label>';
+      h += '<input type="number" id="wiPayMonto" class="form-input" value="' + _walkin.total + '" step="0.01" min="0" oninput="walkinCalcCambio()" /></div>';
+      h += '<div class="form-group"><label class="form-label">Método *</label>';
+      h += '<select id="wiPayMetodo" class="form-select" required onchange="walkinToggleCash()">';
+      h += '<option value="">Seleccionar...</option>';
+      h += '<option value="Efectivo">💵 Efectivo</option>';
+      h += '<option value="Tarjeta">💳 Tarjeta</option>';
+      h += '<option value="Transferencia">🏦 Transferencia</option>';
+      h += '<option value="Depósito">📥 Depósito</option>';
+      h += '</select></div></div>';
+
+      // Cash calculator section
+      h += '<div id="wiCashCalc" style="display:none;background:linear-gradient(135deg,rgba(139,170,106,.1),rgba(139,170,106,.05));border:1px solid var(--accent);border-radius:var(--radius);padding:14px;margin-bottom:14px;">';
+      h += '<div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:10px;">💵 Calculadora de Cambio</div>';
+      h += '<div class="form-group"><label class="form-label">Monto recibido del huésped</label>';
+      h += '<input type="number" id="wiCashRecibido" class="form-input" placeholder="0.00" step="0.01" min="0" oninput="walkinCalcCambio()" style="font-size:18px;font-weight:700;text-align:center;" /></div>';
+      h += '<div id="wiCashCambio" style="text-align:center;font-size:20px;font-weight:800;font-family:Space Mono,monospace;padding:10px;border-radius:var(--radius);background:var(--surface2);color:var(--text2);">Ingresa monto recibido</div>';
+      h += '</div>';
+
+      h += '<div class="form-group"><label class="form-label">Referencia (opcional)</label>';
+      h += '<input type="text" id="wiPayNotas" class="form-input" placeholder="Folio, referencia..." /></div>';
+
+      h += '<div style="display:flex;gap:8px;margin-top:14px;">';
+      h += '<button type="button" class="form-button secondary" onclick="walkinStep2()" style="flex:1;">← Atrás</button>';
+      h += '<button type="button" class="form-button" onclick="walkinFinish()" style="flex:2;">🔑 Completar Walk-in</button>';
+      h += '</div>';
+
+      document.getElementById('walkinWizardContent').innerHTML = h;
+    }
+
+    function walkinToggleCash() {
+      var metodo = document.getElementById('wiPayMetodo').value;
+      document.getElementById('wiCashCalc').style.display = metodo === 'Efectivo' ? 'block' : 'none';
+    }
+
+    function walkinCalcCambio() {
+      var recibido = parseFloat(document.getElementById('wiCashRecibido') ? document.getElementById('wiCashRecibido').value : 0) || 0;
+      var monto = parseFloat(document.getElementById('wiPayMonto').value) || 0;
+      var cambioEl = document.getElementById('wiCashCambio');
+      if (!cambioEl) return;
+      if (recibido <= 0) {
+        cambioEl.textContent = 'Ingresa monto recibido';
+        cambioEl.style.color = 'var(--text2)';
+        cambioEl.style.background = 'var(--surface2)';
+      } else if (recibido < monto) {
+        var falta = monto - recibido;
+        cambioEl.textContent = '⚠️ Faltan $' + falta.toFixed(2);
+        cambioEl.style.color = 'var(--red)';
+        cambioEl.style.background = 'rgba(239,68,68,.1)';
+      } else {
+        var cambio = recibido - monto;
+        cambioEl.textContent = '💰 Cambio: $' + cambio.toFixed(2);
+        cambioEl.style.color = 'var(--green)';
+        cambioEl.style.background = 'rgba(34,197,94,.1)';
+      }
+    }
+
+    async function walkinFinish() {
+      var payMonto = parseFloat(document.getElementById('wiPayMonto').value) || 0;
+      var payMetodo = document.getElementById('wiPayMetodo').value;
+
+      if (payMonto > 0 && !payMetodo) { toast('Selecciona el método de pago', true); return; }
+
+      // Validate cash amount
+      if (payMetodo === 'Efectivo' && payMonto > 0) {
+        var recibido = parseFloat((document.getElementById('wiCashRecibido') || {}).value) || 0;
+        if (recibido < payMonto) {
+          if (!confirm('El monto recibido ($' + recibido.toFixed(2) + ') es menor al monto a cobrar ($' + payMonto.toFixed(2) + '). ¿Continuar?')) return;
+        }
+      }
+
+      var payNotas = (document.getElementById('wiPayNotas').value || '').trim();
+
+      closeModal();
+      await busy(async function() {
+        var n = now();
+        var fecha = normDate(new Date());
+        var hora = n.split(' ')[1];
+        var today = fecha;
+        var checkout = new Date();
+        checkout.setDate(checkout.getDate() + _walkin.noches);
+        var checkoutStr = normDate(checkout);
+
+        // Create reservation
+        var resId = nextId('R', S.reservas);
+        var resRow = [resId, _walkin.roomNum, _walkin.nombre, _walkin.tel, _walkin.email, today, checkoutStr, _walkin.adultos, _walkin.ninos, _walkin.tarifaFinal, _walkin.total, 'Check-in', 'Walk-in', S.user.usuario, n];
+
+        // Room update
+        var room = S.rooms.find(function(r) { return r.numero === _walkin.roomNum; });
+        var roomRow = [room.id, room.numero, room.tipo, room.tarifa, 'Ocupada', room.notas];
+
+        // Registration
+        var regId = 'REG' + Date.now().toString(36).toUpperCase();
+        var regRow = [regId, resId, _walkin.nombre, _walkin.roomNum, today, _walkin.tipoID, _walkin.numID, _walkin.nacion, _walkin.proced, _walkin.motivo, '', n];
+
+        var logRow = [fecha, hora, S.user.usuario, 'Walk-in + Check-in', _walkin.nombre + ' en Hab. ' + _walkin.roomNum, 'info'];
+
+        var ops = [
+          { type: 'append', sheet: '📋 Reservas', values: resRow },
+          { type: 'updateById', sheet: '🏨 Habitaciones', id: room.id, values: roomRow },
+          { type: 'append', sheet: '📝 Registro', values: regRow },
+          { type: 'append', sheet: '📜 Bitácora', values: logRow }
+        ];
+
+        // Payment
+        var payId = null;
+        if (payMonto > 0 && payMetodo) {
+          payId = nextId('PAY', S.cobros);
+          var concepto = payMonto >= _walkin.total ? 'Liquidación' : 'Anticipo';
+          var payRow = [payId, resId, fecha, hora, payMonto, payMetodo, concepto, payNotas, S.user.usuario];
+          var payLog = [fecha, hora, S.user.usuario, 'Pago Registrado', '$' + payMonto + ' ' + payMetodo + ' (' + concepto + ') - Walk-in ' + _walkin.nombre, 'info'];
+          ops.push({ type: 'append', sheet: '💰 Cobros', values: payRow });
+          ops.push({ type: 'append', sheet: '📜 Bitácora', values: payLog });
+        }
+
+        await sheets.multi(ops);
+
+        // Update local state
+        S.reservas.push({
+          id: resId, habitacionNum: _walkin.roomNum, huesped: _walkin.nombre, telefono: _walkin.tel, email: _walkin.email,
+          fechaEntrada: today, fechaSalida: checkoutStr, adultos: _walkin.adultos, niños: _walkin.ninos,
+          tarifa: _walkin.tarifaFinal, tarifaTotal: _walkin.total, estado: 'Check-in', notas: 'Walk-in',
+          creadoPor: S.user.usuario, fechaCreacion: n
+        });
+        var roomIdx = S.rooms.findIndex(function(r) { return r.numero === _walkin.roomNum; });
+        S.rooms[roomIdx].estado = 'Ocupada';
+
+        if (payId && payMonto > 0) {
+          var concepto = payMonto >= _walkin.total ? 'Liquidación' : 'Anticipo';
+          S.cobros.push({ id: payId, reservaId: resId, fecha: fecha, hora: hora, monto: payMonto, metodoPago: payMetodo, concepto: concepto, notas: payNotas, responsable: S.user.usuario });
+        }
+
+        addOrUpdateClient(_walkin.nombre, _walkin.tel, _walkin.email);
+        toast('✅ Walk-in completado — ' + _walkin.nombre + ' en Hab. ' + _walkin.roomNum);
+        render();
+
+        // Show post check-in messaging module
+        var res = S.reservas.find(function(r) { return r.id === resId; });
+        setTimeout(function() { showPostCheckinMessages(res, room); }, 400);
+      }, 'Procesando walk-in...');
+    }
+
     // ============ CHECKIN ============
     function openCheckinModal() {
       const select = document.getElementById('checkinReservaId');
@@ -10522,8 +10876,26 @@
       var guestName = res ? res.huesped : '';
       var habNum = roomNum || (res ? res.habitacionNum : '');
 
+      // Determine which items to auto-check for check-in
+      var autoChecked = new Array(items.length).fill(false);
+      if (type === 'checkin' && res) {
+        // Index 1: "Confirmar datos de reserva" — system has these
+        autoChecked[1] = true;
+        // Index 2: "Confirmar anticipo / método de pago" — if anticipo covered
+        var _aPctCL = getAnticipoPct();
+        if (_aPctCL > 0) {
+          var _paidCL = S.cobros.filter(function(c){return c.reservaId===res.id}).reduce(function(s,c){return s+c.monto},0);
+          var _minCL = Math.ceil(res.tarifaTotal * getAnticipoFraction());
+          if (_paidCL >= _minCL) autoChecked[2] = true;
+        } else {
+          autoChecked[2] = true; // No anticipo required
+        }
+        // Index 7: "Registrar acompañantes" — if adultos/niños already filled
+        if (res.adultos && parseInt(res.adultos) > 0) autoChecked[7] = true;
+      }
+
       _processChecklistState = {
-        checked: new Array(items.length).fill(false),
+        checked: autoChecked.slice(),
         type: type,
         resId: res ? res.id : '',
         roomNum: habNum,
@@ -10533,32 +10905,41 @@
 
       document.getElementById('processChecklistTitle').textContent = title;
 
+      var autoCount = autoChecked.filter(function(v){return v}).length;
+      var initPct = Math.round((autoCount / items.length) * 100);
+
       var h = '';
       h += '<div style="background:var(--surface3);padding:12px;border-radius:var(--radius);margin-bottom:14px;">';
       h += '<div style="font-weight:700;font-size:15px;">' + guestName + '</div>';
       h += '<div style="font-size:12px;color:var(--text2);margin-top:2px;">Habitación ' + habNum + '</div>';
       h += '</div>';
 
+      if (autoCount > 0 && type === 'checkin') {
+        h += '<div style="background:rgba(139,170,106,.1);border:1px solid var(--accent);border-radius:var(--radius);padding:8px 12px;margin-bottom:10px;font-size:12px;color:var(--accent);">✅ ' + autoCount + ' punto(s) verificados automáticamente</div>';
+      }
+
       h += '<div style="margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;">';
       h += '<div style="font-size:12px;color:var(--text2);">VERIFICAR CADA PUNTO</div>';
-      h += '<div id="pcl_progress_text" style="font-size:12px;font-weight:700;color:var(--accent);">0/' + items.length + '</div>';
+      h += '<div id="pcl_progress_text" style="font-size:12px;font-weight:700;color:var(--accent);">' + autoCount + '/' + items.length + '</div>';
       h += '</div>';
       h += '<div style="background:var(--surface2);border-radius:6px;height:6px;margin-bottom:14px;overflow:hidden;">';
-      h += '<div id="pcl_progress_fill" style="height:100%;background:var(--accent);border-radius:6px;transition:width .3s;width:0%;"></div>';
+      h += '<div id="pcl_progress_fill" style="height:100%;background:var(--accent);border-radius:6px;transition:width .3s;width:' + initPct + '%;"></div>';
       h += '</div>';
 
       for (var i = 0; i < items.length; i++) {
-        h += '<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--surface2);cursor:pointer;" onclick="toggleProcessChecklist(' + i + ')">';
-        h += '<input type="checkbox" id="pcl_' + i + '" style="margin-top:2px;accent-color:var(--accent);pointer-events:none;" />';
-        h += '<span id="pcl_label_' + i + '" style="font-size:13px;">' + items[i] + '</span>';
+        var isAuto = autoChecked[i];
+        h += '<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--surface2);cursor:pointer;' + (isAuto ? 'opacity:0.5;' : '') + '" onclick="toggleProcessChecklist(' + i + ')">';
+        h += '<input type="checkbox" id="pcl_' + i + '" ' + (isAuto ? 'checked' : '') + ' style="margin-top:2px;accent-color:var(--accent);pointer-events:none;" />';
+        h += '<span id="pcl_label_' + i + '" style="font-size:13px;' + (isAuto ? 'text-decoration:line-through;' : '') + '">' + items[i] + (isAuto ? ' ✓' : '') + '</span>';
         h += '</div>';
       }
 
+      var allDone = autoCount === items.length;
       h += '<div style="margin-top:16px;">';
-      h += '<button id="processChecklistConfirmBtn" class="form-button" onclick="confirmProcessChecklist()" disabled style="opacity:0.4;">';
+      h += '<button id="processChecklistConfirmBtn" class="form-button" onclick="confirmProcessChecklist()" ' + (allDone ? '' : 'disabled') + ' style="opacity:' + (allDone ? '1' : '0.4') + ';">';
       h += type === 'checkin' ? '🔑 Confirmar Check-in' : '👋 Confirmar Check-out';
       h += '</button>';
-      h += '<div id="pcl_hint" style="font-size:11px;color:var(--text2);text-align:center;margin-top:6px;">Completa todos los puntos para continuar</div>';
+      h += '<div id="pcl_hint" style="font-size:11px;color:var(--text2);text-align:center;margin-top:6px;' + (allDone ? 'display:none;' : '') + '">Completa todos los puntos para continuar</div>';
       h += '</div>';
 
       document.getElementById('processChecklistContent').innerHTML = h;
@@ -10610,12 +10991,35 @@
     }
 
     // --- Guest Registration at Check-in ---
+    function getGuestRegCache(guestName) {
+      try {
+        var cache = JSON.parse(localStorage.getItem('guestRegCache') || '{}');
+        return cache[guestName.toLowerCase().trim()] || null;
+      } catch(e) { return null; }
+    }
+
+    function saveGuestRegCache(guestName, data) {
+      try {
+        var cache = JSON.parse(localStorage.getItem('guestRegCache') || '{}');
+        cache[guestName.toLowerCase().trim()] = data;
+        localStorage.setItem('guestRegCache', JSON.stringify(cache));
+      } catch(e) {}
+    }
+
     function showGuestRegistration(res, room) {
+      // Look up previous registration data for returning guests
+      var prev = getGuestRegCache(res.huesped);
+      var hasPrev = prev && prev.tipoID;
+
       var h = '';
       h += '<div style="background:var(--surface3);padding:12px;border-radius:var(--radius);margin-bottom:14px;">';
       h += '<div style="font-weight:700;">' + res.huesped + '</div>';
       h += '<div style="font-size:12px;color:var(--text2);">Hab. ' + res.habitacionNum + ' · ' + (room ? room.tipo : '') + '</div>';
       h += '</div>';
+
+      if (hasPrev) {
+        h += '<div style="background:rgba(139,170,106,.1);border:1px solid var(--accent);border-radius:var(--radius);padding:10px;margin-bottom:12px;font-size:12px;color:var(--accent);">✅ Huésped recurrente — datos pre-llenados de visita anterior</div>';
+      }
 
       h += '<div style="font-size:12px;color:var(--text2);margin-bottom:12px;">Datos de registro del huésped (requerido por ley). Puedes omitir campos opcionales.</div>';
 
@@ -10623,32 +11027,38 @@
       h += '<input type="hidden" id="regResId" value="' + res.id + '" />';
       h += '<input type="hidden" id="regRoomId" value="' + (room ? room.id : '') + '" />';
 
+      var idTypes = ['INE / IFE', 'Pasaporte', 'Licencia de Conducir', 'Cédula Profesional', 'Otro'];
       h += '<div class="form-group"><label class="form-label">Tipo de Identificación *</label>';
       h += '<select id="regTipoID" class="form-select" required>';
       h += '<option value="">Seleccionar</option>';
-      ['INE / IFE', 'Pasaporte', 'Licencia de Conducir', 'Cédula Profesional', 'Otro'].forEach(function(t) {
-        h += '<option value="' + t + '">' + t + '</option>';
+      idTypes.forEach(function(t) {
+        var sel = (hasPrev && prev.tipoID === t) ? ' selected' : '';
+        h += '<option value="' + t + '"' + sel + '>' + t + '</option>';
       });
       h += '</select></div>';
 
       h += '<div class="form-group"><label class="form-label">Número de Identificación *</label>';
-      h += '<input type="text" id="regNumID" class="form-input" placeholder="Número del documento" required /></div>';
+      h += '<input type="text" id="regNumID" class="form-input" placeholder="Número del documento" required value="' + (hasPrev ? (prev.numID || '') : '') + '" /></div>';
 
+      var naciones = ['Mexicana', 'Estadounidense', 'Canadiense', 'Colombiana', 'Argentina', 'Española', 'Brasileña', 'Otra'];
       h += '<div class="form-group"><label class="form-label">Nacionalidad *</label>';
       h += '<select id="regNacionalidad" class="form-select" required>';
       h += '<option value="">Seleccionar</option>';
-      ['Mexicana', 'Estadounidense', 'Canadiense', 'Colombiana', 'Argentina', 'Española', 'Brasileña', 'Otra'].forEach(function(n) {
-        h += '<option value="' + n + '">' + n + '</option>';
+      naciones.forEach(function(n) {
+        var sel = (hasPrev && prev.nacionalidad === n) ? ' selected' : '';
+        h += '<option value="' + n + '"' + sel + '>' + n + '</option>';
       });
       h += '</select></div>';
 
       h += '<div class="form-group"><label class="form-label">Procedencia (Ciudad/Estado)</label>';
-      h += '<input type="text" id="regProcedencia" class="form-input" placeholder="Ej: CDMX, Guadalajara..." /></div>';
+      h += '<input type="text" id="regProcedencia" class="form-input" placeholder="Ej: CDMX, Guadalajara..." value="' + (hasPrev ? (prev.procedencia || '') : '') + '" /></div>';
 
+      var motivos = ['Turismo', 'Negocios', 'Familia', 'Evento', 'Otro'];
       h += '<div class="form-group"><label class="form-label">Motivo de Viaje</label>';
       h += '<select id="regMotivo" class="form-select">';
-      ['Turismo', 'Negocios', 'Familia', 'Evento', 'Otro'].forEach(function(m) {
-        h += '<option value="' + m + '">' + m + '</option>';
+      motivos.forEach(function(m) {
+        var sel = (hasPrev && prev.motivo === m) ? ' selected' : '';
+        h += '<option value="' + m + '"' + sel + '>' + m + '</option>';
       });
       h += '</select></div>';
 
@@ -10680,6 +11090,9 @@
         observaciones: document.getElementById('regObservaciones').value || ''
       };
 
+      // Cache registration data for future pre-fill (returning guests)
+      saveGuestRegCache(res.huesped, regData);
+
       closeModal();
 
       // Save registration to sheet and do check-in
@@ -10707,8 +11120,8 @@
         toast('Check-in completado con registro');
         render();
 
-        // After check-in, offer breakfast promo if applicable
-        promptBreakfastPromo(res, room);
+        // After check-in, show messaging module
+        showPostCheckinMessages(res, room);
       }, 'Procesando check-in...');
     }
 
@@ -10717,6 +11130,216 @@
       var room = S.rooms.find(function(r) { return r.numero === res.habitacionNum; });
       closeModal();
       await doCheckin(res, room);
+    }
+
+    // ============ POST CHECK-IN MESSAGING MODULE ============
+    function showPostCheckinMessages(res, room) {
+      if (!res) return;
+      var hi = getHotelInfo();
+      var promo = getBreakfastPromo();
+      var promoActive = isBreakfastPromoActive();
+      var personas = room ? getBreakfastPersonas(room.tipo) : 0;
+      var nights = daysUntil(res.fechaEntrada, res.fechaSalida);
+      var phone = (res.telefono || '').replace(/\D/g, '');
+
+      // Build message categories
+      var msgCategories = [
+        {
+          cat: 'bienvenida', label: '👋 Bienvenida', color: '#22c55e',
+          messages: [
+            {
+              id: 'welcome', name: 'Mensaje de Bienvenida', icon: '👋', checked: true,
+              text: '🏨 *' + hi.nombre + '*\n\n¡Hola *' + res.huesped + '*! 👋\n\n¡Bienvenido(a)! Nos da mucho gusto recibirte.\n\nTu habitación *' + res.habitacionNum + '* está lista para ti.\n\n📅 Salida: ' + formatDate(res.fechaSalida) + '\n🕐 Hora de check-out: ' + (hi.checkout_hora || '12:00 PM') + '\n\nCualquier cosa que necesites, estamos a tus órdenes 😊\n\n_' + hi.nombre + '_ 🌿'
+            }
+          ]
+        },
+        {
+          cat: 'info', label: '📶 Información del Hotel', color: '#3b82f6',
+          messages: [
+            {
+              id: 'wifi', name: 'Datos de WiFi', icon: '📶', checked: true,
+              text: '📶 *WiFi ' + hi.nombre + '*\n\n🌐 Red: *' + (hi.wifi_red || '[No configurado]') + '*\n🔑 Contraseña: *' + (hi.wifi_pass || '[No configurado]') + '*\n\n¡Disfruta tu conexión! 😊'
+            },
+            {
+              id: 'instrucciones', name: 'Horarios e Información', icon: '🕐', checked: false,
+              text: '🏨 *' + hi.nombre + '*\n_Información importante_\n\n🔑 *Check-in:* ' + (hi.checkin_hora || '3:00 PM') + '\n👋 *Check-out:* ' + (hi.checkout_hora || '12:00 PM') + '\n\n📍 *Dirección:* ' + (hi.direccion || '') + '\n📞 *Teléfono:* ' + (hi.telefono || '') + '\n\n_Estamos para servirte_ 🌿'
+            }
+          ]
+        },
+        {
+          cat: 'politicas', label: '📋 Políticas y Reglamento', color: '#f59e0b',
+          messages: [
+            {
+              id: 'reglamento', name: 'Reglamento del Hotel', icon: '📋', checked: false,
+              text: '📋 *Reglamento ' + hi.nombre + '*\n\n1️⃣ Horario de silencio: 10:00 PM – 8:00 AM\n2️⃣ No fumar dentro de las habitaciones\n3️⃣ No se permiten fiestas o reuniones\n4️⃣ Mascotas: consultar disponibilidad\n5️⃣ Respetar las áreas comunes\n6️⃣ Reportar cualquier daño\n7️⃣ Objetos de valor en caja de seguridad\n\nGracias por tu comprensión 🙏\n_' + hi.nombre + '_ 🌿'
+            },
+            {
+              id: 'terminos', name: 'Términos y Condiciones', icon: '📄', checked: false,
+              text: '📄 *Términos y Condiciones*\n_' + hi.nombre + '_\n\n' + getTerms().map(function(t, i) { return (i+1) + '. ' + t; }).join('\n') + '\n\n_Gracias por hospedarte con nosotros_ 🌿'
+            }
+          ]
+        },
+        {
+          cat: 'promos', label: '🎁 Promociones', color: '#8b5cf6',
+          messages: []
+        }
+      ];
+
+      // Add breakfast promo message if active
+      if (promoActive && personas > 0) {
+        msgCategories[3].messages.push({
+          id: 'desayuno', name: 'Promoción de Desayuno', icon: '🍳', checked: true, isBreakfast: true,
+          text: '🍳 *Desayuno incluido*\n\n¡Hola *' + res.huesped + '*!\n\nTu habitación incluye desayuno en *' + (promo.partner || 'Restaurante') + '*\n\n🍽️ ' + (promo.descripcion || 'Desayuno continental') + '\n👥 ' + personas + ' persona(s) por desayuno\n🌙 ' + nights + ' noche(s) = ' + nights + ' desayuno(s)\n\n¡Buen provecho! 😊'
+        });
+      }
+
+      // Add Mozzafiato recommendation
+      msgCategories[3].messages.push({
+        id: 'mozzafiato', name: 'Recomendación Mozzafiato', icon: '☕', checked: false,
+        text: '☕ *Restaurante Mozzafiato*\n\n¡Hola *' + res.huesped + '*!\n\nTe recomendamos visitar nuestro restaurante asociado ☕ *Mozzafiato — El placer del buen café*\n' + (promo.descripcion ? '\n🍽️ _' + promo.descripcion + '_\n' : '') + '\n📖 *Menú digital:*\nhttps://mozzafiatoamor-rgb.github.io/mozzafiato-menu/index.html\n\n📱 *WhatsApp:*\nhttps://wa.me/529984088897\n\n¡Que disfrute su estadía! 😊\n_' + hi.nombre + '_ 🌿'
+      });
+
+      var h = '';
+      h += '<div style="background:var(--surface3);padding:12px;border-radius:var(--radius);margin-bottom:14px;">';
+      h += '<div style="font-weight:700;font-size:15px;">✅ Check-in completado</div>';
+      h += '<div style="font-size:12px;color:var(--text2);margin-top:2px;">' + res.huesped + ' · Hab. ' + res.habitacionNum + '</div>';
+      h += '</div>';
+
+      h += '<div style="font-size:13px;color:var(--text2);margin-bottom:14px;">Selecciona los mensajes que deseas enviar al huésped por WhatsApp:</div>';
+
+      msgCategories.forEach(function(cat) {
+        if (cat.messages.length === 0) return;
+        h += '<div style="margin-bottom:14px;">';
+        h += '<div style="font-size:11px;font-weight:700;color:' + cat.color + ';text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;padding-left:4px;">' + cat.label + '</div>';
+
+        cat.messages.forEach(function(msg) {
+          h += '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface2);border-radius:var(--radius);margin-bottom:6px;cursor:pointer;" onclick="togglePostMsg(\'' + msg.id + '\')">';
+          h += '<input type="checkbox" id="postmsg_' + msg.id + '" ' + (msg.checked ? 'checked' : '') + ' style="accent-color:' + cat.color + ';width:18px;height:18px;pointer-events:none;flex-shrink:0;" />';
+          h += '<div style="flex:1;min-width:0;">';
+          h += '<div style="font-size:13px;font-weight:600;">' + msg.icon + ' ' + msg.name + '</div>';
+          h += '<div style="font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + msg.text.substring(0, 60) + '...</div>';
+          h += '</div>';
+          h += '<button onclick="event.stopPropagation();previewPostMsg(\'' + msg.id + '\')" style="background:none;border:none;color:var(--accent);font-size:11px;cursor:pointer;padding:4px 8px;white-space:nowrap;">👁️ Ver</button>';
+          h += '</div>';
+        });
+        h += '</div>';
+      });
+
+      // Breakfast activation prompt if applicable
+      if (promoActive && personas > 0) {
+        h += '<div style="background:linear-gradient(135deg,rgba(139,170,106,.1),rgba(139,170,106,.05));border:1px solid var(--accent);border-radius:var(--radius);padding:12px;margin-bottom:14px;">';
+        h += '<div style="display:flex;align-items:center;gap:10px;">';
+        h += '<input type="checkbox" id="postmsg_activateBreakfast" checked style="accent-color:var(--accent);width:18px;height:18px;" />';
+        h += '<div style="flex:1;"><div style="font-size:13px;font-weight:700;color:var(--accent);">🍳 Activar desayunos para esta estancia</div>';
+        h += '<div style="font-size:11px;color:var(--text2);">' + nights + ' código(s) · ' + personas + ' persona(s) · ' + (promo.partner || 'Restaurante') + '</div></div>';
+        h += '</div></div>';
+      }
+
+      h += '<div style="display:flex;flex-direction:column;gap:8px;margin-top:6px;">';
+      h += '<button class="form-button" onclick="sendPostCheckinMessages(\'' + res.id + '\')" style="background:#25D366;">📲 Enviar seleccionados por WhatsApp</button>';
+      h += '<button class="form-button secondary" onclick="closeModal()">Listo, no enviar mensajes</button>';
+      h += '</div>';
+
+      // Store messages data for later
+      window._postCheckinMsgs = {};
+      msgCategories.forEach(function(cat) {
+        cat.messages.forEach(function(msg) {
+          window._postCheckinMsgs[msg.id] = msg;
+        });
+      });
+      window._postCheckinRes = res;
+      window._postCheckinRoom = room;
+
+      document.getElementById('postCheckinMsgContent').innerHTML = h;
+      openModal('postCheckinMsgModal');
+    }
+
+    function togglePostMsg(msgId) {
+      var cb = document.getElementById('postmsg_' + msgId);
+      if (cb) cb.checked = !cb.checked;
+    }
+
+    function previewPostMsg(msgId) {
+      var msg = window._postCheckinMsgs[msgId];
+      if (!msg) return;
+      var h = '<div style="background:var(--surface3);border-radius:var(--radius);padding:16px;margin-bottom:16px;">';
+      h += '<div style="font-weight:700;margin-bottom:8px;">' + msg.icon + ' ' + msg.name + '</div>';
+      h += '<div style="white-space:pre-wrap;font-size:13px;line-height:1.5;color:var(--text1);">' + msg.text.replace(/\*(.*?)\*/g, '<strong>$1</strong>').replace(/_(.*?)_/g, '<em>$1</em>') + '</div>';
+      h += '</div>';
+      h += '<button class="form-button secondary" onclick="closeModal();setTimeout(function(){showPostCheckinMessages(window._postCheckinRes, window._postCheckinRoom)},100)" style="width:100%;">← Volver</button>';
+
+      document.getElementById('taskDetailContent').innerHTML = h;
+      document.getElementById('taskDetailModal').querySelector('.modal-title').textContent = '👁️ Vista Previa';
+      document.getElementById('taskDetailActions').innerHTML = '';
+      openModal('taskDetailModal');
+    }
+
+    async function sendPostCheckinMessages(resId) {
+      var res = window._postCheckinRes || S.reservas.find(function(r) { return r.id === resId; });
+      var room = window._postCheckinRoom;
+      if (!res) { closeModal(); return; }
+
+      var phone = (res.telefono || '').replace(/\D/g, '');
+
+      // Collect selected messages BEFORE closing modal
+      var selectedTexts = [];
+      var msgs = window._postCheckinMsgs || {};
+      Object.keys(msgs).forEach(function(id) {
+        var cb = document.getElementById('postmsg_' + id);
+        if (cb && cb.checked) {
+          selectedTexts.push(msgs[id].text);
+        }
+      });
+
+      // Check if breakfast activation is selected
+      var wantBreakfast = false;
+      var bfCheckbox = document.getElementById('postmsg_activateBreakfast');
+      if (bfCheckbox && bfCheckbox.checked && room) {
+        wantBreakfast = true;
+      }
+
+      closeModal();
+
+      // Activate breakfast codes if selected (inline, without calling activateBreakfastForRes which has its own closeModal)
+      if (wantBreakfast) {
+        var personas = getBreakfastPersonas(room.tipo);
+        var nights = daysUntil(res.fechaEntrada, res.fechaSalida);
+        if (personas > 0 && nights > 0) {
+          await busy(async function() {
+            var multiOps = [];
+            var _bfCodes = [];
+            for (var _di = 0; _di < nights; _di++) {
+              var _bfDate = new Date(res.fechaEntrada + 'T12:00:00');
+              _bfDate.setDate(_bfDate.getDate() + _di + 1);
+              var _bfDateStr = normDate(_bfDate);
+              var _bfCode = generateBreakfastCode();
+              var _bfRow = [_bfCode, res.id, res.huesped, res.habitacionNum, _bfDateStr, personas, 'Pendiente', '', ''];
+              multiOps.push({ type: 'append', sheet: '🍳 Desayunos', values: _bfRow });
+              _bfCodes.push({ codigo: _bfCode, reservaId: res.id, huesped: res.huesped, habitacion: res.habitacionNum, fecha: _bfDateStr, personas: personas, estado: 'Pendiente', validadoPor: '', horaValidacion: '' });
+            }
+            await sheets.multi(multiOps);
+            S.desayunos = (S.desayunos || []).concat(_bfCodes);
+            toast('🍳 ' + _bfCodes.length + ' desayuno(s) activado(s)');
+            render();
+          }, 'Generando códigos de desayuno...');
+        }
+      }
+
+      if (selectedTexts.length === 0) {
+        toast('No se seleccionaron mensajes');
+        return;
+      }
+
+      // Send via WhatsApp — combine all selected messages
+      if (selectedTexts.length === 1) {
+        var url = 'https://wa.me/' + (phone || '') + '?text=' + encodeURIComponent(selectedTexts[0]);
+        window.open(url, '_blank');
+      } else {
+        var combined = selectedTexts.join('\n\n━━━━━━━━━━━━━━━\n\n');
+        var url = 'https://wa.me/' + (phone || '') + '?text=' + encodeURIComponent(combined);
+        window.open(url, '_blank');
+      }
+      toast('📨 ' + selectedTexts.length + ' mensaje(s) preparados para envío');
     }
 
     function promptBreakfastPromo(res, room) {
@@ -10898,8 +11521,8 @@
         closeModal();
         render();
 
-        // After check-in, offer breakfast promo if applicable
-        promptBreakfastPromo(res, room);
+        // After check-in, show messaging module
+        showPostCheckinMessages(res, room);
       }, 'Procesando check-in...');
     }
 
