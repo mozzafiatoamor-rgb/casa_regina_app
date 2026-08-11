@@ -5893,16 +5893,25 @@
 
       // Key policies — always visible
       var _hi = getHotelInfo();
+      var _peRate = _hi.persona_extra || 0;
       p += '<div style="margin-top:14px;background:linear-gradient(135deg,rgba(55,71,79,0.06),rgba(55,71,79,0.02));border:1px solid rgba(55,71,79,0.2);border-radius:var(--radius);padding:14px;">';
       p += '<div style="font-weight:800;font-size:13px;color:var(--text);margin-bottom:10px;">📌 Políticas Importantes</div>';
       if (anticipo_pct > 0) {
         p += '<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;font-size:12px;"><span>💳</span><div><span style="font-weight:700;">Anticipo:</span> Se requiere el ' + anticipo_pct + '% ($' + _fmt(anticipoMonto) + ') para confirmar la reservación. El ' + (100 - anticipo_pct) + '% restante al check-in.</div></div>';
       }
-      if (peRate > 0) {
-        p += '<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;font-size:12px;"><span>👥</span><div><span style="font-weight:700;">Persona extra:</span> $' + _fmt(peRate) + ' MXN + IVA por persona adicional, por noche.</div></div>';
-      }
       p += '<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;font-size:12px;"><span>❌</span><div><span style="font-weight:700;">Cancelación:</span> +7 días: reembolso 100% · 3-7 días: retención 50% · -3 días/No Show: sin reembolso.</div></div>';
-      p += '<div style="display:flex;align-items:flex-start;gap:8px;font-size:12px;"><span>🕐</span><div><span style="font-weight:700;">Horarios:</span> Check-in: ' + formatHoraDisplay(_hi.checkin_hora) + ' · Check-out: ' + formatHoraDisplay(_hi.checkout_hora) + '</div></div>';
+      p += '<div style="display:flex;align-items:flex-start;gap:8px;font-size:12px;margin-bottom:8px;"><span>🕐</span><div><span style="font-weight:700;">Horarios:</span> Check-in: ' + formatHoraDisplay(_hi.checkin_hora) + ' · Check-out: ' + formatHoraDisplay(_hi.checkout_hora) + '</div></div>';
+      p += '</div>';
+
+      // Occupancy policies — always visible
+      p += '<div style="margin-top:10px;background:linear-gradient(135deg,rgba(33,150,243,0.06),rgba(33,150,243,0.02));border:1px solid rgba(33,150,243,0.2);border-radius:var(--radius);padding:14px;">';
+      p += '<div style="font-weight:800;font-size:13px;color:var(--text);margin-bottom:10px;">🛏️ Políticas de Ocupación</div>';
+      p += '<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;font-size:12px;"><span>👤</span><div><span style="font-weight:700;">Ocupación base:</span> La tarifa ampara máximo 2 personas por habitación.</div></div>';
+      if (_peRate > 0) {
+        p += '<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;font-size:12px;"><span>👥</span><div><span style="font-weight:700;">Persona adicional:</span> $' + _fmt(_peRate) + ' MXN + IVA por persona extra, por noche. La cama supletoria está sujeta a disponibilidad.</div></div>';
+      }
+      p += '<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;font-size:12px;"><span>👶</span><div><span style="font-weight:700;">Menores:</span> Niños menores de 11 años sin costo compartiendo cama con padres (máx. 1 por hab.). A partir de 12 años se considera adulto y aplica cargo de persona extra.</div></div>';
+      p += '<div style="display:flex;align-items:flex-start;gap:8px;font-size:12px;"><span>🚪</span><div><span style="font-weight:700;">Capacidad máxima:</span> Doble Matrimonial: 4 pers. · Doble Twin: 3 pers. · Queen Size: 3 pers. Se puede requerir habitación adicional si se supera.</div></div>';
       p += '</div>';
 
       // Terms & conditions (full, collapsible)
@@ -6203,15 +6212,10 @@
           msg += '━━━━━━━━━━━━━━━━━\n';
         }
         // Key policies summary
-        var waTerms = getTerms();
         msg += '\n📋 *POLÍTICAS IMPORTANTES*\n\n';
         // Anticipo
         if (d.anticipo_pct > 0) {
           msg += '💳 _Anticipo: Se requiere el ' + d.anticipo_pct + '% ($' + _fmt(d.anticipoMonto) + ') para confirmar. El resto al check-in._\n\n';
-        }
-        // Persona extra
-        if (d.peRate > 0) {
-          msg += '👥 _Persona extra: $' + _fmt(d.peRate) + ' MXN + IVA por persona adicional, por noche._\n\n';
         }
         // Cancellation summary
         msg += '❌ _Cancelación:_\n';
@@ -6220,6 +6224,14 @@
         msg += '_• -3 días / No Show: sin reembolso_\n\n';
         // Check-in/out hours
         msg += '🕐 _Check-in: ' + formatHoraDisplay(hi.checkin_hora) + ' | Check-out: ' + formatHoraDisplay(hi.checkout_hora) + '_\n';
+        // Occupancy policies
+        msg += '\n🛏️ *POLÍTICAS DE OCUPACIÓN*\n\n';
+        msg += '👤 _Ocupación base: máximo 2 personas por habitación._\n';
+        if (d.peRate > 0) {
+          msg += '👥 _Persona adicional: $' + _fmt(d.peRate) + ' MXN + IVA por persona extra, por noche._\n';
+        }
+        msg += '👶 _Menores de 11 años: sin costo compartiendo cama (máx. 1 por hab.). Desde 12 años = adulto._\n';
+        msg += '🚪 _Capacidad máxima: Doble Matrimonial 4 pers. · Doble Twin 3 pers. · Queen Size 3 pers._\n';
         msg += '\n📌 _Vigencia: 7 días. Sujeto a disponibilidad._\n';
         msg += '_Términos completos en el PDF adjunto._\n';
         msg += '\n¿Deseas reservar? ¡Con gusto te ayudamos! 😊\n\n_' + hi.nombre + '_ 🌿';
