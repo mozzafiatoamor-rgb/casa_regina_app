@@ -3911,6 +3911,17 @@
         ? function(sh, rg) { return publicRead(S.scriptUrl, sh, rg); }
         : function(sh, rg) { return sheets.read(sh, rg); };
 
+      // Load promo description for display
+      var promoDesc = '';
+      try {
+        var cfgData = await _rd('⚙️ Config', 'A2:B50');
+        for (var ci = 0; ci < cfgData.length; ci++) {
+          if (cfgData[ci][0] === 'breakfastPromo') {
+            try { promoDesc = JSON.parse(cfgData[ci][1]).descripcion || ''; } catch(e) {}
+          }
+        }
+      } catch(e) {}
+
       try {
         var data = await _rd('🍳 Desayunos', 'A2:I5000');
         var found = null;
