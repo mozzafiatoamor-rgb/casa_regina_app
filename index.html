@@ -10570,25 +10570,27 @@
 
         y += 28;
 
-        // Description + value
-        doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
+        // Description + value — calculate actual text height to avoid overlap
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
         doc.setTextColor(80, 80, 80);
         if (promo.descripcion) {
           var desc = promo.descripcion.normalize('NFD').replace(/[̀-ͯ]/g, '');
-          doc.text('🍽 ' + desc, leftCol, y, { maxWidth: cardW - 20 });
-          y += 5;
+          var descMaxW = cardW - 20;
+          var descLines = doc.splitTextToSize(desc, descMaxW);
+          doc.text(descLines, leftCol, y);
+          y += descLines.length * 3.2 + 2;
         }
         var ahorroPersona = promo.precioPorPersona || 0;
         if (ahorroPersona > 0) {
-          doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
+          doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5);
           doc.setTextColor(46, 125, 50);
           doc.text('Ahorro: $' + _fmt(ahorroPersona * code.personas) + ' MXN (Valor $' + _fmt(ahorroPersona) + '/persona — CORTESIA $0)', leftCol, y);
         }
 
         // Bottom instruction
-        doc.setFont('helvetica', 'italic'); doc.setFontSize(7);
+        doc.setFont('helvetica', 'italic'); doc.setFontSize(6.5);
         doc.setTextColor(130, 130, 130);
-        doc.text('Presente este codigo o escanee el QR al llegar al restaurante', margin + cardW / 2, startY + cardH - 5, { align: 'center' });
+        doc.text('Presente este codigo o escanee el QR al llegar al restaurante', margin + cardW / 2, startY + cardH - 4, { align: 'center' });
       });
 
       var fname = 'Desayuno_' + res.huesped.replace(/\s+/g, '_') + '_' + res.id + '.pdf';
@@ -12160,6 +12162,40 @@
               text: _renderMsgTpl('mp_reglamento', _tplVars),
               pdfTitle: 'Reglamento del Hotel',
               pdfBody: '1. Horario de silencio: 10:00 PM - 8:00 AM\n2. No fumar dentro de las habitaciones\n3. No se permiten fiestas o reuniones\n4. Mascotas: consultar disponibilidad\n5. Respetar las areas comunes\n6. Reportar cualquier dano\n7. Objetos de valor en caja de seguridad'
+            },
+            {
+              id: 'mp_ocupacion', name: 'Políticas de Ocupación', icon: '🛏️', checked: false, formal: false,
+              text: (function() {
+                var _oHi = getHotelInfo();
+                var _oBase = _oHi.ocupacionBase || 2;
+                var _oMenores = _oHi.menoresEdadLimite || 11;
+                var _oRules = _oHi.occupancyRules || DEFAULT_HOTEL_INFO.occupancyRules;
+                var _oPe = _oHi.persona_extra || 0;
+                var t = '🛏️ *Políticas de Ocupación*\n_' + _oHi.nombre + '_\n\n';
+                t += '👤 *Ocupación base:* La tarifa incluye máximo *' + _oBase + ' personas* por habitación.\n\n';
+                if (_oPe > 0) {
+                  t += '👥 *Persona adicional:* $' + _fmt(_oPe) + ' MXN + IVA por persona extra, por noche. Cama supletoria sujeta a disponibilidad.\n\n';
+                }
+                t += '👶 *Menores:* Niños menores de ' + _oMenores + ' años sin costo compartiendo cama con padres (máx. 1 por hab.). A partir de ' + (_oMenores + 1) + ' años se considera adulto.\n\n';
+                t += '🚪 *Capacidad máxima por habitación:*\n';
+                _oRules.forEach(function(r) { t += '• ' + r.tipo + ': *' + r.maxPersonas + ' personas*\n'; });
+                t += '\n_Se puede requerir habitación adicional si se supera la capacidad._\n\n_{hotel}_ 🌿';
+                return t.replace(/\{hotel\}/g, _oHi.nombre);
+              })(),
+              pdfTitle: 'Políticas de Ocupación',
+              pdfBody: (function() {
+                var _oHi = getHotelInfo();
+                var _oBase = _oHi.ocupacionBase || 2;
+                var _oMenores = _oHi.menoresEdadLimite || 11;
+                var _oRules = _oHi.occupancyRules || DEFAULT_HOTEL_INFO.occupancyRules;
+                var _oPe = _oHi.persona_extra || 0;
+                var t = 'Ocupación base: máximo ' + _oBase + ' personas por habitación.\n';
+                if (_oPe > 0) t += 'Persona adicional: $' + _fmt(_oPe) + ' MXN + IVA por persona extra, por noche.\n';
+                t += 'Menores de ' + _oMenores + ' años: sin costo compartiendo cama (máx. 1 por hab.).\n';
+                t += 'Capacidad máxima:\n';
+                _oRules.forEach(function(r) { t += '  ' + r.tipo + ': ' + r.maxPersonas + ' personas\n'; });
+                return t;
+              })()
             },
             {
               id: 'mp_terminos', name: 'Términos y Condiciones', icon: '📄', checked: false, formal: true,
