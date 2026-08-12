@@ -2825,6 +2825,17 @@
           // Cache raw value for fallback
           _sheetConfigCache[key] = val;
           try {
+            // For breakfastPromo: localStorage wins if it has valid data
+            // (user may have changed config locally and sync hasn't completed yet)
+            if (key === 'breakfastPromo' && localStorage.getItem('breakfastPromo')) {
+              try {
+                var localVal = JSON.parse(localStorage.getItem('breakfastPromo'));
+                if (typeof localVal === 'object' && localVal !== null && localVal.partner) {
+                  // localStorage has valid data — keep it, don't overwrite
+                  return;
+                }
+              } catch(e2) {}
+            }
             var finalObj = _parseConfigVal(val);
             if (typeof finalObj === 'object' && finalObj !== null) {
               localStorage.setItem(key, JSON.stringify(finalObj));
@@ -8795,7 +8806,8 @@
       var promo = getBreakfastPromo();
       promo.active = active;
       saveBreakfastPromoLocal(promo);
-      _debouncedBfSync();
+      // Sync active flag immediately (not debounced) — this is critical for persistence
+      syncConfigToSheet('breakfastPromo', promo);
       renderConfig();
     }
 
@@ -12940,6 +12952,8 @@
       S.currentModal = modalId;
       document.getElementById('modalOverlay').classList.add('active');
       document.getElementById(modalId).classList.add('active');
+      // Push history so back gesture closes modal
+      history.pushState({ tab: S.currentTab, modal: modalId }, '', '');
     }
 
     function closeModal() {
@@ -12971,13 +12985,19 @@
       document.getElementById('navCurrentIcon').textContent = current.icon;
       document.getElementById('navCurrentLabel').textContent = current.label;
 
-      document.getElementById('navGrid').innerHTML = NAV_TABS.map(function(t) {
+      var navHtml = NAV_TABS.map(function(t) {
         var isActive = t.id === S.currentTab;
         return '<div class="nav-item ' + (isActive ? 'active' : '') + '" onclick="switchTab(\'' + t.id + '\')">' +
           '<div class="nav-item-icon">' + t.icon + '</div>' +
           '<div class="nav-item-label">' + t.label + '</div>' +
           '</div>';
       }).join('');
+      // Add messaging shortcut
+      navHtml += '<div class="nav-item" onclick="closeNav();openMessagingPanel()">' +
+        '<div class="nav-item-icon">📨</div>' +
+        '<div class="nav-item-label">Mensajes</div>' +
+        '</div>';
+      document.getElementById('navGrid').innerHTML = navHtml;
     }
 
     function toggleNav() {
@@ -12989,14 +13009,61 @@
       document.getElementById('navOverlay').classList.remove('open');
     }
 
+    // Track navigation history for back gesture
+    var _navHistory = ['dashboard'];
+    var _navFromPopState = false;
+
     function switchTab(tabName) {
       document.querySelectorAll('.tab-content').forEach(function(t) { t.classList.remove('active'); });
       var tabEl = document.getElementById('tab' + tabName.charAt(0).toUpperCase() + tabName.slice(1));
       if (tabEl) tabEl.classList.add('active');
+
+      var prevTab = S.currentTab;
       S.currentTab = tabName;
       closeNav();
       renderNav();
+
+      // Push to browser history so back gesture navigates tabs
+      if (!_navFromPopState && prevTab !== tabName) {
+        _navHistory.push(tabName);
+        history.pushState({ tab: tabName }, '', '');
+      }
+      _navFromPopState = false;
+
+      // Scroll to top
+      var content = document.querySelector('.tab-content.active');
+      if (content) content.scrollTop = 0;
     }
+
+    // Handle back gesture / browser back button
+    window.addEventListener('popstate', function(e) {
+      // Close modal first if open
+      if (S.currentModal) {
+        closeModal();
+        // Re-push state so we don't lose position
+        history.pushState({ tab: S.currentTab }, '', '');
+        return;
+      }
+      // Close nav panel if open
+      if (document.getElementById('navOverlay').classList.contains('open')) {
+        closeNav();
+        history.pushState({ tab: S.currentTab }, '', '');
+        return;
+      }
+      // Navigate to previous tab
+      if (_navHistory.length > 1) {
+        _navHistory.pop(); // remove current
+        var prevTab = _navHistory[_navHistory.length - 1];
+        _navFromPopState = true;
+        switchTab(prevTab);
+      } else {
+        // At root, push state to prevent app from closing
+        history.pushState({ tab: S.currentTab }, '', '');
+      }
+    });
+
+    // Initialize history state
+    history.replaceState({ tab: 'dashboard' }, '', '');
 
     // Swipe up gesture on nav bar
     (function() {
