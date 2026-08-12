@@ -12000,6 +12000,14 @@
             id: 'mp_voucher_bf', name: 'Voucher Desayuno (PDF)', icon: '🎟️', checked: false, formal: true, isDocument: true, docAction: 'voucher',
             text: '🎟️ Voucher de desayuno con códigos (se genera como documento PDF)'
           });
+          // Individual QR cards
+          var pendBfForQR = existingBf.filter(function(d) { return d.estado === 'Pendiente'; });
+          if (pendBfForQR.length > 0) {
+            msgCategories[3].messages.push({
+              id: 'mp_qr_cards', name: 'Fichas QR individuales (' + pendBfForQR.length + ')', icon: '📱', checked: false, isDocument: true, docAction: 'qrcards',
+              text: '📱 Envía fichas QR individuales por WhatsApp — una por cada código pendiente'
+            });
+          }
         }
 
         // Mozzafiato recommendation
@@ -12164,6 +12172,7 @@
       var wantConfirmacion = document.getElementById('mp_confirmacion') && document.getElementById('mp_confirmacion').checked;
       var wantRecibo = document.getElementById('mp_recibo') && document.getElementById('mp_recibo').checked;
       var wantVoucher = document.getElementById('mp_voucher_bf') && document.getElementById('mp_voucher_bf').checked;
+      var wantQRCards = document.getElementById('mp_qr_cards') && document.getElementById('mp_qr_cards').checked;
 
       // Breakfast activation — read values BEFORE closing modal
       var bfCb = document.getElementById('mp_activateBreakfast');
@@ -12248,8 +12257,16 @@
         setTimeout(function() { generateBreakfastVoucherPDF(res.id, 'share'); }, _docDelay);
         _docDelay += 1500;
       }
+      if (wantQRCards) {
+        // Send each pending code as individual QR card with slight delay between each
+        var pendQR = (S.desayunos || []).filter(function(d) { return d.reservaId === res.id && d.estado === 'Pendiente'; });
+        pendQR.forEach(function(c, i) {
+          setTimeout(function() { shareBreakfastQRCard(c.codigo); }, _docDelay + i * 2000);
+        });
+        _docDelay += pendQR.length * 2000;
+      }
 
-      if (selectedTexts.length === 0 && !wantConfirmacion && !wantRecibo && !wantVoucher && !wantBreakfast) {
+      if (selectedTexts.length === 0 && !wantConfirmacion && !wantRecibo && !wantVoucher && !wantQRCards && !wantBreakfast) {
         toast('No se seleccionó ningún mensaje', true);
       }
     }
