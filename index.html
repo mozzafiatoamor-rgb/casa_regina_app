@@ -7016,11 +7016,13 @@
           g.codes.sort(function(a, b) { return a.fecha.localeCompare(b.fecha); }).forEach(function(c) {
             var stColor = c.estado === 'Pendiente' ? 'var(--yellow)' : c.estado === 'Consumido' ? 'var(--green)' : 'var(--red)';
             var stIcon = c.estado === 'Pendiente' ? '🟡' : c.estado === 'Consumido' ? '✅' : '❌';
-            h += '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--surface3);font-size:12px;">';
+            h += '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--surface3);font-size:12px;">';
             h += '<div><span style="font-family:Space Mono,monospace;font-weight:600;color:var(--accent);">' + c.codigo + '</span>';
             h += '<span style="color:var(--text2);margin-left:8px;">' + formatDate(c.fecha) + ' · ' + c.personas + ' pers.</span></div>';
+            h += '<div style="display:flex;align-items:center;gap:6px;">';
+            if (c.estado === 'Pendiente') h += '<button onclick="event.stopPropagation();shareBreakfastQRCard(\'' + c.codigo + '\')" style="background:#25D366;color:#fff;border:none;border-radius:6px;padding:3px 8px;font-size:10px;cursor:pointer;font-weight:600;">📱 QR</button>';
             h += '<span style="font-size:10px;">' + stIcon + ' ' + c.estado + '</span>';
-            h += '</div>';
+            h += '</div></div>';
           });
           // Action buttons
           h += '<div style="display:flex;gap:6px;margin-top:8px;padding-bottom:4px;">';
@@ -10178,12 +10180,14 @@
         resBf.forEach(function(bf) {
           var stColor = bf.estado === 'Consumido' ? 'var(--green)' : bf.estado === 'Cancelado' ? 'var(--red)' : bf.estado === 'Expirado' ? 'var(--text2)' : 'var(--accent)';
           var stIcon = bf.estado === 'Consumido' ? '✅' : bf.estado === 'Cancelado' ? '❌' : bf.estado === 'Expirado' ? '⏰' : '🎟️';
-          bfSection += '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(0,0,0,0.06);font-size:12px">';
+          bfSection += '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(0,0,0,0.06);font-size:12px">';
           bfSection += '<div><span style="font-family:Space Mono,monospace;font-weight:700;color:' + stColor + '">' + bf.codigo + '</span>';
           bfSection += '<span style="color:var(--text2);margin-left:6px">' + formatDate(bf.fecha) + '</span>';
           bfSection += '<span style="color:var(--text2);margin-left:4px">(' + bf.personas + ' pers.)</span></div>';
+          bfSection += '<div style="display:flex;align-items:center;gap:6px;">';
+          if (bf.estado === 'Pendiente') bfSection += '<button onclick="shareBreakfastQRCard(\'' + bf.codigo + '\')" style="background:#25D366;color:#fff;border:none;border-radius:6px;padding:3px 8px;font-size:10px;cursor:pointer;font-weight:600">📱 QR</button>';
           bfSection += '<span style="font-size:11px">' + stIcon + ' ' + bf.estado + '</span>';
-          bfSection += '</div>';
+          bfSection += '</div></div>';
         });
         bfSection += '<div style="display:flex;gap:6px;margin-top:10px">';
         bfSection += '<button onclick="shareBreakfastCodes(\'' + resId + '\')" style="flex:1;background:#25D366;color:white;border:none;border-radius:8px;padding:8px;font-size:12px;cursor:pointer;font-weight:600">📲 Enviar códigos</button>';
@@ -10277,94 +10281,113 @@
       if (codes.length === 0) { toast('No hay códigos pendientes', true); return; }
       var promo = getBreakfastPromo();
       var hi = getHotelInfo();
-      var totalPers = codes.reduce(function(s, c) { return s + c.personas; }, 0);
-      var valorReal = totalPers * (promo.precioPorPersona || 0);
 
       var { jsPDF } = window.jspdf;
-      var cardW = 148, cardH = 115; // A6 landscape with extra room
-      var doc = new jsPDF({ unit: 'mm', format: [cardW, cardH] });
-
-      // Build QR validation URL base
+      // A4 portrait — 2 vouchers per page
+      var doc = new jsPDF({ unit: 'mm', format: 'a4' });
+      var pageW = 210, pageH = 297, margin = 15;
+      var cardW = pageW - margin * 2, cardH = 120;
       var qrBase = window.location.origin + window.location.pathname + '?validar&u=' + encodeURIComponent(S.scriptUrl) + '&code=';
 
       codes.forEach(function(code, idx) {
-        if (idx > 0) doc.addPage([cardW, cardH]);
+        // 2 cards per page
+        var slot = idx % 2;
+        if (idx > 0 && slot === 0) doc.addPage();
+        var startY = margin + slot * (cardH + 12);
+
+        // Card border
+        doc.setDrawColor(46, 125, 50); doc.setLineWidth(0.6);
+        doc.roundedRect(margin, startY, cardW, cardH, 4, 4, 'S');
 
         // Green header bar
-        doc.setFillColor(46, 125, 50); doc.rect(0, 0, cardW, 24, 'F');
-        doc.setFillColor(56, 142, 60); doc.rect(0, 21, cardW, 3, 'F');
+        doc.setFillColor(46, 125, 50);
+        doc.roundedRect(margin, startY, cardW, 28, 4, 4, 'F');
+        doc.rect(margin, startY + 14, cardW, 14, 'F'); // fill bottom corners
 
         // Logo on header
-        var logoW = 32, logoH = logoW / LOGO_H_RATIO;
-        try { doc.addImage(LOGO_H_DARK_B64 || LOGO_H_DARK, 'PNG', 6, (24 - logoH) / 2, logoW, logoH); } catch(e) {}
+        var logoW = 40, logoH = logoW / LOGO_H_RATIO;
+        try { doc.addImage(LOGO_H_DARK_B64 || LOGO_H_DARK, 'PNG', margin + 8, startY + (28 - logoH) / 2, logoW, logoH); } catch(e) {}
 
         // Title on header
-        doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(16);
         doc.setTextColor(255, 255, 255);
-        doc.text('DESAYUNO INCLUIDO', cardW - 8, 10, { align: 'right' });
-        doc.setFontSize(7); doc.setFont('helvetica', 'normal');
-        doc.text('CORTESIA DEL HOTEL', cardW - 8, 16, { align: 'right' });
-        doc.setFontSize(6);
-        doc.text((promo.partner || '').normalize('NFD').replace(/[̀-ͯ]/g, ''), cardW - 8, 21, { align: 'right' });
+        doc.text('DESAYUNO INCLUIDO', margin + cardW - 10, startY + 12, { align: 'right' });
+        doc.setFontSize(9); doc.setFont('helvetica', 'normal');
+        doc.text('CORTESIA · ' + (promo.partner || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase(), margin + cardW - 10, startY + 20, { align: 'right' });
+        doc.setFontSize(7);
+        doc.text((promo.horario || '8:00 AM a 4:00 PM'), margin + cardW - 10, startY + 25, { align: 'right' });
 
-        var y = 29;
+        var y = startY + 34;
+        var leftCol = margin + 10;
+        var rightCol = margin + cardW - 10;
 
-        // Guest info — compact row
-        doc.setTextColor(100, 100, 100);
-        doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5);
-        doc.text('HUESPED', 8, y); doc.text('HAB.', 78, y); doc.text('FECHA', 100, y); doc.text('PERS.', 130, y);
-        y += 4;
-        doc.setTextColor(17, 17, 17);
-        doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5);
+        // Guest info
+        doc.setTextColor(120, 120, 120);
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
+        doc.text('HUESPED', leftCol, y);
+        doc.text('HABITACION', leftCol + 95, y);
+        doc.text('FECHA', leftCol + 130, y);
+        y += 5;
+        doc.setTextColor(30, 30, 30);
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
         var guestName = res.huesped.normalize('NFD').replace(/[̀-ͯ]/g, '');
-        if (guestName.length > 25) guestName = guestName.substring(0, 24) + '...';
-        doc.text(guestName, 8, y);
-        doc.text(res.habitacionNum, 78, y);
-        doc.text(formatDate(code.fecha), 100, y);
-        doc.text(String(code.personas), 130, y);
+        if (guestName.length > 28) guestName = guestName.substring(0, 27) + '...';
+        doc.text(guestName, leftCol, y);
+        doc.setFontSize(10);
+        doc.text(res.habitacionNum, leftCol + 95, y);
+        doc.text(formatDate(code.fecha), leftCol + 130, y);
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
+        doc.setTextColor(100, 100, 100);
+        doc.text(code.personas + ' persona' + (code.personas > 1 ? 's' : ''), leftCol, y + 5);
 
-        y += 7;
+        y += 12;
 
         // Code box + QR side by side
-        var qrSize = 22;
-        var codeBoxW = cardW - 16 - qrSize - 4;
-        doc.setFillColor(245, 245, 245); doc.roundedRect(8, y, codeBoxW, 18, 2, 2, 'F');
-        doc.setDrawColor(46, 125, 50); doc.setLineWidth(0.4); doc.roundedRect(8, y, codeBoxW, 18, 2, 2, 'S');
-        doc.setFont('helvetica', 'bold'); doc.setFontSize(6);
-        doc.setTextColor(100, 100, 100);
-        doc.text('CODIGO DE VERIFICACION', 8 + codeBoxW / 2, y + 5, { align: 'center' });
-        doc.setFont('helvetica', 'bold'); doc.setFontSize(16);
+        var qrSize = 32;
+        var codeBoxW = cardW - 20 - qrSize - 10;
+
+        // Code box
+        doc.setFillColor(248, 248, 248); doc.roundedRect(leftCol, y, codeBoxW, 24, 3, 3, 'F');
+        doc.setDrawColor(46, 125, 50); doc.setLineWidth(0.5); doc.roundedRect(leftCol, y, codeBoxW, 24, 3, 3, 'S');
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(7);
+        doc.setTextColor(120, 120, 120);
+        doc.text('CODIGO DE VERIFICACION', leftCol + codeBoxW / 2, y + 7, { align: 'center' });
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(22);
         doc.setTextColor(46, 125, 50);
-        doc.text(code.codigo, 8 + codeBoxW / 2, y + 14, { align: 'center' });
+        doc.text(code.codigo, leftCol + codeBoxW / 2, y + 19, { align: 'center' });
 
         // QR code
         try {
           var qrCanvas = document.createElement('canvas');
-          new QRious({ element: qrCanvas, value: qrBase + encodeURIComponent(code.codigo), size: 200, level: 'M', backgroundAlpha: 0 });
-          doc.addImage(qrCanvas.toDataURL('image/png'), 'PNG', cardW - 8 - qrSize, y - 2, qrSize, qrSize);
-        } catch(e) { /* QR library not loaded */ }
+          new QRious({ element: qrCanvas, value: qrBase + encodeURIComponent(code.codigo), size: 300, level: 'M' });
+          var qrX = rightCol - qrSize;
+          doc.addImage(qrCanvas.toDataURL('image/png'), 'PNG', qrX, y - 4, qrSize, qrSize);
+          doc.setFontSize(5.5); doc.setFont('helvetica', 'normal');
+          doc.setTextColor(130, 130, 130);
+          doc.text('Escanear para validar', qrX + qrSize / 2, y + qrSize - 2, { align: 'center' });
+        } catch(e) {}
 
-        y += 21;
+        y += 28;
 
-        // Value + description — compact
-        if (valorReal > 0) {
-          doc.setFont('helvetica', 'normal'); doc.setFontSize(6);
-          doc.setTextColor(100, 100, 100);
-          doc.text('Valor: $' + _fmt(promo.precioPorPersona || 0) + '/persona — CORTESIA $0', cardW / 2, y, { align: 'center' });
-          y += 4;
-        }
+        // Description + value
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
+        doc.setTextColor(80, 80, 80);
         if (promo.descripcion) {
-          doc.setFont('helvetica', 'italic'); doc.setFontSize(5.5);
-          doc.setTextColor(80, 80, 80);
-          var descLines = doc.splitTextToSize(promo.descripcion.normalize('NFD').replace(/[̀-ͯ]/g, ''), cardW - 20);
-          descLines.slice(0, 2).forEach(function(ln) { doc.text(ln, cardW / 2, y, { align: 'center' }); y += 3.5; });
+          var desc = promo.descripcion.normalize('NFD').replace(/[̀-ͯ]/g, '');
+          doc.text('🍽 ' + desc, leftCol, y, { maxWidth: cardW - 20 });
+          y += 5;
+        }
+        var ahorroPersona = promo.precioPorPersona || 0;
+        if (ahorroPersona > 0) {
+          doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
+          doc.setTextColor(46, 125, 50);
+          doc.text('Ahorro: $' + _fmt(ahorroPersona * code.personas) + ' MXN (Valor $' + _fmt(ahorroPersona) + '/persona — CORTESIA $0)', leftCol, y);
         }
 
-        // Footer
-        doc.setFillColor(46, 125, 50); doc.rect(0, cardH - 9, cardW, 9, 'F');
-        doc.setFont('helvetica', 'normal'); doc.setFontSize(5.5);
-        doc.setTextColor(255, 255, 255);
-        doc.text('Presente este codigo o escanee el QR al llegar al restaurante', cardW / 2, cardH - 3.5, { align: 'center' });
+        // Bottom instruction
+        doc.setFont('helvetica', 'italic'); doc.setFontSize(7);
+        doc.setTextColor(130, 130, 130);
+        doc.text('Presente este codigo o escanee el QR al llegar al restaurante', margin + cardW / 2, startY + cardH - 5, { align: 'center' });
       });
 
       var fname = 'Desayuno_' + res.huesped.replace(/\s+/g, '_') + '_' + res.id + '.pdf';
@@ -10378,7 +10401,7 @@
           doc.save(fname);
           toast('PDF descargado — compártelo por WhatsApp');
           setTimeout(function() {
-            var msg = '🍳 *TARJETA DE DESAYUNO* — ' + res.huesped + '\nTe envío tu voucher de desayuno cortesía. Presenta el código en el restaurante *' + (promo.partner || '') + '*.\n\n_' + HOTEL_NAME + '_ 🌿';
+            var msg = '🍳 *TARJETA DE DESAYUNO* — ' + res.huesped + '\nTe envío tu voucher de desayuno cortesía. Presenta el código o escanea el QR en *' + (promo.partner || '') + '*.\n\n_' + HOTEL_NAME + '_ 🌿';
             window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(msg), '_blank');
           }, 500);
         }
@@ -10386,6 +10409,161 @@
         doc.save(fname);
         toast('PDF descargado');
       }
+    }
+
+    // Canvas roundRect polyfill for older browsers
+    function _canvasRoundRect(ctx, x, y, w, h, r) {
+      if (typeof r === 'number') r = [r, r, r, r];
+      if (!Array.isArray(r)) r = [0, 0, 0, 0];
+      while (r.length < 4) r.push(0);
+      ctx.beginPath();
+      ctx.moveTo(x + r[0], y);
+      ctx.lineTo(x + w - r[1], y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + r[1]);
+      ctx.lineTo(x + w, y + h - r[2]);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - r[2], y + h);
+      ctx.lineTo(x + r[3], y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - r[3]);
+      ctx.lineTo(x, y + r[0]);
+      ctx.quadraticCurveTo(x, y, x + r[0], y);
+      ctx.closePath();
+    }
+
+    // Generate individual QR card image for one breakfast code — shareable via WhatsApp
+    function generateBreakfastQRCard(codeObj) {
+      var promo = getBreakfastPromo();
+      var hi = getHotelInfo();
+      var qrUrl = window.location.origin + window.location.pathname + '?validar&u=' + encodeURIComponent(S.scriptUrl) + '&code=' + encodeURIComponent(codeObj.codigo);
+      var ahorro = (promo.precioPorPersona || 0) * codeObj.personas;
+
+      // Create canvas card
+      var w = 600, h = 750;
+      var canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      var ctx = canvas.getContext('2d');
+
+      // Background
+      ctx.fillStyle = '#ffffff';
+      _canvasRoundRect(ctx, 0, 0, w, h, 20);
+      ctx.fill();
+
+      // Green header
+      ctx.fillStyle = '#2e7d32';
+      _canvasRoundRect(ctx, 0, 0, w, 130, [20, 20, 0, 0]);
+      ctx.fill();
+
+      // Header text
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 32px Helvetica, Arial, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('🍳 DESAYUNO INCLUIDO', w / 2, 50);
+      ctx.font = '18px Helvetica, Arial, sans-serif';
+      ctx.fillText('CORTESIA · ' + (promo.partner || 'Restaurante').toUpperCase(), w / 2, 80);
+      ctx.font = '16px Helvetica, Arial, sans-serif';
+      ctx.fillStyle = 'rgba(255,255,255,0.8)';
+      ctx.fillText('Horario: ' + (promo.horario || '8:00 AM a 4:00 PM'), w / 2, 110);
+
+      // Guest info
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#999';
+      ctx.font = '14px Helvetica, Arial, sans-serif';
+      ctx.fillText('HUESPED', 30, 160);
+      ctx.fillText('HAB.', 360, 160);
+      ctx.fillText('FECHA', 460, 160);
+      ctx.fillStyle = '#222';
+      ctx.font = 'bold 20px Helvetica, Arial, sans-serif';
+      var gName = codeObj.huesped || '';
+      if (gName.length > 22) gName = gName.substring(0, 21) + '...';
+      ctx.fillText(gName, 30, 185);
+      ctx.fillText(codeObj.habitacion || '', 360, 185);
+      ctx.fillText(formatDate(codeObj.fecha), 460, 185);
+      ctx.fillStyle = '#777';
+      ctx.font = '15px Helvetica, Arial, sans-serif';
+      ctx.fillText(codeObj.personas + ' persona' + (codeObj.personas > 1 ? 's' : ''), 30, 208);
+
+      // QR code — large and prominent
+      var qrCanvas = document.createElement('canvas');
+      try {
+        new QRious({ element: qrCanvas, value: qrUrl, size: 280, level: 'M' });
+      } catch(e) {}
+      var qrX = (w - 280) / 2, qrY = 230;
+
+      // QR border
+      ctx.strokeStyle = '#2e7d32';
+      ctx.lineWidth = 3;
+      _canvasRoundRect(ctx, qrX - 15, qrY - 15, 310, 310, 12);
+      ctx.stroke();
+      ctx.fillStyle = '#fafafa';
+      _canvasRoundRect(ctx, qrX - 15, qrY - 15, 310, 310, 12);
+      ctx.fill();
+
+      ctx.drawImage(qrCanvas, qrX, qrY, 280, 280);
+
+      // Code text below QR
+      var codeY = qrY + 310;
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#999';
+      ctx.font = '13px Helvetica, Arial, sans-serif';
+      ctx.fillText('CODIGO DE VERIFICACION', w / 2, codeY);
+      ctx.fillStyle = '#2e7d32';
+      ctx.font = 'bold 36px monospace';
+      ctx.fillText(codeObj.codigo, w / 2, codeY + 38);
+
+      // Savings wow
+      if (ahorro > 0) {
+        ctx.fillStyle = '#2e7d32';
+        ctx.font = 'bold 18px Helvetica, Arial, sans-serif';
+        ctx.fillText('¡Te ahorras $' + _fmt(ahorro) + ' MXN!', w / 2, codeY + 68);
+        ctx.fillStyle = '#999';
+        ctx.font = '13px Helvetica, Arial, sans-serif';
+        ctx.fillText('Valor $' + _fmt(promo.precioPorPersona) + '/persona — GRATIS para ti', w / 2, codeY + 88);
+      }
+
+      // Footer
+      ctx.fillStyle = '#2e7d32';
+      _canvasRoundRect(ctx, 0, h - 55, w, 55, [0, 0, 20, 20]);
+      ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.font = '15px Helvetica, Arial, sans-serif';
+      ctx.fillText('Presenta este QR en ' + (promo.partner || 'el restaurante'), w / 2, h - 28);
+      ctx.font = '12px Helvetica, Arial, sans-serif';
+      ctx.fillStyle = 'rgba(255,255,255,0.7)';
+      ctx.fillText(hi.nombre, w / 2, h - 10);
+
+      return canvas;
+    }
+
+    function shareBreakfastQRCard(codeId) {
+      var codeObj = (S.desayunos || []).find(function(d) { return d.codigo === codeId; });
+      if (!codeObj) { toast('Código no encontrado', true); return; }
+      var res = S.reservas.find(function(r) { return r.id === codeObj.reservaId; });
+      var promo = getBreakfastPromo();
+
+      var canvas = generateBreakfastQRCard(codeObj);
+      canvas.toBlob(function(blob) {
+        var fname = 'Desayuno_' + codeObj.codigo + '.png';
+        var file = new File([blob], fname, { type: 'image/png' });
+        if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+          navigator.share({
+            files: [file],
+            title: 'Desayuno ' + codeObj.codigo,
+            text: '🍳 Tu código de desayuno cortesía en ' + (promo.partner || 'el restaurante') + '. Presenta este QR al mesero.'
+          }).catch(function(){});
+        } else {
+          // Fallback: download image + open WhatsApp with message
+          var url = URL.createObjectURL(blob);
+          var a = document.createElement('a'); a.href = url; a.download = fname; a.click();
+          URL.revokeObjectURL(url);
+          toast('Imagen descargada — envíala por WhatsApp');
+          var phone = res ? getGuestPhone(res).replace(/\D/g, '') : '';
+          if (phone) {
+            setTimeout(function() {
+              var msg = '🍳 *DESAYUNO CORTESIA*\n\nHola *' + codeObj.huesped + '*! Aquí está tu ficha de desayuno.\n\n🎟️ Código: *' + codeObj.codigo + '*\n📅 Fecha: ' + formatDate(codeObj.fecha) + '\n👥 ' + codeObj.personas + ' persona(s)\n🕐 Horario: ' + (promo.horario || '8:00 AM a 4:00 PM') + '\n\n📱 *Muestra la imagen al mesero en ' + (promo.partner || 'el restaurante') + '* para que escanee tu QR.\n\n_' + getHotelInfo().nombre + '_ 🌿';
+              window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(msg), '_blank');
+            }, 500);
+          }
+        }
+      }, 'image/png');
     }
 
     async function cancelBreakfastCodes(resId) {
