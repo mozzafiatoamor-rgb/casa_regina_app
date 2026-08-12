@@ -2460,7 +2460,14 @@
       anticipo_pct: 50,
       wifi_red: '',
       wifi_pass: '',
-      persona_extra: 0
+      persona_extra: 0,
+      ocupacionBase: 2,
+      menoresEdadLimite: 11,
+      occupancyRules: [
+        { tipo: 'Doble Matrimonial', maxPersonas: 4 },
+        { tipo: 'Doble Twin', maxPersonas: 3 },
+        { tipo: 'Queen Size', maxPersonas: 3 }
+      ]
     };
 
     function getHotelInfo() {
@@ -2783,21 +2790,87 @@
         nombre: 'Despedida + Reseña',
         icon: '⭐',
         texto: '🏨 *{hotel}*\n\nHola *{huesped}* 👋\n\n¡Gracias por hospedarte con nosotros! Esperamos que tu estancia haya sido muy agradable.\n\nNos encantaría conocer tu opinión. Si tienes un momento, déjanos tu reseña aquí:\n⭐ {reviewLink}\n\n¡Tu feedback nos ayuda a mejorar! 🙏\n\nEsperamos verte pronto de nuevo 🌿\n\n_{hotel}_'
+      },
+      mp_welcome: {
+        nombre: 'Bienvenida (Mensajería)',
+        icon: '👋',
+        texto: '🏨 *{hotel}*\n\n¡Hola *{huesped}*! 👋\n\n¡Bienvenido(a)! Nos da mucho gusto recibirte.\n\nTu habitación *{habitacion}* está lista para ti.\n\n📅 Salida: {salida}\n🕐 Hora de check-out: {checkout_hora}\n\nCualquier cosa que necesites, estamos a tus órdenes 😊\n\n_{hotel}_ 🌿'
+      },
+      mp_wifi: {
+        nombre: 'WiFi (Mensajería)',
+        icon: '📶',
+        texto: '📶 *WiFi {hotel}*\n\n🌐 Red: *{wifi_red}*\n🔑 Contraseña: *{wifi_pass}*\n\n¡Disfruta tu conexión! 😊'
+      },
+      mp_horarios: {
+        nombre: 'Horarios e Info (Mensajería)',
+        icon: '🕐',
+        texto: '🏨 *{hotel}*\n_Información importante_\n\n🔑 *Check-in:* {checkin_hora}\n👋 *Check-out:* {checkout_hora}\n\n📍 *Dirección:* {direccion}\n📞 *Teléfono:* {telefono}\n\n_Estamos para servirte_ 🌿'
+      },
+      mp_reglamento: {
+        nombre: 'Reglamento (Mensajería)',
+        icon: '📋',
+        texto: '📋 *Reglamento {hotel}*\n\n1️⃣ Horario de silencio: 10:00 PM – 8:00 AM\n2️⃣ No fumar dentro de las habitaciones\n3️⃣ No se permiten fiestas o reuniones\n4️⃣ Mascotas: consultar disponibilidad\n5️⃣ Respetar las áreas comunes\n6️⃣ Reportar cualquier daño\n7️⃣ Objetos de valor en caja de seguridad\n\nGracias por tu comprensión 🙏\n_{hotel}_ 🌿'
       }
     };
 
     // Obtener/guardar plantillas (localStorage)
     function getMsgTemplates() {
+      var defaults = JSON.parse(JSON.stringify(DEFAULT_MSG_TEMPLATES));
       try {
         var saved = localStorage.getItem('msgTemplates');
-        if (saved) return JSON.parse(saved);
+        if (saved) {
+          var parsed = JSON.parse(saved);
+          // Merge: saved keys override defaults, new default keys are added
+          Object.keys(defaults).forEach(function(k) {
+            if (!parsed[k]) parsed[k] = defaults[k];
+          });
+          return parsed;
+        }
       } catch(e) {}
-      return JSON.parse(JSON.stringify(DEFAULT_MSG_TEMPLATES));
+      return defaults;
     }
 
     function saveMsgTemplates(templates) {
       localStorage.setItem('msgTemplates', JSON.stringify(templates));
       syncConfigToSheet('msgTemplates', templates);
+    }
+
+    // Render a template by key, replacing {variables} with values
+    function _renderMsgTpl(key, vars) {
+      var templates = getMsgTemplates();
+      var tpl = templates[key];
+      if (!tpl) return '';
+      var text = tpl.texto;
+      Object.keys(vars).forEach(function(k) {
+        text = text.replace(new RegExp('\\{' + k + '\\}', 'g'), vars[k] != null ? vars[k] : '');
+      });
+      return text;
+    }
+
+    // Helper to get occupancy rules from hotel config
+    function getOccupancyRules() {
+      var hi = getHotelInfo();
+      return hi.occupancyRules || DEFAULT_HOTEL_INFO.occupancyRules;
+    }
+
+    // Get max personas for a room type from occupancy rules
+    function getMaxPersonas(tipo) {
+      var rules = getOccupancyRules();
+      var rule = rules.find(function(r) { return r.tipo === tipo; });
+      if (rule) return rule.maxPersonas;
+      // Case-insensitive match
+      var lower = (tipo || '').toLowerCase();
+      rule = rules.find(function(r) { return r.tipo.toLowerCase() === lower; });
+      if (rule) return rule.maxPersonas;
+      // Partial match
+      rule = rules.find(function(r) { return lower.indexOf(r.tipo.toLowerCase()) !== -1 || r.tipo.toLowerCase().indexOf(lower) !== -1; });
+      return rule ? rule.maxPersonas : 0;
+    }
+
+    // Build occupancy summary string from config
+    function getOccupancySummary() {
+      var rules = getOccupancyRules();
+      return rules.map(function(r) { return r.tipo + ': ' + r.maxPersonas + ' pers.'; }).join(' · ');
     }
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
@@ -6018,12 +6091,16 @@
       // Occupancy policies — always visible
       p += '<div style="margin-top:10px;background:linear-gradient(135deg,rgba(33,150,243,0.06),rgba(33,150,243,0.02));border:1px solid rgba(33,150,243,0.2);border-radius:var(--radius);padding:14px;">';
       p += '<div style="font-weight:800;font-size:13px;color:var(--text);margin-bottom:10px;">🛏️ Políticas de Ocupación</div>';
-      p += '<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;font-size:12px;"><span>👤</span><div><span style="font-weight:700;">Ocupación base:</span> La tarifa ampara máximo 2 personas por habitación.</div></div>';
+      var _ocupBase = _hi.ocupacionBase || 2;
+      var _menoresLim = _hi.menoresEdadLimite || 11;
+      var _ocupRules = _hi.occupancyRules || DEFAULT_HOTEL_INFO.occupancyRules;
+      var _ocupSummary = _ocupRules.map(function(r) { return r.tipo + ': ' + r.maxPersonas + ' pers.'; }).join(' · ');
+      p += '<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;font-size:12px;"><span>👤</span><div><span style="font-weight:700;">Ocupación base:</span> La tarifa ampara máximo ' + _ocupBase + ' personas por habitación.</div></div>';
       if (_peRate > 0) {
         p += '<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;font-size:12px;"><span>👥</span><div><span style="font-weight:700;">Persona adicional:</span> $' + _fmt(_peRate) + ' MXN + IVA por persona extra, por noche. La cama supletoria está sujeta a disponibilidad.</div></div>';
       }
-      p += '<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;font-size:12px;"><span>👶</span><div><span style="font-weight:700;">Menores:</span> Niños menores de 11 años sin costo compartiendo cama con padres (máx. 1 por hab.). A partir de 12 años se considera adulto y aplica cargo de persona extra.</div></div>';
-      p += '<div style="display:flex;align-items:flex-start;gap:8px;font-size:12px;"><span>🚪</span><div><span style="font-weight:700;">Capacidad máxima:</span> Doble Matrimonial: 4 pers. · Doble Twin: 3 pers. · Queen Size: 3 pers. Se puede requerir habitación adicional si se supera.</div></div>';
+      p += '<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;font-size:12px;"><span>👶</span><div><span style="font-weight:700;">Menores:</span> Niños menores de ' + _menoresLim + ' años sin costo compartiendo cama con padres (máx. 1 por hab.). A partir de ' + (_menoresLim + 1) + ' años se considera adulto y aplica cargo de persona extra.</div></div>';
+      p += '<div style="display:flex;align-items:flex-start;gap:8px;font-size:12px;"><span>🚪</span><div><span style="font-weight:700;">Capacidad máxima:</span> ' + _ocupSummary + '. Se puede requerir habitación adicional si se supera.</div></div>';
       p += '</div>';
 
       // Terms & conditions (full, collapsible)
@@ -6286,14 +6363,18 @@
       y += polBoxH + 4;
 
       // === POLÍTICAS DE OCUPACIÓN (blue-tinted box) ===
+      var _pdfOcupBase = _pdfHi.ocupacionBase || 2;
+      var _pdfMenoresLim = _pdfHi.menoresEdadLimite || 11;
+      var _pdfOcupRules = _pdfHi.occupancyRules || DEFAULT_HOTEL_INFO.occupancyRules;
+      var _pdfOcupSummary = _pdfOcupRules.map(function(r) { return r.tipo + ': ' + r.maxPersonas + ' pers.'; }).join(' — ');
       var occItems = [
-        'Ocupación base: La tarifa publicada ampara máximo 2 personas por habitación.'
+        'Ocupación base: La tarifa publicada ampara máximo ' + _pdfOcupBase + ' personas por habitación.'
       ];
       if (_pdfPeRate > 0) {
         occItems.push('Persona adicional: $' + _fmt(_pdfPeRate) + ' MXN + IVA por persona extra, por noche. Cama supletoria sujeta a disponibilidad.');
       }
-      occItems.push('Menores: Niños menores de 11 años sin costo compartiendo cama (máx. 1 por hab.). A partir de 12 años = adulto con cargo de persona extra.');
-      occItems.push('Capacidad máxima: Doble Matrimonial: 4 pers. — Doble Twin: 3 pers. — Queen Size: 3 pers. El hotel puede requerir habitación adicional si se supera.');
+      occItems.push('Menores: Niños menores de ' + _pdfMenoresLim + ' años sin costo compartiendo cama (máx. 1 por hab.). A partir de ' + (_pdfMenoresLim + 1) + ' años = adulto con cargo de persona extra.');
+      occItems.push('Capacidad máxima: ' + _pdfOcupSummary + '. El hotel puede requerir habitación adicional si se supera.');
 
       doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
       var occLinesSizes = occItems.map(function(item) { return doc.splitTextToSize('• ' + item, contentW - 16); });
@@ -6396,12 +6477,15 @@
         msg += '🕐 _Check-in: ' + formatHoraDisplay(hi.checkin_hora) + ' | Check-out: ' + formatHoraDisplay(hi.checkout_hora) + '_\n';
         // Occupancy policies
         msg += '\n🛏️ *POLÍTICAS DE OCUPACIÓN*\n\n';
-        msg += '👤 _Ocupación base: máximo 2 personas por habitación._\n';
+        var _waOcupBase = hi.ocupacionBase || 2;
+        var _waMenoresLim = hi.menoresEdadLimite || 11;
+        var _waOcupRules = hi.occupancyRules || DEFAULT_HOTEL_INFO.occupancyRules;
+        msg += '👤 _Ocupación base: máximo ' + _waOcupBase + ' personas por habitación._\n';
         if (d.peRate > 0) {
           msg += '👥 _Persona adicional: $' + _fmt(d.peRate) + ' MXN + IVA por persona extra, por noche._\n';
         }
-        msg += '👶 _Menores de 11 años: sin costo compartiendo cama (máx. 1 por hab.). Desde 12 años = adulto._\n';
-        msg += '🚪 _Capacidad máxima: Doble Matrimonial 4 pers. · Doble Twin 3 pers. · Queen Size 3 pers._\n';
+        msg += '👶 _Menores de ' + _waMenoresLim + ' años: sin costo compartiendo cama (máx. 1 por hab.). Desde ' + (_waMenoresLim + 1) + ' años = adulto._\n';
+        msg += '🚪 _Capacidad máxima: ' + _waOcupRules.map(function(r) { return r.tipo + ' ' + r.maxPersonas + ' pers.'; }).join(' · ') + '_\n';
         msg += '\n📌 _Vigencia: 7 días. Sujeto a disponibilidad._\n';
         msg += '_Términos completos en el PDF adjunto._\n';
         msg += '\n¿Deseas reservar? ¡Con gusto te ayudamos! 😊\n\n_' + hi.nombre + '_ 🌿';
@@ -8655,6 +8739,7 @@
         { id: 'emergencia', label: '🆘 Emergencia' },
         { id: 'usuarios', label: '👤 Usuarios' },
         { id: 'tarifas', label: '💲 Tarifas' },
+        { id: 'ocupacion', label: '🛏️ Ocupación' },
         { id: 'desayunos', label: '🍳 Desayunos' },
         { id: 'app', label: '📱 App' }
       ];
@@ -8682,6 +8767,8 @@
         renderUsersConfig();
       } else if (S.configTab === 'tarifas') {
         renderTarifasConfig();
+      } else if (S.configTab === 'ocupacion') {
+        renderOcupacionConfig();
       } else if (S.configTab === 'desayunos') {
         renderDesayunosConfig();
       } else if (S.configTab === 'app') {
@@ -8895,6 +8982,110 @@
       promo.rules.splice(idx, 1);
       saveBreakfastPromoLocal(promo);
       _debouncedBfSync();
+      renderConfig();
+    }
+
+    // ============ OCCUPANCY CONFIG ============
+    function renderOcupacionConfig() {
+      var hi = getHotelInfo();
+      var rules = hi.occupancyRules || DEFAULT_HOTEL_INFO.occupancyRules;
+      var ocupBase = hi.ocupacionBase != null ? hi.ocupacionBase : 2;
+      var menoresLimite = hi.menoresEdadLimite != null ? hi.menoresEdadLimite : 11;
+
+      var h = '<div style="margin-bottom:16px">';
+      h += '<div class="section-title">Políticas de Ocupación</div>';
+      h += '<div style="font-size:12px;color:var(--text2);margin-bottom:16px">Configura las reglas de ocupación por habitación. Se muestran en cotizaciones y términos y condiciones.</div>';
+      h += '</div>';
+
+      // Ocupación base
+      h += '<div style="background:var(--surface2);border-radius:var(--radius);padding:14px;margin-bottom:12px;">';
+      h += '<div style="font-weight:700;font-size:13px;margin-bottom:10px">Ocupación base</div>';
+      h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">';
+      h += '<div><label class="form-label" style="font-size:11px">Personas incluidas en tarifa</label>';
+      h += '<input type="number" id="ocup_base" class="login-input" value="' + ocupBase + '" min="1" max="10" style="padding:8px;font-size:12px;text-align:center"></div>';
+      h += '<div><label class="form-label" style="font-size:11px">Edad límite menores gratis</label>';
+      h += '<div style="display:flex;align-items:center;gap:6px">';
+      h += '<input type="number" id="ocup_menores" class="login-input" value="' + menoresLimite + '" min="0" max="18" style="padding:8px;font-size:12px;text-align:center;width:70px">';
+      h += '<span style="font-size:11px;color:var(--text2)">años (menores no pagan si comparten cama)</span>';
+      h += '</div></div>';
+      h += '</div></div>';
+
+      // Cargo persona extra (reference)
+      h += '<div style="background:var(--surface2);border-radius:var(--radius);padding:14px;margin-bottom:12px;">';
+      h += '<div style="font-weight:700;font-size:13px;margin-bottom:6px">Cargo por persona adicional</div>';
+      h += '<div style="font-size:12px;color:var(--text2);margin-bottom:8px">Configurado en Datos del Hotel → Persona extra</div>';
+      h += '<div style="font-size:18px;font-weight:800;color:var(--accent);font-family:Space Mono,monospace">$' + _fmt(hi.persona_extra || 0) + ' MXN + IVA</div>';
+      h += '<div style="font-size:11px;color:var(--text2);margin-top:4px">por persona, por noche</div>';
+      h += '</div>';
+
+      // Capacidad máxima por tipo
+      h += '<div style="background:var(--surface2);border-radius:var(--radius);padding:14px;margin-bottom:12px;">';
+      h += '<div style="font-weight:700;font-size:13px;margin-bottom:10px">Capacidad máxima por tipo de habitación</div>';
+      h += '<div style="font-size:11px;color:var(--text2);margin-bottom:10px">Define cuántas personas puede albergar cada tipo (incluye persona extra y supletorias)</div>';
+
+      rules.forEach(function(rule, i) {
+        h += '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;background:var(--surface3);padding:8px 10px;border-radius:8px">';
+        h += '<input type="text" value="' + rule.tipo + '" class="ocup-rule-tipo" data-idx="' + i + '" placeholder="Tipo de habitación" style="flex:1;background:var(--bg);border:1px solid var(--surface3);border-radius:6px;padding:6px 8px;font-size:12px;color:var(--text)">';
+        h += '<span style="font-size:11px;color:var(--text2);white-space:nowrap">máx:</span>';
+        h += '<input type="number" value="' + rule.maxPersonas + '" class="ocup-rule-max" data-idx="' + i + '" min="1" max="20" style="width:50px;background:var(--bg);border:1px solid var(--surface3);border-radius:6px;padding:6px;font-size:12px;text-align:center;color:var(--text)">';
+        h += '<span style="font-size:11px;color:var(--text2)">pers.</span>';
+        h += '<button onclick="removeOcupRule(' + i + ')" style="background:none;border:none;color:var(--red);font-size:16px;cursor:pointer;padding:2px">✕</button>';
+        h += '</div>';
+      });
+
+      h += '<button class="form-button secondary" onclick="addOcupRule()" style="font-size:11px;padding:6px 12px;margin-top:4px">+ Agregar tipo</button>';
+      h += '</div>';
+
+      // Preview
+      h += '<div style="background:linear-gradient(135deg,rgba(33,150,243,0.06),rgba(33,150,243,0.02));border:1px solid rgba(33,150,243,0.2);border-radius:var(--radius);padding:14px;margin-bottom:12px;">';
+      h += '<div style="font-weight:700;font-size:12px;color:var(--text);margin-bottom:8px">👁️ Vista previa (así aparece en cotizaciones)</div>';
+      h += '<div style="font-size:11px;color:var(--text2);line-height:1.6">';
+      h += '👤 <strong>Ocupación base:</strong> La tarifa ampara máximo ' + ocupBase + ' personas por habitación.<br>';
+      if (hi.persona_extra > 0) {
+        h += '👥 <strong>Persona adicional:</strong> $' + _fmt(hi.persona_extra) + ' MXN + IVA por persona extra, por noche.<br>';
+      }
+      h += '👶 <strong>Menores:</strong> Niños menores de ' + menoresLimite + ' años sin costo compartiendo cama (máx. 1 por hab.).<br>';
+      h += '🚪 <strong>Capacidad máxima:</strong> ' + rules.map(function(r) { return r.tipo + ': ' + r.maxPersonas + ' pers.'; }).join(' · ');
+      h += '</div></div>';
+
+      // Save button
+      h += '<button class="form-button" onclick="saveOcupacionConfig()" style="width:100%;padding:12px;font-size:14px;font-weight:700;background:var(--accent);color:var(--bg)">💾 Guardar Políticas de Ocupación</button>';
+
+      document.getElementById('configContent').innerHTML = h;
+    }
+
+    function addOcupRule() {
+      var hi = getHotelInfo();
+      if (!hi.occupancyRules) hi.occupancyRules = [];
+      hi.occupancyRules.push({ tipo: '', maxPersonas: 2 });
+      saveHotelInfo(hi);
+      renderConfig();
+    }
+
+    function removeOcupRule(idx) {
+      var hi = getHotelInfo();
+      if (!hi.occupancyRules) return;
+      hi.occupancyRules.splice(idx, 1);
+      saveHotelInfo(hi);
+      renderConfig();
+    }
+
+    function saveOcupacionConfig() {
+      var hi = getHotelInfo();
+      hi.ocupacionBase = parseInt(document.getElementById('ocup_base').value) || 2;
+      hi.menoresEdadLimite = parseInt(document.getElementById('ocup_menores').value) || 11;
+
+      var tipos = document.querySelectorAll('.ocup-rule-tipo');
+      var maxes = document.querySelectorAll('.ocup-rule-max');
+      var newRules = [];
+      tipos.forEach(function(el, i) {
+        var tipo = el.value.trim();
+        var max = parseInt(maxes[i].value) || 2;
+        if (tipo) newRules.push({ tipo: tipo, maxPersonas: max });
+      });
+      hi.occupancyRules = newRules;
+      saveHotelInfo(hi);
+      toast('Políticas de ocupación guardadas');
       renderConfig();
     }
 
@@ -9763,10 +9954,10 @@
       { title: 'Identificación', text: 'Al momento del check-in se solicitará una identificación oficial vigente con fotografía del titular de la reservación.' },
       { title: 'Menores de edad', text: 'Los menores de edad deberán estar acompañados en todo momento por un adulto responsable registrado en la reservación.' },
       { title: 'Responsabilidad', text: 'El hotel no se hace responsable por objetos de valor no depositados en la caja de seguridad de la habitación. Se recomienda su uso durante la estancia.' },
-      { title: 'Ocupación base', text: 'La tarifa base publicada ampara la estadía de un máximo de dos (2) personas. Habitación Doble Matrimonial (1 Cama Matrimonial): hasta 2 personas. Habitación Doble Twin (2 Camas Individuales): hasta 2 personas en camas independientes. Habitación Queen Size (1 Cama Queen): hasta 2 personas.' },
+      { title: 'Ocupación base', text: 'La tarifa base publicada ampara la estadía de un máximo de ' + (getHotelInfo().ocupacionBase || 2) + ' persona(s) por habitación.' },
       { title: 'Cargo por persona adicional', text: 'Toda persona extra que pernocte o haga uso de la habitación superando la ocupación base de dos (2) personas estará sujeta a un cargo adicional obligatorio de $' + (getHotelInfo().persona_extra || 150) + '.00 MXN + IVA por persona, por noche. El pago de esta tarifa no garantiza automáticamente la instalación de una cama supletoria, la cual estará sujeta a disponibilidad y al espacio físico asignado en la habitación.' },
-      { title: 'Política de menores (persona extra)', text: 'Niños menores de 11 años pueden hospedarse sin costo adicional compartiendo las camas existentes con sus padres o tutores (máximo 1 menor gratis por habitación en categorías Matrimonial o Queen). A partir de los 12 años, todo huésped será considerado como adulto para efectos de la tarifa y aplicará el cargo por persona extra.' },
-      { title: 'Capacidad máxima por habitación', text: 'Por disposiciones legales y normativas de seguridad e incendios: Habitación Doble Matrimonial: máximo 4 personas (cargo por persona extra a partir de la 3.ª). Habitación Doble Twin: máximo 3 personas (sujeto a cama supletoria). Habitación Queen Size: máximo 3 personas. El hotel se reserva el derecho de rechazar el ingreso o requerir una habitación adicional si se supera la capacidad máxima.' }
+      { title: 'Política de menores (persona extra)', text: 'Niños menores de ' + (getHotelInfo().menoresEdadLimite || 11) + ' años pueden hospedarse sin costo adicional compartiendo las camas existentes con sus padres o tutores (máximo 1 menor gratis por habitación). A partir de los ' + ((getHotelInfo().menoresEdadLimite || 11) + 1) + ' años, todo huésped será considerado como adulto para efectos de la tarifa y aplicará el cargo por persona extra.' },
+      { title: 'Capacidad máxima por habitación', text: 'Por disposiciones legales y normativas de seguridad e incendios: ' + (getHotelInfo().occupancyRules || DEFAULT_HOTEL_INFO.occupancyRules).map(function(r) { return r.tipo + ': máximo ' + r.maxPersonas + ' personas'; }).join('. ') + '. El hotel se reserva el derecho de rechazar el ingreso o requerir una habitación adicional si se supera la capacidad máxima.' }
     ];
 
     function getTerms() {
@@ -9779,15 +9970,25 @@
       // Always inject current hotel hours into the Check-in/Check-out term
       var hi = getHotelInfo();
       var peCargoStr = '$' + (hi.persona_extra || 150) + '.00 MXN + IVA';
+      var _tOcupBase = hi.ocupacionBase || 2;
+      var _tMenoresLim = hi.menoresEdadLimite || 11;
+      var _tOcupRules = hi.occupancyRules || DEFAULT_HOTEL_INFO.occupancyRules;
+      var _tOcupSummary = _tOcupRules.map(function(r) { return r.tipo + ': máximo ' + r.maxPersonas + ' personas'; }).join('. ');
       terms = terms.map(function(t) {
         if (t.title === 'Check-in / Check-out') {
           return { title: t.title, text: 'La hora de entrada es a las ' + formatHoraDisplay(hi.checkin_hora) + ' y la hora de salida es a las ' + formatHoraDisplay(hi.checkout_hora) + '. El early check-in y late check-out están sujetos a disponibilidad y pueden generar cargos adicionales.' };
         }
         if (t.title === 'Cargo por persona adicional') {
-          return { title: t.title, text: 'Toda persona extra que pernocte o haga uso de la habitación superando la ocupación base de dos (2) personas estará sujeta a un cargo adicional obligatorio de ' + peCargoStr + ' por persona, por noche. El pago de esta tarifa no garantiza automáticamente la instalación de una cama supletoria, la cual estará sujeta a disponibilidad y al espacio físico asignado en la habitación.' };
+          return { title: t.title, text: 'Toda persona extra que pernocte o haga uso de la habitación superando la ocupación base de ' + _tOcupBase + ' persona(s) estará sujeta a un cargo adicional obligatorio de ' + peCargoStr + ' por persona, por noche. El pago de esta tarifa no garantiza automáticamente la instalación de una cama supletoria, la cual estará sujeta a disponibilidad y al espacio físico asignado en la habitación.' };
         }
         if (t.title === 'Política de menores (persona extra)') {
-          return { title: t.title, text: 'Niños menores de 11 años pueden hospedarse sin costo adicional compartiendo las camas existentes con sus padres o tutores (máximo 1 menor gratis por habitación en categorías Matrimonial o Queen). A partir de los 12 años, todo huésped será considerado como adulto para efectos de la tarifa y aplicará el cargo por persona extra de ' + peCargoStr + ' por noche.' };
+          return { title: t.title, text: 'Niños menores de ' + _tMenoresLim + ' años pueden hospedarse sin costo adicional compartiendo las camas existentes con sus padres o tutores (máximo 1 menor gratis por habitación). A partir de los ' + (_tMenoresLim + 1) + ' años, todo huésped será considerado como adulto para efectos de la tarifa y aplicará el cargo por persona extra de ' + peCargoStr + ' por noche.' };
+        }
+        if (t.title === 'Ocupación base') {
+          return { title: t.title, text: 'La tarifa base publicada ampara la estadía de un máximo de ' + _tOcupBase + ' persona(s) por habitación.' };
+        }
+        if (t.title === 'Capacidad máxima por habitación') {
+          return { title: t.title, text: 'Por disposiciones legales y normativas de seguridad e incendios: ' + _tOcupSummary + '. El hotel se reserva el derecho de rechazar el ingreso o requerir una habitación adicional si se supera la capacidad máxima.' };
         }
         return t;
       });
@@ -11901,6 +12102,26 @@
       gi += '</div></div>';
       document.getElementById('msgPanelGuestInfo').innerHTML = gi;
 
+      // Template variables for this guest
+      var _tplVars = {
+        hotel: hi.nombre,
+        huesped: res.huesped,
+        habitacion: res.habitacionNum,
+        entrada: formatDate(res.fechaEntrada),
+        salida: formatDate(res.fechaSalida),
+        checkin_hora: formatHoraDisplay(hi.checkin_hora),
+        checkout_hora: formatHoraDisplay(hi.checkout_hora),
+        wifi_red: hi.wifi_red || '[No configurado]',
+        wifi_pass: hi.wifi_pass || '[No configurado]',
+        direccion: hi.direccion || '',
+        telefono: hi.telefono || '',
+        noches: nights,
+        tipoHab: room ? room.tipo : '',
+        tarifa: room ? _fmt(room.tarifa) : '0',
+        total: room ? _fmt(room.tarifa * nights) : '0',
+        reviewLink: hi.reviewLink || ''
+      };
+
       // Build message categories
       var msgCategories = [
         {
@@ -11908,7 +12129,8 @@
           messages: [
             {
               id: 'mp_welcome', name: 'Mensaje de Bienvenida', icon: '👋', checked: false, formal: false,
-              text: '🏨 *' + hi.nombre + '*\n\n¡Hola *' + res.huesped + '*! 👋\n\n¡Bienvenido(a)! Nos da mucho gusto recibirte.\n\nTu habitación *' + res.habitacionNum + '* está lista para ti.\n\n📅 Salida: ' + formatDate(res.fechaSalida) + '\n🕐 Hora de check-out: ' + formatHoraDisplay(hi.checkout_hora) + '\n\nCualquier cosa que necesites, estamos a tus órdenes 😊\n\n_' + hi.nombre + '_ 🌿'
+              tplKey: 'mp_welcome',
+              text: _renderMsgTpl('mp_welcome', _tplVars)
             }
           ]
         },
@@ -11917,11 +12139,13 @@
           messages: [
             {
               id: 'mp_wifi', name: 'Datos de WiFi', icon: '📶', checked: false, formal: false,
-              text: '📶 *WiFi ' + hi.nombre + '*\n\n🌐 Red: *' + (hi.wifi_red || '[No configurado]') + '*\n🔑 Contraseña: *' + (hi.wifi_pass || '[No configurado]') + '*\n\n¡Disfruta tu conexión! 😊'
+              tplKey: 'mp_wifi',
+              text: _renderMsgTpl('mp_wifi', _tplVars)
             },
             {
               id: 'mp_horarios', name: 'Horarios e Información', icon: '🕐', checked: false, formal: true,
-              text: '🏨 *' + hi.nombre + '*\n_Información importante_\n\n🔑 *Check-in:* ' + formatHoraDisplay(hi.checkin_hora) + '\n👋 *Check-out:* ' + formatHoraDisplay(hi.checkout_hora) + '\n\n📍 *Dirección:* ' + (hi.direccion || '') + '\n📞 *Teléfono:* ' + (hi.telefono || '') + '\n\n_Estamos para servirte_ 🌿',
+              tplKey: 'mp_horarios',
+              text: _renderMsgTpl('mp_horarios', _tplVars),
               pdfTitle: 'Información del Hotel',
               pdfBody: 'Check-in: ' + formatHoraDisplay(hi.checkin_hora) + '\nCheck-out: ' + formatHoraDisplay(hi.checkout_hora) + '\nDirección: ' + (hi.direccion || '') + '\nTeléfono: ' + (hi.telefono || '')
             }
@@ -11932,7 +12156,8 @@
           messages: [
             {
               id: 'mp_reglamento', name: 'Reglamento del Hotel', icon: '📋', checked: false, formal: true,
-              text: '📋 *Reglamento ' + hi.nombre + '*\n\n1️⃣ Horario de silencio: 10:00 PM – 8:00 AM\n2️⃣ No fumar dentro de las habitaciones\n3️⃣ No se permiten fiestas o reuniones\n4️⃣ Mascotas: consultar disponibilidad\n5️⃣ Respetar las áreas comunes\n6️⃣ Reportar cualquier daño\n7️⃣ Objetos de valor en caja de seguridad\n\nGracias por tu comprensión 🙏\n_' + hi.nombre + '_ 🌿',
+              tplKey: 'mp_reglamento',
+              text: _renderMsgTpl('mp_reglamento', _tplVars),
               pdfTitle: 'Reglamento del Hotel',
               pdfBody: '1. Horario de silencio: 10:00 PM - 8:00 AM\n2. No fumar dentro de las habitaciones\n3. No se permiten fiestas o reuniones\n4. Mascotas: consultar disponibilidad\n5. Respetar las areas comunes\n6. Reportar cualquier dano\n7. Objetos de valor en caja de seguridad'
             },
@@ -12106,6 +12331,16 @@
     function editMsgPanel(id) {
       var msg = (window._msgPanelMsgs || {})[id];
       if (!msg) return;
+      // If message has a template key, show the template text for editing
+      var editText = msg.text;
+      var hasTpl = false;
+      if (msg.tplKey) {
+        var tpls = getMsgTemplates();
+        if (tpls[msg.tplKey]) {
+          editText = tpls[msg.tplKey].texto;
+          hasTpl = true;
+        }
+      }
       var overlay = '<div id="msgPreviewOverlay" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);z-index:10001;display:flex;align-items:center;justify-content:center;padding:20px" onclick="if(event.target===this)this.remove()">';
       overlay += '<div style="background:var(--bg);border-radius:var(--radius);padding:20px;max-width:420px;width:100%;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3)">';
       overlay += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">';
@@ -12116,10 +12351,11 @@
       overlay += '</div></div>';
       // Preview mode
       overlay += '<div id="msgPreviewView" style="flex:1;overflow-y:auto;white-space:pre-wrap;font-size:12px;line-height:1.6;color:var(--text);background:var(--surface2);padding:14px;border-radius:8px">' + msg.text.replace(/\n/g, '<br>').replace(/\*(.*?)\*/g, '<strong>$1</strong>').replace(/_(.*?)_/g, '<em>$1</em>') + '</div>';
-      // Edit mode (hidden initially)
-      overlay += '<textarea id="msgEditArea" style="display:none;flex:1;min-height:200px;width:100%;padding:12px;font-size:12px;line-height:1.5;border:2px solid var(--accent);border-radius:8px;background:var(--surface2);color:var(--text);font-family:inherit;resize:none;box-sizing:border-box">' + msg.text.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</textarea>';
-      overlay += '<div id="msgEditActions" style="display:none;margin-top:8px;display:flex;gap:8px;">';
-      overlay += '</div>';
+      // Edit mode (hidden initially) — show template text with {variables} for template-backed messages
+      overlay += '<textarea id="msgEditArea" data-tplkey="' + (msg.tplKey || '') + '" style="display:none;flex:1;min-height:200px;width:100%;padding:12px;font-size:12px;line-height:1.5;border:2px solid var(--accent);border-radius:8px;background:var(--surface2);color:var(--text);font-family:inherit;resize:none;box-sizing:border-box">' + editText.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</textarea>';
+      if (hasTpl) {
+        overlay += '<div style="margin-top:6px;font-size:10px;color:var(--text2);line-height:1.4">Variables: {huesped}, {hotel}, {habitacion}, {entrada}, {salida}, {checkin_hora}, {checkout_hora}, {wifi_red}, {wifi_pass}, {direccion}, {telefono}<br>Los cambios se guardan para todos los dispositivos.</div>';
+      }
       overlay += '</div></div>';
       document.body.insertAdjacentHTML('beforeend', overlay);
     }
@@ -12133,6 +12369,31 @@
       if (isEditing) {
         // Save changes
         var newText = editor.value;
+        var tplKey = editor.getAttribute('data-tplkey');
+        if (tplKey) {
+          // Persist to template system (cross-device via Sheet)
+          var templates = getMsgTemplates();
+          if (templates[tplKey]) {
+            templates[tplKey].texto = newText;
+            saveMsgTemplates(templates);
+          }
+          // Re-render with current guest's variables
+          var res = window._msgPanelRes;
+          var room = window._msgPanelRoom;
+          var hi = getHotelInfo();
+          if (res) {
+            var vars = {
+              hotel: hi.nombre, huesped: res.huesped, habitacion: res.habitacionNum,
+              entrada: formatDate(res.fechaEntrada), salida: formatDate(res.fechaSalida),
+              checkin_hora: formatHoraDisplay(hi.checkin_hora), checkout_hora: formatHoraDisplay(hi.checkout_hora),
+              wifi_red: hi.wifi_red || '[No configurado]', wifi_pass: hi.wifi_pass || '[No configurado]',
+              direccion: hi.direccion || '', telefono: hi.telefono || '',
+              noches: daysUntil(res.fechaEntrada, res.fechaSalida), tipoHab: room ? room.tipo : '',
+              tarifa: room ? _fmt(room.tarifa) : '0', reviewLink: hi.reviewLink || ''
+            };
+            newText = _renderMsgTpl(tplKey, vars);
+          }
+        }
         if (window._msgPanelMsgs && window._msgPanelMsgs[id]) {
           window._msgPanelMsgs[id].text = newText;
         }
@@ -12141,7 +12402,7 @@
         editor.style.display = 'none';
         toggleBtn.innerHTML = '✏️ Editar';
         toggleBtn.style.background = 'var(--accent)';
-        toast('Mensaje actualizado');
+        toast(tplKey ? 'Plantilla guardada para todos los dispositivos' : 'Mensaje actualizado');
       } else {
         // Enter edit mode
         preview.style.display = 'none';
