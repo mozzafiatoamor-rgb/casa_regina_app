@@ -2085,7 +2085,7 @@
           <div style="display:flex;align-items:center;gap:10px;padding:12px;background:var(--surface2);border-radius:var(--radius);margin-bottom:10px;">
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;flex:1;">
               <input type="checkbox" id="newResFactura" onchange="toggleNewResIVA()" style="accent-color:var(--accent);width:18px;height:18px;" />
-              <div><div style="font-size:13px;font-weight:600;">🧾 ¿Requiere factura?</div><div style="font-size:11px;color:var(--text2);">Agrega IVA 16% al total</div></div>
+              <div><div style="font-size:13px;font-weight:600;">🧾 ¿Requiere factura?</div><div style="font-size:11px;color:var(--text2);">Agrega IVA 16% + ISH 3% al total</div></div>
             </label>
           </div>
           <div id="newResFacturaFields" style="display:none;">
@@ -2290,7 +2290,7 @@
         <div style="display:flex;align-items:center;gap:10px;margin:10px 0 14px;padding:12px;background:var(--surface2);border-radius:var(--radius);">
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;flex:1;">
             <input type="checkbox" id="payFactura" onchange="togglePayIVA()" style="accent-color:var(--accent);width:18px;height:18px;" />
-            <div><div style="font-size:13px;font-weight:600;">¿Requiere factura?</div><div style="font-size:11px;color:var(--text2);">Agrega IVA 16% al monto</div></div>
+            <div><div style="font-size:13px;font-weight:600;">¿Requiere factura?</div><div style="font-size:11px;color:var(--text2);">Agrega IVA 16% + ISH 3% al monto</div></div>
           </label>
           <div id="payIVAInfo" style="font-size:12px;font-weight:700;color:var(--accent);display:none;"></div>
         </div>
@@ -5704,6 +5704,15 @@
     // ============ COTIZACIONES (multi-habitación, persistidas) ============
     var _cotizacionData = null;
     var _cotizacionCounter = parseInt(localStorage.getItem('cotizacionCounter') || '0');
+    var _facturaCounter = parseInt(localStorage.getItem('facturaCounter') || '0');
+    var ISH_RATE = 0.03; // Impuesto Sobre Hospedaje 3%
+    var IVA_RATE = 0.16;
+
+    function nextFacturaFolio() {
+      _facturaCounter++;
+      localStorage.setItem('facturaCounter', _facturaCounter);
+      return 'FACT-' + String(_facturaCounter).padStart(4, '0');
+    }
     var _cotRooms = [];
     var _editingCotId = null; // null = new, string = editing existing
 
@@ -5982,7 +5991,7 @@
       h += '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface3);border-radius:var(--radius);">';
       h += '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;flex:1;">';
       h += '<input type="checkbox" id="cotIVA" onchange="calcCotizacion()" ' + (_cotizacionData && _cotizacionData.conIVA ? 'checked' : '') + ' style="accent-color:var(--accent);width:18px;height:18px;" />';
-      h += '<div><div style="font-size:13px;font-weight:600;">Incluir IVA 16%</div><div style="font-size:11px;color:var(--text2);">Marcar si requiere factura</div></div>';
+      h += '<div><div style="font-size:13px;font-weight:600;">Incluir IVA 16% + ISH 3%</div><div style="font-size:11px;color:var(--text2);">Marcar si requiere factura</div></div>';
       h += '</label></div>';
 
       h += '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface3);border-radius:var(--radius);">';
@@ -6073,8 +6082,9 @@
       });
 
       var subtotal = grandSubtotalHab + grandSubtotalPE;
-      var iva = conIVA ? Math.round(subtotal * 0.16 * 100) / 100 : 0;
-      var total = subtotal + iva;
+      var iva = conIVA ? Math.round(subtotal * IVA_RATE * 100) / 100 : 0;
+      var ish = conIVA ? Math.round(subtotal * ISH_RATE * 100) / 100 : 0;
+      var total = subtotal + iva + ish;
       var anticipo_pct = getAnticipoPct();
       var anticipoMonto = anticipo_pct > 0 ? Math.ceil(total * getAnticipoFraction()) : 0;
 
@@ -6088,7 +6098,7 @@
         roomLines: roomLines,
         peRate: peRate,
         grandSubtotalHab: grandSubtotalHab, grandSubtotalPE: grandSubtotalPE,
-        subtotal: subtotal, conIVA: conIVA, iva: iva, total: total,
+        subtotal: subtotal, conIVA: conIVA, iva: iva, ish: ish, total: total,
         anticipo_pct: anticipo_pct, anticipoMonto: anticipoMonto,
         mostrarHorarios: mostrarHorarios,
         incluyeDesayuno: incluyeDesayuno,
@@ -6120,6 +6130,7 @@
       });
       if (conIVA) {
         p += '<div style="display:flex;justify-content:space-between;margin-bottom:4px;color:var(--text2);"><span>IVA (16%):</span><span>$' + _fmt(iva) + '</span></div>';
+        p += '<div style="display:flex;justify-content:space-between;margin-bottom:4px;color:var(--text2);"><span>ISH (3%):</span><span>$' + _fmt(ish) + '</span></div>';
       }
       p += '<div style="display:flex;justify-content:space-between;font-weight:700;font-size:16px;margin-top:8px;padding-top:8px;border-top:2px solid var(--accent);">';
       p += '<span>TOTAL:</span><span style="color:var(--accent);">$' + _fmt(total) + '</span></div>';
@@ -6184,7 +6195,7 @@
       var _ocupSummary = _ocupRules.map(function(r) { return r.tipo + ': ' + r.maxPersonas + ' pers.'; }).join(' · ');
       p += '<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;font-size:12px;"><span>👤</span><div><span style="font-weight:700;">Ocupación base:</span> La tarifa ampara máximo ' + _ocupBase + ' personas por habitación.</div></div>';
       if (_peRate > 0) {
-        p += '<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;font-size:12px;"><span>👥</span><div><span style="font-weight:700;">Persona adicional:</span> $' + _fmt(_peRate) + ' MXN + IVA por persona extra, por noche. La cama supletoria está sujeta a disponibilidad.</div></div>';
+        p += '<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;font-size:12px;"><span>👥</span><div><span style="font-weight:700;">Persona adicional:</span> $' + _fmt(_peRate) + ' MXN + impuestos por persona extra, por noche. La cama supletoria está sujeta a disponibilidad.</div></div>';
       }
       p += '<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;font-size:12px;"><span>👶</span><div><span style="font-weight:700;">Menores:</span> Niños menores de ' + _menoresLim + ' años sin costo compartiendo cama con padres (máx. 1 por hab.). A partir de ' + (_menoresLim + 1) + ' años se considera adulto y aplica cargo de persona extra.</div></div>';
       p += '<div style="display:flex;align-items:flex-start;gap:8px;font-size:12px;"><span>🚪</span><div><span style="font-weight:700;">Capacidad máxima:</span> ' + _ocupSummary + '. Se puede requerir habitación adicional si se supera.</div></div>';
@@ -6352,7 +6363,10 @@
           addPricingRow('Pers. extra: ' + rl.personasExtra + '/hab. × ' + rl.cantidad + ' hab. × $' + _fmt(d.peRate) + ' × ' + d.nights + 'n', rl.subtotalPE, true);
         }
       });
-      if (d.conIVA) { addPricingRow('IVA (16%)', d.iva, false); }
+      if (d.conIVA) {
+        addPricingRow('IVA (16%)', d.iva, false);
+        addPricingRow('ISH (3%)', d.ish, false);
+      }
 
       // Total
       doc.setDrawColor(55, 71, 79); doc.setLineWidth(0.5);
@@ -6458,7 +6472,7 @@
         'Ocupación base: La tarifa publicada ampara máximo ' + _pdfOcupBase + ' personas por habitación.'
       ];
       if (_pdfPeRate > 0) {
-        occItems.push('Persona adicional: $' + _fmt(_pdfPeRate) + ' MXN + IVA por persona extra, por noche. Cama supletoria sujeta a disponibilidad.');
+        occItems.push('Persona adicional: $' + _fmt(_pdfPeRate) + ' MXN + impuestos por persona extra, por noche. Cama supletoria sujeta a disponibilidad.');
       }
       occItems.push('Menores: Niños menores de ' + _pdfMenoresLim + ' años sin costo compartiendo cama (máx. 1 por hab.). A partir de ' + (_pdfMenoresLim + 1) + ' años = adulto con cargo de persona extra.');
       occItems.push('Capacidad máxima: ' + _pdfOcupSummary + '. El hotel puede requerir habitación adicional si se supera.');
@@ -6530,7 +6544,7 @@
             msg += '  _+ ' + rl.personasExtra + ' pers. extra/hab. = $' + _fmt(rl.subtotalPE) + '_\n';
           }
         });
-        if (d.conIVA) msg += '\n🧾 IVA (16%): $' + _fmt(d.iva) + '\n';
+        if (d.conIVA) msg += '\n🧾 IVA (16%): $' + _fmt(d.iva) + '\n🧾 ISH (3%): $' + _fmt(d.ish) + '\n';
         msg += '\n✅ *Total: $' + _fmt(d.total) + ' MXN*\n';
         if (d.anticipo_pct > 0) msg += '\n💳 Anticipo (' + d.anticipo_pct + '%): *$' + _fmt(d.anticipoMonto) + '*\n';
         if (d.incluyeDesayuno && d.bfAhorroTotal > 0) {
@@ -6569,7 +6583,7 @@
         var _waOcupRules = hi.occupancyRules || DEFAULT_HOTEL_INFO.occupancyRules;
         msg += '👤 _Ocupación base: máximo ' + _waOcupBase + ' personas por habitación._\n';
         if (d.peRate > 0) {
-          msg += '👥 _Persona adicional: $' + _fmt(d.peRate) + ' MXN + IVA por persona extra, por noche._\n';
+          msg += '👥 _Persona adicional: $' + _fmt(d.peRate) + ' MXN + impuestos por persona extra, por noche._\n';
         }
         msg += '👶 _Menores de ' + _waMenoresLim + ' años: sin costo compartiendo cama (máx. 1 por hab.). Desde ' + (_waMenoresLim + 1) + ' años = adulto._\n';
         msg += '🚪 _Capacidad máxima: ' + _waOcupRules.map(function(r) { return r.tipo + ' ' + r.maxPersonas + ' pers.'; }).join(' · ') + '_\n';
@@ -6677,15 +6691,16 @@
       });
       var subtotal = grandSubtotalHab + grandSubtotalPE;
       var conIVA = cot.opciones.conIVA || false;
-      var iva = conIVA ? Math.round(subtotal * 0.16 * 100) / 100 : 0;
-      var total = subtotal + iva;
+      var iva = conIVA ? Math.round(subtotal * IVA_RATE * 100) / 100 : 0;
+      var ish = conIVA ? Math.round(subtotal * ISH_RATE * 100) / 100 : 0;
+      var total = subtotal + iva + ish;
       var anticipo_pct = getAnticipoPct();
       _cotizacionData = {
         nombre: cot.nombre, telefono: cot.telefono, email: cot.email,
         checkin: cot.checkin, checkout: cot.checkout, adultos: cot.adultos, ninos: cot.ninos,
         nights: nights, totalHabs: totalHabs, roomLines: roomLines,
         peRate: peRate, grandSubtotalHab: grandSubtotalHab, grandSubtotalPE: grandSubtotalPE,
-        subtotal: subtotal, conIVA: conIVA, iva: iva, total: total,
+        subtotal: subtotal, conIVA: conIVA, iva: iva, ish: ish, total: total,
         anticipo_pct: anticipo_pct, anticipoMonto: anticipo_pct > 0 ? Math.ceil(total * getAnticipoFraction()) : 0,
         mostrarHorarios: cot.opciones.mostrarHorarios || false,
         incluyeDesayuno: cot.opciones.incluyeDesayuno || false,
@@ -7591,12 +7606,13 @@
         html+='<div class="cobro-card '+sc+'">';
         html+='<div class="cobro-head"><div><div class="cobro-guest">'+r.huesped+(_ivaCobro?' <span style="font-size:10px;background:#e8f5e9;color:#2e7d32;padding:1px 6px;border-radius:4px;font-weight:600">🧾 Factura</span>':'')+'</div><div style="font-size:11px;color:var(--text2)">'+r.estado+' · '+formatDate(r.fechaEntrada)+' → '+formatDate(r.fechaSalida)+'</div></div><div class="cobro-room">'+r.habitacionNum+'</div></div>';
         html+='<div class="cobro-amounts">'+
-          '<div class="cobro-amt"><div class="cobro-amt-val">$'+r.tarifaTotal+'</div><div class="cobro-amt-lbl">Total'+(_ivaCobro?' (c/IVA)':'')+'</div></div>'+
+          '<div class="cobro-amt"><div class="cobro-amt-val">$'+r.tarifaTotal+'</div><div class="cobro-amt-lbl">Total'+(_ivaCobro?' (c/imp.)':'')+'</div></div>'+
           '<div class="cobro-amt"><div class="cobro-amt-val" style="color:var(--green)">$'+totalPaid+'</div><div class="cobro-amt-lbl">Pagado</div></div>'+
           '<div class="cobro-amt"><div class="cobro-amt-val" style="color:'+(balance>0?'var(--red)':'var(--green)')+'">$'+balance+'</div><div class="cobro-amt-lbl">Saldo</div></div>'+
           '</div>';
         if(_ivaCobro){
-          html+='<div style="font-size:10px;color:var(--text2);padding:4px 0;text-align:right">Subtotal: $'+_ivaCobro.subtotal.toLocaleString('es-MX')+' + IVA: $'+_ivaCobro.iva.toLocaleString('es-MX',{minimumFractionDigits:2})+' · RFC: '+_ivaCobro.rfc+'</div>';
+          var _ishCobro = _ivaCobro.ish || 0;
+          html+='<div style="font-size:10px;color:var(--text2);padding:4px 0;text-align:right">' + (_ivaCobro.folio ? '<strong>' + _ivaCobro.folio + '</strong> · ' : '') + 'Sub: $'+_ivaCobro.subtotal.toLocaleString('es-MX')+' + IVA: $'+_ivaCobro.iva.toLocaleString('es-MX',{minimumFractionDigits:2})+' + ISH: $'+_ishCobro.toLocaleString('es-MX',{minimumFractionDigits:2})+' · RFC: '+_ivaCobro.rfc+'</div>';
         }
         html+='<div class="cobro-bar"><div class="cobro-bar-fill" style="width:'+pct+'%;background:'+bc+'"></div></div>';
         html+='<div style="font-size:11px;text-align:right;color:var(--text2);margin-bottom:4px">'+sl+'</div>';
@@ -7794,10 +7810,13 @@
       h+='<div class="receipt-div"></div>';
       var _ivaRec = parseIVAData(res.notas);
       if (_ivaRec) {
+        var _ishRec = _ivaRec.ish || 0;
         h+='<div class="receipt-row"><span class="receipt-label">Subtotal hospedaje</span><span class="receipt-value">$'+_ivaRec.subtotal.toLocaleString('es-MX')+'</span></div>';
         h+='<div class="receipt-row"><span class="receipt-label">IVA (16%)</span><span class="receipt-value">$'+_ivaRec.iva.toLocaleString('es-MX',{minimumFractionDigits:2})+'</span></div>';
-        h+='<div class="receipt-row"><span class="receipt-label" style="font-weight:700">Total c/IVA</span><span class="receipt-value" style="font-weight:700">$'+res.tarifaTotal.toLocaleString('es-MX',{minimumFractionDigits:2})+'</span></div>';
+        h+='<div class="receipt-row"><span class="receipt-label">ISH (3%)</span><span class="receipt-value">$'+_ishRec.toLocaleString('es-MX',{minimumFractionDigits:2})+'</span></div>';
+        h+='<div class="receipt-row"><span class="receipt-label" style="font-weight:700">Total c/impuestos</span><span class="receipt-value" style="font-weight:700">$'+res.tarifaTotal.toLocaleString('es-MX',{minimumFractionDigits:2})+'</span></div>';
         h+='<div class="receipt-div"></div>';
+        if(_ivaRec.folio) h+='<div class="receipt-row"><span class="receipt-label">Folio Factura</span><span class="receipt-value" style="font-weight:700">'+_ivaRec.folio+'</span></div>';
         h+='<div class="receipt-row"><span class="receipt-label">RFC</span><span class="receipt-value">'+_ivaRec.rfc+'</span></div>';
         if(_ivaRec.razonSocial) h+='<div class="receipt-row"><span class="receipt-label">Razón Social</span><span class="receipt-value" style="font-size:10px;max-width:160px;text-align:right">'+_ivaRec.razonSocial+'</span></div>';
       } else {
@@ -7854,9 +7873,12 @@
       text += '─────────────\n';
       var _ivaRecWA = parseIVAData(res.notas);
       if (_ivaRecWA) {
+        var _ishRecWA = _ivaRecWA.ish || 0;
         text += '*Subtotal:* $' + _ivaRecWA.subtotal.toLocaleString('es-MX') + '\n';
         text += '*IVA (16%):* $' + _ivaRecWA.iva.toLocaleString('es-MX',{minimumFractionDigits:2}) + '\n';
-        text += '*Total c/IVA:* $' + res.tarifaTotal.toLocaleString('es-MX',{minimumFractionDigits:2}) + '\n';
+        text += '*ISH (3%):* $' + _ishRecWA.toLocaleString('es-MX',{minimumFractionDigits:2}) + '\n';
+        text += '*Total c/impuestos:* $' + res.tarifaTotal.toLocaleString('es-MX',{minimumFractionDigits:2}) + '\n';
+        if (_ivaRecWA.folio) text += '🧾 Folio: ' + _ivaRecWA.folio + '\n';
         text += '🧾 RFC: ' + _ivaRecWA.rfc + (_ivaRecWA.razonSocial ? ' — ' + _ivaRecWA.razonSocial : '') + '\n';
       } else {
         text += '*Total:* $' + res.tarifaTotal + '\n';
@@ -7941,10 +7963,14 @@
 
         var _ivaRecPdf = parseIVAData(res.notas);
         if (_ivaRecPdf) {
+          var _ishRecPdf = _ivaRecPdf.ish || 0;
           row('Subtotal hospedaje','$'+_ivaRecPdf.subtotal.toLocaleString('es-MX'));
           row('IVA (16%)','$'+_ivaRecPdf.iva.toLocaleString('es-MX',{minimumFractionDigits:2}));
-          row('Total c/IVA','$'+res.tarifaTotal.toLocaleString('es-MX',{minimumFractionDigits:2}),17,17,17,true);
+          row('ISH (3%)','$'+_ishRecPdf.toLocaleString('es-MX',{minimumFractionDigits:2}));
+          row('Total c/impuestos','$'+res.tarifaTotal.toLocaleString('es-MX',{minimumFractionDigits:2}),17,17,17,true);
           dash();
+          if(_ivaRecPdf.folio) row('Folio factura',_ivaRecPdf.folio,100,140,80,true);
+          if(_ivaRecPdf.hotel) row('Establecimiento',_ivaRecPdf.hotel);
           row('RFC',_ivaRecPdf.rfc,100,140,80,true);
           if(_ivaRecPdf.razonSocial) row('Razon Social',_ivaRecPdf.razonSocial);
         } else {
@@ -8073,10 +8099,13 @@
       var _ivaConf = parseIVAData(res.notas);
       h += '<div class="receipt-row"><span class="receipt-label">Tarifa por noche</span><span class="receipt-value">$' + res.tarifa + '</span></div>';
       if (_ivaConf) {
+        var _ishConf = _ivaConf.ish || 0;
         h += '<div class="receipt-row"><span class="receipt-label">Subtotal (' + nights + ' noches)</span><span class="receipt-value">$' + _ivaConf.subtotal.toLocaleString('es-MX') + '</span></div>';
         h += '<div class="receipt-row"><span class="receipt-label">IVA (16%)</span><span class="receipt-value">$' + _ivaConf.iva.toLocaleString('es-MX',{minimumFractionDigits:2}) + '</span></div>';
-        h += '<div class="receipt-row"><span class="receipt-label" style="font-weight:700">Total c/IVA</span><span class="receipt-value" style="font-weight:700;font-size:15px">$' + res.tarifaTotal.toLocaleString('es-MX',{minimumFractionDigits:2}) + '</span></div>';
+        h += '<div class="receipt-row"><span class="receipt-label">ISH (3%)</span><span class="receipt-value">$' + _ishConf.toLocaleString('es-MX',{minimumFractionDigits:2}) + '</span></div>';
+        h += '<div class="receipt-row"><span class="receipt-label" style="font-weight:700">Total c/impuestos</span><span class="receipt-value" style="font-weight:700;font-size:15px">$' + res.tarifaTotal.toLocaleString('es-MX',{minimumFractionDigits:2}) + '</span></div>';
         h += '<div class="receipt-div"></div>';
+        if (_ivaConf.folio) h += '<div class="receipt-row"><span class="receipt-label">Folio Factura</span><span class="receipt-value" style="font-weight:700">' + _ivaConf.folio + '</span></div>';
         h += '<div class="receipt-row"><span class="receipt-label">RFC</span><span class="receipt-value">' + _ivaConf.rfc + '</span></div>';
         if (_ivaConf.razonSocial) h += '<div class="receipt-row"><span class="receipt-label">Razón Social</span><span class="receipt-value" style="font-size:10px;max-width:180px;text-align:right">' + _ivaConf.razonSocial + '</span></div>';
       } else {
@@ -8164,9 +8193,12 @@
       var _ivaWA = parseIVAData(res.notas);
       t += '*Tarifa/noche:* $' + res.tarifa + '\n';
       if (_ivaWA) {
+        var _ishWA = _ivaWA.ish || 0;
         t += '*Subtotal:* $' + _ivaWA.subtotal.toLocaleString('es-MX') + '\n';
         t += '*IVA (16%):* $' + _ivaWA.iva.toLocaleString('es-MX',{minimumFractionDigits:2}) + '\n';
-        t += '*Total c/IVA:* $' + res.tarifaTotal.toLocaleString('es-MX',{minimumFractionDigits:2}) + '\n';
+        t += '*ISH (3%):* $' + _ishWA.toLocaleString('es-MX',{minimumFractionDigits:2}) + '\n';
+        t += '*Total c/impuestos:* $' + res.tarifaTotal.toLocaleString('es-MX',{minimumFractionDigits:2}) + '\n';
+        if (_ivaWA.folio) t += '🧾 Folio: ' + _ivaWA.folio + '\n';
         t += '🧾 RFC: ' + _ivaWA.rfc + (_ivaWA.razonSocial ? ' — ' + _ivaWA.razonSocial : '') + '\n';
       } else {
         t += '*Total estancia:* $' + res.tarifaTotal + '\n';
@@ -8278,10 +8310,14 @@
         var _ivaPdf = parseIVAData(res.notas);
         row('Tarifa/noche','$'+res.tarifa);
         if (_ivaPdf) {
+          var _ishPdf = _ivaPdf.ish || 0;
           row('Subtotal ('+nights+' noches)','$'+_ivaPdf.subtotal.toLocaleString('es-MX'));
           row('IVA (16%)','$'+_ivaPdf.iva.toLocaleString('es-MX',{minimumFractionDigits:2}));
-          row('Total c/IVA','$'+res.tarifaTotal.toLocaleString('es-MX',{minimumFractionDigits:2}),17,17,17,true);
+          row('ISH (3%)','$'+_ishPdf.toLocaleString('es-MX',{minimumFractionDigits:2}));
+          row('Total c/impuestos','$'+res.tarifaTotal.toLocaleString('es-MX',{minimumFractionDigits:2}),17,17,17,true);
           dash();
+          if(_ivaPdf.folio) row('Folio factura',_ivaPdf.folio,100,140,80,true);
+          if(_ivaPdf.hotel) row('Establecimiento',_ivaPdf.hotel);
           row('RFC',_ivaPdf.rfc,100,140,80,true);
           if(_ivaPdf.razonSocial) row('Razon Social',_ivaPdf.razonSocial);
         } else {
@@ -9106,7 +9142,7 @@
       h += '<div style="background:var(--surface2);border-radius:var(--radius);padding:14px;margin-bottom:12px;">';
       h += '<div style="font-weight:700;font-size:13px;margin-bottom:6px">Cargo por persona adicional</div>';
       h += '<div style="font-size:12px;color:var(--text2);margin-bottom:8px">Configurado en Datos del Hotel → Persona extra</div>';
-      h += '<div style="font-size:18px;font-weight:800;color:var(--accent);font-family:Space Mono,monospace">$' + _fmt(hi.persona_extra || 0) + ' MXN + IVA</div>';
+      h += '<div style="font-size:18px;font-weight:800;color:var(--accent);font-family:Space Mono,monospace">$' + _fmt(hi.persona_extra || 0) + ' MXN + impuestos</div>';
       h += '<div style="font-size:11px;color:var(--text2);margin-top:4px">por persona, por noche</div>';
       h += '</div>';
 
@@ -9134,7 +9170,7 @@
       h += '<div style="font-size:11px;color:var(--text2);line-height:1.6">';
       h += '👤 <strong>Ocupación base:</strong> La tarifa ampara máximo ' + ocupBase + ' personas por habitación.<br>';
       if (hi.persona_extra > 0) {
-        h += '👥 <strong>Persona adicional:</strong> $' + _fmt(hi.persona_extra) + ' MXN + IVA por persona extra, por noche.<br>';
+        h += '👥 <strong>Persona adicional:</strong> $' + _fmt(hi.persona_extra) + ' MXN + impuestos por persona extra, por noche.<br>';
       }
       h += '👶 <strong>Menores:</strong> Niños menores de ' + menoresLimite + ' años sin costo compartiendo cama (máx. 1 por hab.).<br>';
       h += '🚪 <strong>Capacidad máxima:</strong> ' + rules.map(function(r) { return r.tipo + ': ' + r.maxPersonas + ' pers.'; }).join(' · ');
@@ -10047,7 +10083,7 @@
       { title: 'Menores de edad', text: 'Los menores de edad deberán estar acompañados en todo momento por un adulto responsable registrado en la reservación.' },
       { title: 'Responsabilidad', text: 'El hotel no se hace responsable por objetos de valor no depositados en la caja de seguridad de la habitación. Se recomienda su uso durante la estancia.' },
       { title: 'Ocupación base', text: 'La tarifa base publicada ampara la estadía de un máximo de ' + (getHotelInfo().ocupacionBase || 2) + ' persona(s) por habitación.' },
-      { title: 'Cargo por persona adicional', text: 'Toda persona extra que pernocte o haga uso de la habitación superando la ocupación base de dos (2) personas estará sujeta a un cargo adicional obligatorio de $' + (getHotelInfo().persona_extra || 150) + '.00 MXN + IVA por persona, por noche. El pago de esta tarifa no garantiza automáticamente la instalación de una cama supletoria, la cual estará sujeta a disponibilidad y al espacio físico asignado en la habitación.' },
+      { title: 'Cargo por persona adicional', text: 'Toda persona extra que pernocte o haga uso de la habitación superando la ocupación base de dos (2) personas estará sujeta a un cargo adicional obligatorio de $' + (getHotelInfo().persona_extra || 150) + '.00 MXN + impuestos por persona, por noche. El pago de esta tarifa no garantiza automáticamente la instalación de una cama supletoria, la cual estará sujeta a disponibilidad y al espacio físico asignado en la habitación.' },
       { title: 'Política de menores (persona extra)', text: 'Niños menores de ' + (getHotelInfo().menoresEdadLimite || 11) + ' años pueden hospedarse sin costo adicional compartiendo las camas existentes con sus padres o tutores (máximo 1 menor gratis por habitación). A partir de los ' + ((getHotelInfo().menoresEdadLimite || 11) + 1) + ' años, todo huésped será considerado como adulto para efectos de la tarifa y aplicará el cargo por persona extra.' },
       { title: 'Capacidad máxima por habitación', text: 'Por disposiciones legales y normativas de seguridad e incendios: ' + (getHotelInfo().occupancyRules || DEFAULT_HOTEL_INFO.occupancyRules).map(function(r) { return r.tipo + ': máximo ' + r.maxPersonas + ' personas'; }).join('. ') + '. El hotel se reserva el derecho de rechazar el ingreso o requerir una habitación adicional si se supera la capacidad máxima.' }
     ];
@@ -10061,7 +10097,7 @@
       if (!terms) terms = DEFAULT_TERMS.map(function(t) { return { title: t.title, text: t.text }; });
       // Always inject current hotel hours into the Check-in/Check-out term
       var hi = getHotelInfo();
-      var peCargoStr = '$' + (hi.persona_extra || 150) + '.00 MXN + IVA';
+      var peCargoStr = '$' + (hi.persona_extra || 150) + '.00 MXN + impuestos';
       var _tOcupBase = hi.ocupacionBase || 2;
       var _tMenoresLim = hi.menoresEdadLimite || 11;
       var _tOcupRules = hi.occupancyRules || DEFAULT_HOTEL_INFO.occupancyRules;
@@ -10379,12 +10415,14 @@
             ${(function(){
               var _iva = parseIVAData(res.notas);
               if (_iva) {
+                var _ishVal = _iva.ish || 0;
                 return '<div style="font-size:11px;color:var(--text2);margin-bottom:2px">Subtotal: $' + _iva.subtotal.toLocaleString('es-MX') + '</div>' +
                   '<div style="font-size:11px;color:var(--text2);margin-bottom:2px">IVA (16%): $' + _iva.iva.toLocaleString('es-MX',{minimumFractionDigits:2}) + '</div>' +
+                  '<div style="font-size:11px;color:var(--text2);margin-bottom:2px">ISH (3%): $' + _ishVal.toLocaleString('es-MX',{minimumFractionDigits:2}) + '</div>' +
                   '<div style="font-size:20px;font-weight:700;font-family:Space Mono,monospace;color:var(--accent)">$' + res.tarifaTotal.toLocaleString('es-MX',{minimumFractionDigits:2}) + '</div>' +
-                  '<div style="font-size:11px;color:var(--text2);margin-top:4px">$' + res.tarifa + ' × ' + daysUntil(res.fechaEntrada, res.fechaSalida) + ' noches + IVA</div>' +
+                  '<div style="font-size:11px;color:var(--text2);margin-top:4px">$' + res.tarifa + ' × ' + daysUntil(res.fechaEntrada, res.fechaSalida) + ' noches + impuestos</div>' +
                   '<div style="margin-top:6px;padding:6px 8px;background:rgba(139,170,106,0.1);border:1px solid var(--accent);border-radius:6px;font-size:11px">' +
-                  '🧾 <strong>Factura</strong> — RFC: ' + _iva.rfc + ((_iva.razonSocial) ? ' — ' + _iva.razonSocial : '') + '</div>';
+                  '🧾 <strong>Factura' + (_iva.folio ? ' ' + _iva.folio : '') + '</strong>' + (_iva.hotel ? ' — ' + _iva.hotel : '') + '<br>RFC: ' + _iva.rfc + ((_iva.razonSocial) ? ' — ' + _iva.razonSocial : '') + '</div>';
               }
               return '<div style="font-size:20px;font-weight:700;font-family:Space Mono,monospace;color:var(--accent)">$' + res.tarifaTotal + '</div>' +
                 '<div style="font-size:11px;color:var(--text2);margin-top:4px">$' + res.tarifa + ' × ' + daysUntil(res.fechaEntrada, res.fechaSalida) + ' noches</div>';
@@ -11002,8 +11040,9 @@
       var infoEl = document.getElementById('payIVAInfo');
       var monto = parseFloat(montoInput.value) || 0;
       if (checked && monto > 0) {
-        var iva = Math.round(monto * 0.16 * 100) / 100;
-        infoEl.textContent = '+IVA: $' + iva.toLocaleString('es-MX', {minimumFractionDigits:2}) + ' = $' + (monto + iva).toLocaleString('es-MX', {minimumFractionDigits:2});
+        var iva = Math.round(monto * IVA_RATE * 100) / 100;
+        var ish = Math.round(monto * ISH_RATE * 100) / 100;
+        infoEl.innerHTML = '+IVA: $' + _fmt(iva) + ' +ISH: $' + _fmt(ish) + ' = <strong>$' + _fmt(monto + iva + ish) + '</strong>';
         infoEl.style.display = 'block';
       } else {
         infoEl.style.display = 'none';
@@ -11063,13 +11102,15 @@
       var resId = document.getElementById('payResId').value;
       var montoBase = parseFloat(document.getElementById('payMonto').value);
       var requiereFactura = document.getElementById('payFactura').checked;
-      var ivaAmount = requiereFactura ? Math.round(montoBase * 0.16 * 100) / 100 : 0;
-      var monto = montoBase + ivaAmount;
+      var ivaAmount = requiereFactura ? Math.round(montoBase * IVA_RATE * 100) / 100 : 0;
+      var ishAmount = requiereFactura ? Math.round(montoBase * ISH_RATE * 100) / 100 : 0;
+      var monto = montoBase + ivaAmount + ishAmount;
       var metodo = document.getElementById('payMetodo').value;
       var concepto = document.getElementById('payConcepto').value;
       var notas = document.getElementById('payNotas').value;
       if (requiereFactura) {
-        notas = (notas ? notas + ' | ' : '') + 'FACTURA — Subtotal: $' + montoBase.toLocaleString('es-MX', {minimumFractionDigits:2}) + ' + IVA: $' + ivaAmount.toLocaleString('es-MX', {minimumFractionDigits:2});
+        var _payFolio = nextFacturaFolio();
+        notas = (notas ? notas + ' | ' : '') + 'FACTURA ' + _payFolio + ' — Subtotal: $' + _fmt(montoBase) + ' + IVA: $' + _fmt(ivaAmount) + ' + ISH: $' + _fmt(ishAmount);
       }
 
       if (!montoBase || montoBase <= 0 || !metodo) {
@@ -11079,7 +11120,7 @@
 
       var res = S.reservas.find(r => r.id === resId);
       var existingPaid = S.cobros.filter(function(c){return c.reservaId===resId}).reduce(function(s,c){return s+c.monto},0);
-      var tarifaConIVA = requiereFactura ? res.tarifaTotal * 1.16 : res.tarifaTotal;
+      var tarifaConIVA = requiereFactura ? res.tarifaTotal * (1 + IVA_RATE + ISH_RATE) : res.tarifaTotal;
       var currentBalance = tarifaConIVA - existingPaid;
       if (currentBalance <= 0) {
         toast('Esta reserva ya está pagada', false);
@@ -11157,11 +11198,13 @@
       var tarifa = parseFloat(document.getElementById('newResTarifa').value) || 0;
       var checkin = document.getElementById('newResCheckIn').value;
       var checkout = document.getElementById('newResCheckOut').value;
-      if (!checkin || !checkout || !tarifa) { infoEl.textContent = 'Llena tarifa y fechas para ver desglose IVA'; return; }
+      if (!checkin || !checkout || !tarifa) { infoEl.textContent = 'Llena tarifa y fechas para ver desglose'; return; }
       var days = daysUntil(checkin, checkout);
       var subtotal = days * tarifa;
-      var iva = Math.round(subtotal * 0.16 * 100) / 100;
-      infoEl.innerHTML = '🧾 Subtotal: <strong>$' + subtotal.toLocaleString('es-MX') + '</strong> + IVA (16%): <strong>$' + iva.toLocaleString('es-MX', {minimumFractionDigits:2}) + '</strong> = Total: <strong>$' + (subtotal + iva).toLocaleString('es-MX', {minimumFractionDigits:2}) + '</strong>';
+      var iva = Math.round(subtotal * IVA_RATE * 100) / 100;
+      var ish = Math.round(subtotal * ISH_RATE * 100) / 100;
+      var total = subtotal + iva + ish;
+      infoEl.innerHTML = '🧾 Subtotal: <strong>$' + _fmt(subtotal) + '</strong><br>IVA (16%): <strong>$' + _fmt(iva) + '</strong> · ISH (3%): <strong>$' + _fmt(ish) + '</strong><br>Total: <strong>$' + _fmt(total) + '</strong>';
     }
 
     function toggleNewResPayment() {
@@ -11182,7 +11225,7 @@
       var days = daysUntil(checkin, checkout);
       var subtotal = days * tarifa;
       var factura = document.getElementById('newResFactura') && document.getElementById('newResFactura').checked;
-      var total = factura ? subtotal + Math.round(subtotal * 0.16 * 100) / 100 : subtotal;
+      var total = factura ? subtotal + Math.round(subtotal * IVA_RATE * 100) / 100 + Math.round(subtotal * ISH_RATE * 100) / 100 : subtotal;
       var monto = Math.ceil(total * (pct / 100));
       document.getElementById('newResPayMonto').value = monto;
     }
@@ -11286,8 +11329,9 @@
         const subtotal = days * tarifa;
         var factura = document.getElementById('newResFactura') && document.getElementById('newResFactura').checked;
         if (factura) {
-          var iva = Math.round(subtotal * 0.16 * 100) / 100;
-          document.getElementById('newResTotal').innerHTML = '<span style="font-size:11px;color:var(--text2)">Subtotal $' + subtotal.toLocaleString('es-MX') + ' + IVA $' + iva.toLocaleString('es-MX',{minimumFractionDigits:2}) + '</span><br>$' + (subtotal + iva).toLocaleString('es-MX',{minimumFractionDigits:2});
+          var iva = Math.round(subtotal * IVA_RATE * 100) / 100;
+          var ish = Math.round(subtotal * ISH_RATE * 100) / 100;
+          document.getElementById('newResTotal').innerHTML = '<span style="font-size:11px;color:var(--text2)">Subtotal $' + _fmt(subtotal) + ' + IVA $' + _fmt(iva) + ' + ISH $' + _fmt(ish) + '</span><br>$' + _fmt(subtotal + iva + ish);
         } else {
           document.getElementById('newResTotal').textContent = '$' + subtotal;
         }
@@ -11367,10 +11411,12 @@
         const days = daysUntil(checkin, checkout);
         const subtotal = days * tarifa;
         var ivaAmount = 0;
+        var ishAmount = 0;
         if (wantsFactura) {
-          ivaAmount = Math.round(subtotal * 0.16 * 100) / 100;
+          ivaAmount = Math.round(subtotal * IVA_RATE * 100) / 100;
+          ishAmount = Math.round(subtotal * ISH_RATE * 100) / 100;
         }
-        const total = subtotal + ivaAmount;
+        const total = subtotal + ivaAmount + ishAmount;
         const n = now();
         const fecha = normDate(new Date());
         const hora = n.split(' ')[1];
@@ -11378,7 +11424,9 @@
         // Build notas: combine user notes with IVA data if applicable
         var notas = notasText;
         if (wantsFactura) {
-          var ivaData = JSON.stringify({factura:true, rfc:rfc, razonSocial:razonSocial, subtotal:subtotal, iva:ivaAmount});
+          var _factFolio = nextFacturaFolio();
+          var _hi = getHotelInfo();
+          var ivaData = JSON.stringify({factura:true, folio:_factFolio, hotel:_hi.nombre, rfc:rfc, razonSocial:razonSocial, subtotal:subtotal, iva:ivaAmount, ish:ishAmount});
           notas = (notasText ? notasText + ' | ' : '') + '[IVA:' + ivaData + ']';
         }
 
@@ -11454,9 +11502,10 @@
       h += '<div style="font-size:13px;color:#666;margin-bottom:4px">' + formatDate(res.fechaEntrada) + ' → ' + formatDate(res.fechaSalida) + '</div>';
       var _ivaPost = parseIVAData(res.notas);
       if (_ivaPost) {
-        h += '<div style="font-size:12px;color:#666;margin:4px 0">Subtotal: $' + _ivaPost.subtotal.toLocaleString('es-MX') + ' + IVA: $' + _ivaPost.iva.toLocaleString('es-MX',{minimumFractionDigits:2}) + '</div>';
+        var _ishPost = _ivaPost.ish || 0;
+        h += '<div style="font-size:12px;color:#666;margin:4px 0">Sub: $' + _ivaPost.subtotal.toLocaleString('es-MX') + ' + IVA: $' + _ivaPost.iva.toLocaleString('es-MX',{minimumFractionDigits:2}) + ' + ISH: $' + _ishPost.toLocaleString('es-MX',{minimumFractionDigits:2}) + '</div>';
         h += '<div style="font-size:18px;font-weight:700;font-family:Space Mono,monospace;color:#333;margin:4px 0 12px">Total: $' + res.tarifaTotal.toLocaleString('es-MX',{minimumFractionDigits:2}) + '</div>';
-        h += '<div style="font-size:11px;color:#8b6914;background:#fff8e1;border-radius:6px;padding:6px;margin-bottom:10px">🧾 Factura — RFC: ' + _ivaPost.rfc + '</div>';
+        h += '<div style="font-size:11px;color:#8b6914;background:#fff8e1;border-radius:6px;padding:6px;margin-bottom:10px">🧾 Factura' + (_ivaPost.folio ? ' ' + _ivaPost.folio : '') + ' — RFC: ' + _ivaPost.rfc + '</div>';
       } else {
         h += '<div style="font-size:18px;font-weight:700;font-family:Space Mono,monospace;color:#333;margin:12px 0">Total: $' + res.tarifaTotal + '</div>';
       }
@@ -12308,7 +12357,7 @@
                 var t = '🛏️ *Políticas de Ocupación*\n_' + _oHi.nombre + '_\n\n';
                 t += '👤 *Ocupación base:* La tarifa incluye máximo *' + _oBase + ' personas* por habitación.\n\n';
                 if (_oPe > 0) {
-                  t += '👥 *Persona adicional:* $' + _fmt(_oPe) + ' MXN + IVA por persona extra, por noche. Cama supletoria sujeta a disponibilidad.\n\n';
+                  t += '👥 *Persona adicional:* $' + _fmt(_oPe) + ' MXN + impuestos por persona extra, por noche. Cama supletoria sujeta a disponibilidad.\n\n';
                 }
                 t += '👶 *Menores:* Niños menores de ' + _oMenores + ' años sin costo compartiendo cama con padres (máx. 1 por hab.). A partir de ' + (_oMenores + 1) + ' años se considera adulto.\n\n';
                 t += '🚪 *Capacidad máxima por habitación:*\n';
@@ -12324,7 +12373,7 @@
                 var _oRules = _oHi.occupancyRules || DEFAULT_HOTEL_INFO.occupancyRules;
                 var _oPe = _oHi.persona_extra || 0;
                 var t = 'Ocupación base: máximo ' + _oBase + ' personas por habitación.\n';
-                if (_oPe > 0) t += 'Persona adicional: $' + _fmt(_oPe) + ' MXN + IVA por persona extra, por noche.\n';
+                if (_oPe > 0) t += 'Persona adicional: $' + _fmt(_oPe) + ' MXN + impuestos por persona extra, por noche.\n';
                 t += 'Menores de ' + _oMenores + ' años: sin costo compartiendo cama (máx. 1 por hab.).\n';
                 t += 'Capacidad máxima:\n';
                 _oRules.forEach(function(r) { t += '  ' + r.tipo + ': ' + r.maxPersonas + ' personas\n'; });
