@@ -13,6 +13,7 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
   <style>
     * {
       margin: 0;
@@ -2508,6 +2509,7 @@
       endDate: '',
       partner: 'Restaurante Cafeteria Mozzafiato',
       descripcion: 'Desayuno continental: jugo natural, fruta de temporada, pan artesanal, café o té ilimitado',
+      horario: '8:00 AM a 4:00 PM',
       precioPorPersona: 150,
       rules: [
         { tipo: 'Doble', personas: 2 },
@@ -3810,8 +3812,14 @@
         '<div id="validarResult" style="margin-top:20px;"></div>' +
         '<div id="validarHistory" style="margin-top:30px;"></div>';
 
-      // Auto-focus
-      setTimeout(function() { document.getElementById('validarCode').focus(); }, 100);
+      // Auto-fill from QR code link (?validar&code=DES-XXXX)
+      var urlCode = new URLSearchParams(window.location.search).get('code');
+      if (urlCode) {
+        document.getElementById('validarCode').value = urlCode.toUpperCase();
+        setTimeout(function() { validarDesayunoCode(); }, 300);
+      } else {
+        setTimeout(function() { document.getElementById('validarCode').focus(); }, 100);
+      }
 
       // Enter key support
       document.getElementById('validarCode').addEventListener('keydown', function(e) {
@@ -6937,15 +6945,18 @@
       h += '<div class="report-box" style="text-align:center;padding:10px;"><div style="font-size:22px;font-weight:800;color:var(--accent);">' + des.length + '</div><div style="font-size:10px;color:var(--text2);">Total códigos</div></div>';
       h += '</div>';
 
-      // Validation link
+      // Validation link + QR
       if (promoActive && S.scriptUrl) {
         var valLink = window.location.origin + window.location.pathname + '?validar&u=' + encodeURIComponent(S.scriptUrl);
         h += '<div style="background:var(--surface3);padding:10px 12px;border-radius:var(--radius);margin-bottom:14px;">';
-        h += '<div style="font-size:11px;color:var(--text2);margin-bottom:4px;">Link de validación para restaurante:</div>';
-        h += '<div style="display:flex;gap:6px;">';
-        h += '<button class="form-button secondary" onclick="navigator.clipboard.writeText(\'' + valLink.replace(/'/g, "\\'") + '\');toast(\'Link copiado\')" style="font-size:11px;padding:6px 10px;flex:1;">📋 Copiar link</button>';
+        h += '<div style="font-size:11px;color:var(--text2);margin-bottom:6px;">Link de validación para restaurante:</div>';
+        h += '<div style="display:flex;gap:10px;align-items:center;">';
+        h += '<canvas id="valQrCanvas" width="80" height="80" style="border-radius:6px;background:#fff;padding:4px;width:80px;height:80px;flex-shrink:0;"></canvas>';
+        h += '<div style="flex:1;display:flex;flex-direction:column;gap:6px;">';
+        h += '<button class="form-button secondary" onclick="navigator.clipboard.writeText(\'' + valLink.replace(/'/g, "\\'") + '\');toast(\'Link copiado\')" style="font-size:11px;padding:6px 10px;">📋 Copiar link</button>';
         h += '<button class="form-button secondary" onclick="window.open(\'' + valLink.replace(/'/g, "\\'") + '\',\'_blank\')" style="font-size:11px;padding:6px 10px;">🔗 Abrir</button>';
-        h += '</div></div>';
+        h += '<button class="form-button secondary" onclick="shareValidationQR()" style="font-size:11px;padding:6px 10px;">📤 Compartir QR</button>';
+        h += '</div></div></div>';
       }
 
       // Today's pending codes
@@ -7027,6 +7038,33 @@
       h += '</div>';
 
       document.getElementById('desayunosContent').innerHTML = h;
+
+      // Render validation QR after DOM update
+      if (promoActive && S.scriptUrl) {
+        setTimeout(function() {
+          var qrEl = document.getElementById('valQrCanvas');
+          if (qrEl && typeof QRious !== 'undefined') {
+            var valLink = window.location.origin + window.location.pathname + '?validar&u=' + encodeURIComponent(S.scriptUrl);
+            new QRious({ element: qrEl, value: valLink, size: 200, level: 'M' });
+          }
+        }, 50);
+      }
+    }
+
+    function shareValidationQR() {
+      var qrEl = document.getElementById('valQrCanvas');
+      if (!qrEl) return;
+      qrEl.toBlob(function(blob) {
+        var file = new File([blob], 'QR_Validacion_Desayuno.png', { type: 'image/png' });
+        if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+          navigator.share({ files: [file], title: 'QR Validación Desayuno', text: 'Escanea este QR para validar códigos de desayuno' }).catch(function(){});
+        } else {
+          var url = URL.createObjectURL(blob);
+          var a = document.createElement('a'); a.href = url; a.download = 'QR_Validacion_Desayuno.png'; a.click();
+          URL.revokeObjectURL(url);
+          toast('QR descargado');
+        }
+      });
     }
 
     // --- Bitácora (existing, refactored) ---
@@ -8758,6 +8796,11 @@
       h += '<textarea id="bfDescripcion" class="login-input" rows="3" placeholder="Ej: Desayuno continental: jugo natural, fruta de temporada, pan artesanal, café o té ilimitado" oninput="updateBreakfastField(\'descripcion\',this.value)" style="padding:8px;font-size:12px;resize:vertical;width:100%;box-sizing:border-box;font-family:inherit">' + (promo.descripcion || '') + '</textarea>';
       h += '<div style="font-size:10px;color:var(--text2);margin-top:2px">Aparece en cotizaciones y tickets de desayuno para el huésped</div></div>';
 
+      // Horario de desayuno
+      h += '<div style="margin-bottom:12px"><label class="form-label" style="font-size:11px">Horario de desayuno</label>';
+      h += '<input type="text" id="bfHorario" class="login-input" value="' + (promo.horario || '8:00 AM a 4:00 PM') + '" placeholder="Ej: 8:00 AM a 4:00 PM" oninput="updateBreakfastField(\'horario\',this.value)" style="padding:8px;font-size:12px">';
+      h += '<div style="font-size:10px;color:var(--text2);margin-top:2px">Se muestra en los mensajes de desayuno al huésped</div></div>';
+
       // Price per person
       h += '<div style="margin-bottom:12px"><label class="form-label" style="font-size:11px">Precio real del desayuno por persona (MXN)</label>';
       h += '<div style="display:flex;align-items:center;gap:8px;">';
@@ -10238,82 +10281,90 @@
       var valorReal = totalPers * (promo.precioPorPersona || 0);
 
       var { jsPDF } = window.jspdf;
-      var cardW = 148, cardH = 105; // A6 landscape-ish
+      var cardW = 148, cardH = 115; // A6 landscape with extra room
       var doc = new jsPDF({ unit: 'mm', format: [cardW, cardH] });
+
+      // Build QR validation URL base
+      var qrBase = window.location.origin + window.location.pathname + '?validar&u=' + encodeURIComponent(S.scriptUrl) + '&code=';
 
       codes.forEach(function(code, idx) {
         if (idx > 0) doc.addPage([cardW, cardH]);
-        var y = 8;
 
-        // Green gradient header bar
-        doc.setFillColor(46, 125, 50); doc.rect(0, 0, cardW, 28, 'F');
-        doc.setFillColor(56, 142, 60); doc.rect(0, 24, cardW, 4, 'F');
+        // Green header bar
+        doc.setFillColor(46, 125, 50); doc.rect(0, 0, cardW, 24, 'F');
+        doc.setFillColor(56, 142, 60); doc.rect(0, 21, cardW, 3, 'F');
 
         // Logo on header
-        try { doc.addImage(LOGO_H_DARK_B64 || LOGO_H_DARK, 'PNG', 6, 3, 36, 36 / LOGO_H_RATIO); } catch(e) {}
+        var logoW = 32, logoH = logoW / LOGO_H_RATIO;
+        try { doc.addImage(LOGO_H_DARK_B64 || LOGO_H_DARK, 'PNG', 6, (24 - logoH) / 2, logoW, logoH); } catch(e) {}
 
         // Title on header
-        doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
         doc.setTextColor(255, 255, 255);
-        doc.text('DESAYUNO INCLUIDO', cardW - 8, 11, { align: 'right' });
-        doc.setFontSize(8); doc.setFont('helvetica', 'normal');
-        doc.text('CORTESIA DEL HOTEL', cardW - 8, 17, { align: 'right' });
+        doc.text('DESAYUNO INCLUIDO', cardW - 8, 10, { align: 'right' });
+        doc.setFontSize(7); doc.setFont('helvetica', 'normal');
+        doc.text('CORTESIA DEL HOTEL', cardW - 8, 16, { align: 'right' });
         doc.setFontSize(6);
-        doc.text(promo.partner || '', cardW - 8, 23, { align: 'right' });
+        doc.text((promo.partner || '').normalize('NFD').replace(/[̀-ͯ]/g, ''), cardW - 8, 21, { align: 'right' });
 
-        y = 34;
+        var y = 29;
 
-        // Guest info
-        doc.setTextColor(80, 80, 80);
-        doc.setFont('helvetica', 'normal'); doc.setFontSize(7);
-        doc.text('HUESPED', 8, y); doc.text('HABITACION', 80, y); doc.text('FECHA', 115, y);
-        y += 5;
-        doc.setTextColor(17, 17, 17);
-        doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
-        doc.text(res.huesped.normalize('NFD').replace(/[̀-ͯ]/g, ''), 8, y);
-        doc.text(res.habitacionNum, 80, y);
-        doc.text(formatDate(code.fecha), 115, y);
+        // Guest info — compact row
+        doc.setTextColor(100, 100, 100);
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5);
+        doc.text('HUESPED', 8, y); doc.text('HAB.', 78, y); doc.text('FECHA', 100, y); doc.text('PERS.', 130, y);
         y += 4;
-        doc.setFont('helvetica', 'normal'); doc.setFontSize(7);
-        doc.setTextColor(100, 100, 100);
-        doc.text(code.personas + ' persona' + (code.personas > 1 ? 's' : ''), 8, y);
+        doc.setTextColor(17, 17, 17);
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5);
+        var guestName = res.huesped.normalize('NFD').replace(/[̀-ͯ]/g, '');
+        if (guestName.length > 25) guestName = guestName.substring(0, 24) + '...';
+        doc.text(guestName, 8, y);
+        doc.text(res.habitacionNum, 78, y);
+        doc.text(formatDate(code.fecha), 100, y);
+        doc.text(String(code.personas), 130, y);
 
-        y += 8;
+        y += 7;
 
-        // Code box — prominent
-        doc.setFillColor(245, 245, 245); doc.roundedRect(8, y, cardW - 16, 18, 3, 3, 'F');
-        doc.setDrawColor(46, 125, 50); doc.setLineWidth(0.5); doc.roundedRect(8, y, cardW - 16, 18, 3, 3, 'S');
-        doc.setFont('helvetica', 'bold'); doc.setFontSize(7);
+        // Code box + QR side by side
+        var qrSize = 22;
+        var codeBoxW = cardW - 16 - qrSize - 4;
+        doc.setFillColor(245, 245, 245); doc.roundedRect(8, y, codeBoxW, 18, 2, 2, 'F');
+        doc.setDrawColor(46, 125, 50); doc.setLineWidth(0.4); doc.roundedRect(8, y, codeBoxW, 18, 2, 2, 'S');
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(6);
         doc.setTextColor(100, 100, 100);
-        doc.text('CODIGO DE VERIFICACION', cardW / 2, y + 5, { align: 'center' });
-        doc.setFont('helvetica', 'bold'); doc.setFontSize(18);
+        doc.text('CODIGO DE VERIFICACION', 8 + codeBoxW / 2, y + 5, { align: 'center' });
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(16);
         doc.setTextColor(46, 125, 50);
-        doc.text(code.codigo, cardW / 2, y + 14, { align: 'center' });
+        doc.text(code.codigo, 8 + codeBoxW / 2, y + 14, { align: 'center' });
 
-        y += 22;
+        // QR code
+        try {
+          var qrCanvas = document.createElement('canvas');
+          new QRious({ element: qrCanvas, value: qrBase + encodeURIComponent(code.codigo), size: 200, level: 'M', backgroundAlpha: 0 });
+          doc.addImage(qrCanvas.toDataURL('image/png'), 'PNG', cardW - 8 - qrSize, y - 2, qrSize, qrSize);
+        } catch(e) { /* QR library not loaded */ }
 
-        // Value callout
+        y += 21;
+
+        // Value + description — compact
         if (valorReal > 0) {
           doc.setFont('helvetica', 'normal'); doc.setFontSize(6);
           doc.setTextColor(100, 100, 100);
-          var valText = 'Valor: $' + _fmt(promo.precioPorPersona || 0) + '/persona — CORTESIA $0';
-          doc.text(valText, cardW / 2, y, { align: 'center' });
+          doc.text('Valor: $' + _fmt(promo.precioPorPersona || 0) + '/persona — CORTESIA $0', cardW / 2, y, { align: 'center' });
           y += 4;
         }
-
-        // Description
         if (promo.descripcion) {
-          doc.setFont('helvetica', 'italic'); doc.setFontSize(6);
+          doc.setFont('helvetica', 'italic'); doc.setFontSize(5.5);
           doc.setTextColor(80, 80, 80);
           var descLines = doc.splitTextToSize(promo.descripcion.normalize('NFD').replace(/[̀-ͯ]/g, ''), cardW - 20);
-          descLines.forEach(function(ln) { doc.text(ln, cardW / 2, y, { align: 'center' }); y += 4; });
+          descLines.slice(0, 2).forEach(function(ln) { doc.text(ln, cardW / 2, y, { align: 'center' }); y += 3.5; });
         }
 
         // Footer
-        doc.setFillColor(46, 125, 50); doc.rect(0, cardH - 10, cardW, 10, 'F');
+        doc.setFillColor(46, 125, 50); doc.rect(0, cardH - 9, cardW, 9, 'F');
         doc.setFont('helvetica', 'normal'); doc.setFontSize(5.5);
         doc.setTextColor(255, 255, 255);
-        doc.text('Presente este codigo al llegar al restaurante', cardW / 2, cardH - 4, { align: 'center' });
+        doc.text('Presente este codigo o escanee el QR al llegar al restaurante', cardW / 2, cardH - 3.5, { align: 'center' });
       });
 
       var fname = 'Desayuno_' + res.huesped.replace(/\s+/g, '_') + '_' + res.id + '.pdf';
@@ -11740,23 +11791,28 @@
         var bfDesc = promo.descripcion || 'Desayuno continental';
         var bfPrecio = promo.precioPorPersona || 0;
 
+        var bfHorario = promo.horario || '8:00 AM a 4:00 PM';
         if (hasBf) {
-          // Already has codes — send them with instructions
+          // Already has codes — send them with instructions + wow savings
           var pendBfCodes = existingBf.filter(function(d) { return d.estado === 'Pendiente'; });
           var codesText = '';
+          var totalBfPersonas = 0;
           existingBf.forEach(function(d) {
             var statusIcon = d.estado === 'Pendiente' ? '🟢' : '✅';
             codesText += statusIcon + ' *' + d.codigo + '* — ' + formatDate(d.fecha) + ' (' + d.personas + ' pers.) ' + (d.estado !== 'Pendiente' ? '_(usado)_' : '') + '\n';
+            totalBfPersonas += d.personas;
           });
+          var ahorroTotal = totalBfPersonas * bfPrecio;
           msgCategories[3].messages.push({
             id: 'mp_desayuno_codes', name: 'Códigos de Desayuno', icon: '🍳', checked: false,
-            text: '🍳 *¡Tu reservación incluye desayuno!*\n\n¡Hola *' + res.huesped + '*! 🌿\n\nTu estancia en *' + hi.nombre + '* incluye desayuno cortesía de:\n\n☕ *' + partnerName + '*\n🍽️ _' + bfDesc + '_\n\n📋 *Tus códigos de desayuno:*\n' + codesText + '\n📌 *¿Cómo funciona?*\n1️⃣ Presenta tu código al mesero en *' + partnerName + '*\n2️⃣ El restaurante lo verifica en nuestro sistema\n3️⃣ ¡Disfruta tu desayuno sin costo adicional!\n\n⏰ Válido durante tu estancia\n💰 Valor por desayuno: $' + _fmt(bfPrecio) + ' por persona\n\n¡Buen provecho! 😊\n_' + hi.nombre + '_ 🌿'
+            text: '🍳 *¡Tu reservación incluye desayuno!*\n\n¡Hola *' + res.huesped + '*! 🌿\n\nTu estancia en *' + hi.nombre + '* incluye desayuno cortesía en:\n\n☕ *' + partnerName + '*\n🍽️ _' + bfDesc + '_\n🕐 *Horario:* ' + bfHorario + '\n\n📋 *Tus códigos de desayuno:*\n' + codesText + '\n💰 *¡Te estás ahorrando $' + _fmt(ahorroTotal) + ' MXN!*\n_(' + existingBf.length + ' desayuno(s) × $' + _fmt(bfPrecio) + ' c/u = GRATIS para ti)_\n\n📌 *¿Cómo funciona?*\n1️⃣ Ve a *' + partnerName + '* en horario de ' + bfHorario + '\n2️⃣ Presenta tu código al mesero\n3️⃣ ¡Disfruta tu desayuno sin costo adicional!\n\n¡Buen provecho! 😊\n_' + hi.nombre + '_ 🌿'
           });
         } else if (personas > 0) {
           // No codes yet — promo available, inform and suggest
+          var ahorroEstancia = bfPrecio * personas * nights;
           msgCategories[3].messages.push({
             id: 'mp_desayuno_info', name: 'Info Desayuno Incluido', icon: '🍳', checked: false,
-            text: '🍳 *¡Tu reservación incluye desayuno!*\n\n¡Hola *' + res.huesped + '*! 🌿\n\nTu estancia en *' + hi.nombre + '* incluye desayuno para *' + personas + ' persona(s)* por noche en:\n\n☕ *' + partnerName + '*\n🍽️ _' + bfDesc + '_\n\n🌙 ' + nights + ' noche(s) = *' + nights + ' desayuno(s)*\n💰 Valor: $' + _fmt(bfPrecio * personas * nights) + ' MXN de ahorro\n\n📌 *En recepción te daremos tus códigos de verificación* para presentar en el restaurante.\n\n¡Buen provecho! 😊\n_' + hi.nombre + '_ 🌿'
+            text: '🍳 *¡Tu reservación incluye desayuno!*\n\n¡Hola *' + res.huesped + '*! 🌿\n\nTu estancia en *' + hi.nombre + '* incluye desayuno para *' + personas + ' persona(s)* por noche en:\n\n☕ *' + partnerName + '*\n🍽️ _' + bfDesc + '_\n🕐 *Horario:* ' + bfHorario + '\n\n🌙 ' + nights + ' noche(s) × ' + personas + ' persona(s) = *' + (nights * personas) + ' desayuno(s)*\n\n💰 *¡Te estás ahorrando $' + _fmt(ahorroEstancia) + ' MXN!*\n_($' + _fmt(bfPrecio) + ' por persona × ' + (nights * personas) + ' = GRATIS para ti)_\n\n📌 *En recepción te daremos tus códigos de verificación* para presentar en el restaurante.\n\n¡Buen provecho! 😊\n_' + hi.nombre + '_ 🌿'
           });
         }
 
@@ -11771,7 +11827,7 @@
         // Mozzafiato recommendation
         msgCategories[3].messages.push({
           id: 'mp_mozzafiato', name: 'Recomendación ' + partnerName, icon: '☕', checked: false,
-          text: '☕ *' + partnerName + '*\n_El placer del buen café_\n\n¡Hola *' + res.huesped + '*!\n\nTe invitamos a conocer *' + partnerName + '*, nuestro restaurante asociado donde podrás disfrutar de:\n\n🍽️ _' + bfDesc + '_\n' + (hasBf ? '\n🍳 *Recuerda que tu estancia incluye desayuno* — presenta tu código al mesero.\n' : '') + '\n📖 *Menú digital:*\nhttps://mozzafiatoamor-rgb.github.io/mozzafiato-menu/index.html\n\n📱 *WhatsApp directo:*\nhttps://wa.me/529984088897\n\n¡Que disfrute su estadía! 😊\n_' + hi.nombre + '_ 🌿'
+          text: '☕ *' + partnerName + '*\n_El placer del buen café_\n\n¡Hola *' + res.huesped + '*!\n\nTe invitamos a conocer *' + partnerName + '*, nuestro restaurante asociado donde podrás disfrutar de:\n\n🍽️ _' + bfDesc + '_\n🕐 *Horario:* ' + bfHorario + '\n' + (hasBf ? '\n🍳 *Recuerda que tu estancia incluye desayuno* — presenta tu código al mesero.\n' : '') + '\n📖 *Menú digital:*\nhttps://mozzafiatoamor-rgb.github.io/mozzafiato-menu/index.html\n\n📱 *WhatsApp directo:*\nhttps://wa.me/529984088897\n\n¡Que disfrute su estadía! 😊\n_' + hi.nombre + '_ 🌿'
         });
       } else {
         // Promo not active, just show Mozzafiato recommendation
@@ -11798,7 +11854,7 @@
           mh += '<div style="font-size:13px;font-weight:600;">' + msg.icon + ' ' + msg.name + formalBadge + docBadge + '</div>';
           if (!msg.isDocument) mh += '<div style="font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + msg.text.substring(0, 60) + '...</div>';
           mh += '</div>';
-          if (!msg.isDocument) mh += '<button onclick="event.stopPropagation();previewMsgPanel(\'' + msg.id + '\')" style="background:none;border:none;color:var(--accent);font-size:11px;cursor:pointer;padding:4px 8px;white-space:nowrap;">👁️ Ver</button>';
+          if (!msg.isDocument) mh += '<button onclick="event.stopPropagation();editMsgPanel(\'' + msg.id + '\')" style="background:none;border:none;color:var(--accent);font-size:11px;cursor:pointer;padding:4px 8px;white-space:nowrap;">✏️ Editar</button>';
           mh += '</div>';
         });
         mh += '</div>';
@@ -11861,16 +11917,53 @@
       if (cb) cb.checked = !cb.checked;
     }
 
-    function previewMsgPanel(id) {
+    function editMsgPanel(id) {
       var msg = (window._msgPanelMsgs || {})[id];
       if (!msg) return;
       var overlay = '<div id="msgPreviewOverlay" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);z-index:10001;display:flex;align-items:center;justify-content:center;padding:20px" onclick="if(event.target===this)this.remove()">';
-      overlay += '<div style="background:var(--bg);border-radius:var(--radius);padding:20px;max-width:400px;width:100%;max-height:70vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)">';
-      overlay += '<div style="font-weight:700;margin-bottom:12px;font-size:14px">' + msg.icon + ' ' + msg.name + '</div>';
-      overlay += '<div style="white-space:pre-wrap;font-size:12px;line-height:1.6;color:var(--text);background:var(--surface2);padding:14px;border-radius:8px">' + msg.text.replace(/\n/g, '<br>').replace(/\*(.*?)\*/g, '<strong>$1</strong>').replace(/_(.*?)_/g, '<em>$1</em>') + '</div>';
-      overlay += '<button onclick="this.closest(\'#msgPreviewOverlay\').remove()" style="width:100%;margin-top:12px;padding:10px;background:var(--surface3);border:none;border-radius:8px;cursor:pointer;color:var(--text);font-family:inherit">Cerrar</button>';
+      overlay += '<div style="background:var(--bg);border-radius:var(--radius);padding:20px;max-width:420px;width:100%;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3)">';
+      overlay += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">';
+      overlay += '<div style="font-weight:700;font-size:14px">' + msg.icon + ' ' + msg.name + '</div>';
+      overlay += '<div style="display:flex;gap:6px;">';
+      overlay += '<button id="msgEditToggle" onclick="toggleMsgEdit(\'' + id + '\')" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:11px;cursor:pointer;font-family:inherit">✏️ Editar</button>';
+      overlay += '<button onclick="this.closest(\'#msgPreviewOverlay\').remove()" style="background:var(--surface3);border:none;border-radius:6px;padding:5px 10px;font-size:11px;cursor:pointer;color:var(--text);font-family:inherit">✕</button>';
+      overlay += '</div></div>';
+      // Preview mode
+      overlay += '<div id="msgPreviewView" style="flex:1;overflow-y:auto;white-space:pre-wrap;font-size:12px;line-height:1.6;color:var(--text);background:var(--surface2);padding:14px;border-radius:8px">' + msg.text.replace(/\n/g, '<br>').replace(/\*(.*?)\*/g, '<strong>$1</strong>').replace(/_(.*?)_/g, '<em>$1</em>') + '</div>';
+      // Edit mode (hidden initially)
+      overlay += '<textarea id="msgEditArea" style="display:none;flex:1;min-height:200px;width:100%;padding:12px;font-size:12px;line-height:1.5;border:2px solid var(--accent);border-radius:8px;background:var(--surface2);color:var(--text);font-family:inherit;resize:none;box-sizing:border-box">' + msg.text.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</textarea>';
+      overlay += '<div id="msgEditActions" style="display:none;margin-top:8px;display:flex;gap:8px;">';
+      overlay += '</div>';
       overlay += '</div></div>';
       document.body.insertAdjacentHTML('beforeend', overlay);
+    }
+
+    function toggleMsgEdit(id) {
+      var preview = document.getElementById('msgPreviewView');
+      var editor = document.getElementById('msgEditArea');
+      var toggleBtn = document.getElementById('msgEditToggle');
+      if (!preview || !editor) return;
+      var isEditing = editor.style.display !== 'none';
+      if (isEditing) {
+        // Save changes
+        var newText = editor.value;
+        if (window._msgPanelMsgs && window._msgPanelMsgs[id]) {
+          window._msgPanelMsgs[id].text = newText;
+        }
+        preview.innerHTML = newText.replace(/\n/g, '<br>').replace(/\*(.*?)\*/g, '<strong>$1</strong>').replace(/_(.*?)_/g, '<em>$1</em>');
+        preview.style.display = '';
+        editor.style.display = 'none';
+        toggleBtn.innerHTML = '✏️ Editar';
+        toggleBtn.style.background = 'var(--accent)';
+        toast('Mensaje actualizado');
+      } else {
+        // Enter edit mode
+        preview.style.display = 'none';
+        editor.style.display = '';
+        editor.focus();
+        toggleBtn.innerHTML = '💾 Guardar';
+        toggleBtn.style.background = 'var(--green)';
+      }
     }
 
     async function msgPanelSendWA() {
@@ -11936,10 +12029,14 @@
       if (_newBfCodes.length > 0) {
         var _promo = getBreakfastPromo();
         var _codesLines = '';
+        var _totalBfPers = 0;
         _newBfCodes.forEach(function(d) {
           _codesLines += '🟢 *' + d.codigo + '* — ' + formatDate(d.fecha) + ' (' + d.personas + ' pers.)\n';
+          _totalBfPers += d.personas;
         });
-        var _codesMsg = '🍳 *¡Tu reservación incluye desayuno!*\n\n¡Hola *' + res.huesped + '*! 🌿\n\nTu estancia en *' + getHotelInfo().nombre + '* incluye desayuno cortesía de:\n\n☕ *' + (_promo.partner || 'Restaurante') + '*\n🍽️ _' + (_promo.descripcion || 'Desayuno continental') + '_\n\n📋 *Tus códigos de desayuno:*\n' + _codesLines + '\n📌 *¿Cómo funciona?*\n1️⃣ Presenta tu código al mesero en *' + (_promo.partner || 'Restaurante') + '*\n2️⃣ El restaurante lo verifica en nuestro sistema\n3️⃣ ¡Disfruta tu desayuno sin costo adicional!\n\n⏰ Válido durante tu estancia\n💰 Valor por desayuno: $' + _fmt(_promo.precioPorPersona || 0) + ' por persona\n\n¡Buen provecho! 😊\n_' + getHotelInfo().nombre + '_ 🌿';
+        var _bfAhorro = _totalBfPers * (_promo.precioPorPersona || 0);
+        var _bfHorario = _promo.horario || '8:00 AM a 4:00 PM';
+        var _codesMsg = '🍳 *¡Tu reservación incluye desayuno!*\n\n¡Hola *' + res.huesped + '*! 🌿\n\nTu estancia en *' + getHotelInfo().nombre + '* incluye desayuno cortesía en:\n\n☕ *' + (_promo.partner || 'Restaurante') + '*\n🍽️ _' + (_promo.descripcion || 'Desayuno continental') + '_\n🕐 *Horario:* ' + _bfHorario + '\n\n📋 *Tus códigos de desayuno:*\n' + _codesLines + '\n💰 *¡Te estás ahorrando $' + _fmt(_bfAhorro) + ' MXN!*\n_(' + _newBfCodes.length + ' desayuno(s) × $' + _fmt(_promo.precioPorPersona || 0) + ' c/u = GRATIS para ti)_\n\n📌 *¿Cómo funciona?*\n1️⃣ Ve a *' + (_promo.partner || 'Restaurante') + '* en horario de ' + _bfHorario + '\n2️⃣ Presenta tu código al mesero\n3️⃣ ¡Disfruta tu desayuno sin costo adicional!\n\n¡Buen provecho! 😊\n_' + getHotelInfo().nombre + '_ 🌿';
         // Replace any generic desayuno info text, or add as new
         var _replaced = false;
         for (var _si = 0; _si < selectedTexts.length; _si++) {
