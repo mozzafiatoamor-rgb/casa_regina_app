@@ -10736,37 +10736,79 @@
       return canvas;
     }
 
+    // Convert dataURL to Blob (works on all browsers including iOS Safari)
+    function _dataURLtoBlob(dataURL) {
+      var parts = dataURL.split(',');
+      var mime = parts[0].match(/:(.*?);/)[1];
+      var raw = atob(parts[1]);
+      var arr = new Uint8Array(raw.length);
+      for (var i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+      return new Blob([arr], { type: mime });
+    }
+
     function shareBreakfastQRCard(codeId) {
       var codeObj = (S.desayunos || []).find(function(d) { return d.codigo === codeId; });
       if (!codeObj) { toast('Código no encontrado', true); return; }
       var res = S.reservas.find(function(r) { return r.id === codeObj.reservaId; });
       var promo = getBreakfastPromo();
+      var hi = getHotelInfo();
 
       var canvas = generateBreakfastQRCard(codeObj);
-      canvas.toBlob(function(blob) {
-        var fname = 'Desayuno_' + codeObj.codigo + '.png';
-        var file = new File([blob], fname, { type: 'image/png' });
-        if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-          navigator.share({
-            files: [file],
-            title: 'Desayuno ' + codeObj.codigo,
-            text: '🍳 Tu código de desayuno cortesía en ' + (promo.partner || 'el restaurante') + '. Presenta este QR al mesero.'
-          }).catch(function(){});
-        } else {
-          // Fallback: download image + open WhatsApp with message
-          var url = URL.createObjectURL(blob);
-          var a = document.createElement('a'); a.href = url; a.download = fname; a.click();
-          URL.revokeObjectURL(url);
-          toast('Imagen descargada — envíala por WhatsApp');
-          var phone = res ? getGuestPhone(res).replace(/\D/g, '') : '';
-          if (phone) {
-            setTimeout(function() {
-              var msg = '🍳 *DESAYUNO CORTESIA*\n\nHola *' + codeObj.huesped + '*! Aquí está tu ficha de desayuno.\n\n🎟️ Código: *' + codeObj.codigo + '*\n📅 Fecha: ' + formatDate(codeObj.fecha) + '\n👥 ' + codeObj.personas + ' persona(s)\n🕐 Horario: ' + (promo.horario || '8:00 AM a 4:00 PM') + '\n\n📱 *Muestra la imagen al mesero en ' + (promo.partner || 'el restaurante') + '* para que escanee tu QR.\n\n_' + getHotelInfo().nombre + '_ 🌿';
-              window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(msg), '_blank');
-            }, 500);
-          }
+      var fname = 'Desayuno_' + codeObj.codigo + '.png';
+      var waMsg = '🍳 *DESAYUNO CORTESIA*\n\nHola *' + codeObj.huesped + '*! Aquí está tu ficha de desayuno.\n\n🎟️ Código: *' + codeObj.codigo + '*\n📅 Fecha: ' + formatDate(codeObj.fecha) + '\n👥 ' + codeObj.personas + ' persona(s)\n🕐 Horario: ' + (promo.horario || '8:00 AM a 4:00 PM') + '\n\n📱 *Muestra la imagen al mesero en ' + (promo.partner || 'el restaurante') + '* para que escanee tu QR.\n\n_' + hi.nombre + '_ 🌿';
+      var phone = res ? getGuestPhone(res).replace(/\D/g, '') : '';
+
+      // Use toDataURL (universal) → convert to Blob (avoids iOS toBlob issues)
+      var dataURL = canvas.toDataURL('image/png');
+      var blob = _dataURLtoBlob(dataURL);
+
+      // Try Web Share API with files
+      var canShareFiles = false;
+      try {
+        if (navigator.share && navigator.canShare) {
+          var testFile = new File([blob], fname, { type: 'image/png' });
+          canShareFiles = navigator.canShare({ files: [testFile] });
         }
-      }, 'image/png');
+      } catch(e) { canShareFiles = false; }
+
+      if (canShareFiles) {
+        var file = new File([blob], fname, { type: 'image/png' });
+        navigator.share({
+          files: [file],
+          title: 'Desayuno ' + codeObj.codigo,
+          text: '🍳 Tu código de desayuno cortesía. Presenta este QR al mesero.'
+        }).catch(function(err) {
+          // If share was cancelled or failed, show image overlay as fallback
+          if (err.name !== 'AbortError') _showQRImageOverlay(dataURL, fname, phone, waMsg);
+        });
+      } else {
+        // Fallback: show image overlay for save + WhatsApp
+        _showQRImageOverlay(dataURL, fname, phone, waMsg);
+      }
+    }
+
+    // Fullscreen overlay showing the QR card image — user can long-press to save (iOS) or tap download
+    function _showQRImageOverlay(dataURL, fname, phone, waMsg) {
+      var ov = document.createElement('div');
+      ov.id = 'qrImageOverlay';
+      ov.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.85);z-index:10002;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px';
+      ov.onclick = function(e) { if (e.target === ov) ov.remove(); };
+
+      var inner = '<div style="max-width:380px;width:100%;text-align:center">';
+      inner += '<div style="color:#fff;font-size:13px;margin-bottom:12px;line-height:1.4">📱 Mantén presionada la imagen para guardarla, luego envíala por WhatsApp</div>';
+      inner += '<img src="' + dataURL + '" style="width:100%;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.5)" />';
+      inner += '<div style="display:flex;gap:8px;margin-top:14px">';
+      // Download button
+      inner += '<a href="' + dataURL + '" download="' + fname + '" style="flex:1;display:block;background:var(--accent,#3b82f6);color:#fff;padding:12px;border-radius:8px;text-decoration:none;font-size:13px;font-weight:600;text-align:center">⬇️ Descargar</a>';
+      // WhatsApp button
+      if (phone) {
+        inner += '<a href="https://wa.me/' + phone + '?text=' + encodeURIComponent(waMsg) + '" target="_blank" style="flex:1;display:block;background:#25D366;color:#fff;padding:12px;border-radius:8px;text-decoration:none;font-size:13px;font-weight:600;text-align:center">📲 WhatsApp</a>';
+      }
+      inner += '</div>';
+      inner += '<button onclick="this.closest(\'#qrImageOverlay\').remove()" style="margin-top:10px;background:none;border:1px solid rgba(255,255,255,.3);color:#fff;padding:8px 20px;border-radius:8px;font-size:12px;cursor:pointer;width:100%">Cerrar</button>';
+      inner += '</div>';
+      ov.innerHTML = inner;
+      document.body.appendChild(ov);
     }
 
     async function cancelBreakfastCodes(resId) {
