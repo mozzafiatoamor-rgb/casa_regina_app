@@ -3903,7 +3903,7 @@
     async function validarDesayunoCode() {
       var code = (document.getElementById('validarCode').value || '').trim().toUpperCase();
       var resultDiv = document.getElementById('validarResult');
-      if (!code) { resultDiv.innerHTML = '<p style="color:var(--danger);text-align:center;">Ingresa un código</p>'; return; }
+      if (!code) { resultDiv.innerHTML = '<p style="color:#dc3545;text-align:center;">Ingresa un código</p>'; return; }
 
       resultDiv.innerHTML = '<p style="text-align:center;">Buscando...</p>';
 
@@ -3931,10 +3931,10 @@
 
         if (!found) {
           resultDiv.innerHTML =
-            '<div style="text-align:center;padding:20px;background:var(--danger-light,#fee);border-radius:12px;">' +
+            '<div style="text-align:center;padding:20px;background:#f8d7da;border-radius:12px;border:2px solid #dc3545;">' +
               '<div style="font-size:48px;margin-bottom:8px;">❌</div>' +
-              '<p style="font-size:18px;font-weight:600;color:var(--danger);">Código no encontrado</p>' +
-              '<p style="color:var(--text-secondary);font-size:14px;">Verifica que el código sea correcto</p>' +
+              '<p style="font-size:18px;font-weight:600;color:#842029;">Código no encontrado</p>' +
+              '<p style="color:#6c757d;font-size:14px;">Verifica que el código sea correcto</p>' +
             '</div>';
           return;
         }
@@ -3944,56 +3944,102 @@
         var habitacion = String(found[3]);
         var fecha = String(found[4]).substring(0, 10);
         var personas = parseInt(found[5]) || 1;
-        var today = new Date().toISOString().substring(0, 10);
+        // Use LOCAL date (not UTC) to avoid timezone issues
+        var _now = new Date();
+        var today = _now.getFullYear() + '-' + String(_now.getMonth() + 1).padStart(2, '0') + '-' + String(_now.getDate()).padStart(2, '0');
+
+        // Load promo hours
+        var promoHorario = '';
+        try {
+          var cfgData2 = await _rd('⚙️ Config', 'A2:B50');
+          for (var ci2 = 0; ci2 < cfgData2.length; ci2++) {
+            if (cfgData2[ci2][0] === 'breakfastPromo') {
+              try { promoHorario = JSON.parse(cfgData2[ci2][1]).horario || '8:00 AM a 4:00 PM'; } catch(e) { promoHorario = '8:00 AM a 4:00 PM'; }
+            }
+          }
+        } catch(e) { promoHorario = '8:00 AM a 4:00 PM'; }
+        if (!promoHorario) promoHorario = '8:00 AM a 4:00 PM';
+
+        // Guest info block (reused in multiple states)
+        var _guestBlock =
+          '<div style="background:rgba(0,0,0,0.04);border-radius:10px;padding:12px;margin-bottom:14px;text-align:left">' +
+            '<p style="margin:5px 0;font-size:14px;color:#333;">👤 Huésped: <strong>' + huesped + '</strong></p>' +
+            '<p style="margin:5px 0;font-size:14px;color:#333;">🚪 Habitación: <strong>' + habitacion + '</strong></p>' +
+            '<p style="margin:5px 0;font-size:14px;color:#333;">👥 Personas: <strong>' + personas + '</strong></p>' +
+            '<p style="margin:5px 0;font-size:14px;color:#333;">📅 Fecha: <strong>' + formatDate(fecha) + '</strong></p>' +
+            '<p style="margin:5px 0;font-size:14px;color:#333;">🕐 Horario: <strong>' + promoHorario + '</strong></p>' +
+          '</div>';
 
         if (estado === 'Consumido') {
           var validadoPor = String(found[7] || '');
           var horaVal = String(found[8] || '');
           resultDiv.innerHTML =
-            '<div style="text-align:center;padding:20px;background:#fff3cd;border-radius:12px;">' +
+            '<div style="text-align:center;padding:20px;background:#fff3cd;border-radius:12px;border:2px solid #f0ad4e;">' +
               '<div style="font-size:48px;margin-bottom:8px;">⚠️</div>' +
-              '<p style="font-size:18px;font-weight:600;color:#856404;">Ya fue consumido</p>' +
-              '<p style="margin-top:8px;">Huésped: <strong>' + huesped + '</strong></p>' +
-              '<p>Validado: ' + horaVal + '</p>' +
+              '<p style="font-size:20px;font-weight:700;color:#664d03;">Ya fue consumido</p>' +
+              '<p style="margin-top:4px;font-size:13px;color:#664d03;">Validado: ' + horaVal + (validadoPor ? ' por ' + validadoPor : '') + '</p>' +
+              '<div style="margin-top:12px">' + _guestBlock + '</div>' +
             '</div>';
           return;
         }
 
         if (estado === 'Cancelado') {
           resultDiv.innerHTML =
-            '<div style="text-align:center;padding:20px;background:var(--danger-light,#fee);border-radius:12px;">' +
+            '<div style="text-align:center;padding:20px;background:#f8d7da;border-radius:12px;border:2px solid #dc3545;">' +
               '<div style="font-size:48px;margin-bottom:8px;">🚫</div>' +
-              '<p style="font-size:18px;font-weight:600;color:var(--danger);">Código cancelado</p>' +
+              '<p style="font-size:20px;font-weight:700;color:#842029;">Código cancelado</p>' +
+              '<p style="font-size:13px;color:#842029;margin-top:4px;">Este código ya no es válido</p>' +
+              '<div style="margin-top:12px">' + _guestBlock + '</div>' +
             '</div>';
           return;
         }
 
-        if (fecha !== today) {
+        // Calculate date difference
+        var fechaDate = new Date(fecha + 'T12:00:00'); // noon to avoid TZ edge cases
+        var todayDate = new Date(today + 'T12:00:00');
+        var diffDays = Math.round((fechaDate - todayDate) / (1000 * 60 * 60 * 24));
+
+        if (diffDays < 0) {
+          // Past date — expired
+          var diasPasados = Math.abs(diffDays);
           resultDiv.innerHTML =
-            '<div style="text-align:center;padding:20px;background:#fff3cd;border-radius:12px;">' +
-              '<div style="font-size:48px;margin-bottom:8px;">📅</div>' +
-              '<p style="font-size:18px;font-weight:600;color:#856404;">No es válido hoy</p>' +
-              '<p style="margin-top:8px;">Este código es para: <strong>' + formatDate(fecha) + '</strong></p>' +
+            '<div style="text-align:center;padding:20px;background:#f8d7da;border-radius:12px;border:2px solid #dc3545;">' +
+              '<div style="font-size:48px;margin-bottom:8px;">⏰</div>' +
+              '<p style="font-size:20px;font-weight:700;color:#842029;">Código expirado</p>' +
+              '<p style="font-size:14px;color:#842029;margin-top:4px;">Era válido el <strong>' + formatDate(fecha) + '</strong> (hace ' + diasPasados + ' día' + (diasPasados > 1 ? 's' : '') + ')</p>' +
+              '<div style="margin-top:12px">' + _guestBlock + '</div>' +
             '</div>';
           return;
         }
 
-        // Valid! Show confirmation — wow style
+        if (diffDays > 0) {
+          // Future date — show info but don't allow marking as consumed
+          var enDias = diffDays === 1 ? 'mañana' : 'en ' + diffDays + ' días';
+          resultDiv.innerHTML =
+            '<div style="text-align:center;padding:20px;background:linear-gradient(135deg,#e3f2fd,#bbdefb);border-radius:12px;border:2px solid #1976d2;">' +
+              '<div style="font-size:48px;margin-bottom:8px;">📅</div>' +
+              '<p style="font-size:20px;font-weight:700;color:#0d47a1;">Válido para ' + enDias + '</p>' +
+              '<p style="font-size:14px;color:#1565c0;margin-top:4px;">Este código es para el <strong>' + formatDate(fecha) + '</strong></p>' +
+              '<p style="font-size:13px;color:#1565c0;margin-top:2px;">🕐 Horario: <strong>' + promoHorario + '</strong></p>' +
+              (promoDesc ? '<div style="text-align:center;padding:8px 10px;background:rgba(255,255,255,0.6);border-radius:8px;margin:12px 0;font-size:13px;color:#1565c0;border-left:3px solid #1976d2;">🍽️ ' + promoDesc + '</div>' : '') +
+              '<div style="margin-top:12px">' + _guestBlock + '</div>' +
+              '<p style="font-size:12px;color:#1565c0;margin-top:8px;font-style:italic;">No se puede marcar como consumido hasta el día indicado.</p>' +
+            '</div>';
+          return;
+        }
+
+        // TODAY — Valid! Show confirmation
         resultDiv.innerHTML =
           '<div style="padding:20px;background:linear-gradient(135deg,#d4edda,#c8e6c9);border-radius:12px;border:2px solid #2e7d32;position:relative;overflow:hidden;">' +
             '<div style="position:absolute;top:8px;right:-28px;background:#2e7d32;color:#fff;font-size:9px;font-weight:700;padding:3px 32px;transform:rotate(45deg);letter-spacing:1px;">GRATIS</div>' +
             '<div style="text-align:center;">' +
               '<div style="font-size:48px;margin-bottom:4px;">✅</div>' +
-              '<p style="font-size:22px;font-weight:800;color:#1b5e20;margin-bottom:2px;">Código válido</p>' +
-              '<p style="font-size:13px;color:#2e7d32;margin-bottom:12px;">Desayuno cortesía del hotel</p>' +
+              '<p style="font-size:22px;font-weight:800;color:#1b5e20;margin-bottom:2px;">¡Válido hoy!</p>' +
+              '<p style="font-size:14px;color:#2e7d32;margin-bottom:4px;">Desayuno cortesía del hotel</p>' +
+              '<p style="font-size:13px;color:#2e7d32;margin-bottom:12px;">🕐 Horario: <strong>' + promoHorario + '</strong></p>' +
             '</div>' +
             (promoDesc ? '<div style="text-align:center;padding:8px 10px;background:rgba(255,255,255,0.6);border-radius:8px;margin-bottom:12px;font-size:13px;color:#2e7d32;border-left:3px solid #2e7d32;">🍽️ ' + promoDesc + '</div>' : '') +
-            '<div style="background:rgba(255,255,255,0.6);border-radius:8px;padding:12px;margin-bottom:12px;">' +
-              '<p style="margin:4px 0;">👤 Huésped: <strong>' + huesped + '</strong></p>' +
-              '<p style="margin:4px 0;">🚪 Habitación: <strong>' + habitacion + '</strong></p>' +
-              '<p style="margin:4px 0;">👥 Personas: <strong>' + personas + '</strong></p>' +
-              '<p style="margin:4px 0;">📅 Fecha: <strong>' + formatDate(fecha) + '</strong></p>' +
-            '</div>' +
+            _guestBlock +
             '<button onclick="confirmarDesayuno(\'' + code + '\')" ' +
               'style="width:100%;padding:14px;background:#1b5e20;color:white;border:none;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;letter-spacing:0.5px;">' +
               '🍳 Marcar como consumido</button>' +
@@ -4055,15 +4101,15 @@
             '<p style="font-size:22px;font-weight:800;color:#1b5e20;">¡Desayuno registrado!</p>' +
             '<p style="margin-top:6px;color:#2e7d32;font-size:14px;">Código <strong style="font-family:monospace;letter-spacing:2px;">' + code + '</strong> consumido</p>' +
             '<p style="margin-top:8px;font-size:12px;color:#388e3c;">🍽️ ¡Buen provecho!</p>' +
-            '<p style="margin-top:4px;font-size:11px;color:var(--text-secondary);">' + nowStr + '</p>' +
+            '<p style="margin-top:4px;font-size:11px;color:#6c757d;">' + nowStr + '</p>' +
           '</div>';
 
       } catch(err) {
         resultDiv.innerHTML =
-          '<div style="text-align:center;padding:20px;background:var(--danger-light,#fee);border-radius:12px;">' +
-            '<p style="color:var(--danger);">Error al registrar: ' + err.message + '</p>' +
+          '<div style="text-align:center;padding:20px;background:#f8d7da;border-radius:12px;border:2px solid #dc3545;">' +
+            '<p style="color:#842029;font-weight:600;">Error al registrar: ' + err.message + '</p>' +
             '<button onclick="confirmarDesayuno(\'' + code + '\')" ' +
-              'style="margin-top:12px;padding:10px 20px;background:var(--primary);color:white;border:none;border-radius:8px;cursor:pointer;">Reintentar</button>' +
+              'style="margin-top:12px;padding:10px 20px;background:#1976d2;color:white;border:none;border-radius:8px;cursor:pointer;">Reintentar</button>' +
           '</div>';
       }
     }
