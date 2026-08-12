@@ -2517,6 +2517,7 @@
       partner: 'Restaurante Cafeteria Mozzafiato',
       descripcion: 'Desayuno continental: jugo natural, fruta de temporada, pan artesanal, café o té ilimitado',
       horario: '8:00 AM a 4:00 PM',
+      restricciones: 'Válido únicamente para huéspedes registrados del hotel.\nNo aplica para acompañantes externos.\nPresentar código QR al momento de ordenar.\nSujeto a disponibilidad.\nNo transferible ni acumulable.',
       precioPorPersona: 150,
       rules: [
         { tipo: 'Doble', personas: 2 },
@@ -3948,17 +3949,44 @@
         var _now = new Date();
         var today = _now.getFullYear() + '-' + String(_now.getMonth() + 1).padStart(2, '0') + '-' + String(_now.getDate()).padStart(2, '0');
 
-        // Load promo hours
+        // Load promo hours and restrictions
         var promoHorario = '';
+        var promoRestricciones = '';
+        var promoPartner = '';
         try {
           var cfgData2 = await _rd('⚙️ Config', 'A2:B50');
           for (var ci2 = 0; ci2 < cfgData2.length; ci2++) {
             if (cfgData2[ci2][0] === 'breakfastPromo') {
-              try { promoHorario = JSON.parse(cfgData2[ci2][1]).horario || '8:00 AM a 4:00 PM'; } catch(e) { promoHorario = '8:00 AM a 4:00 PM'; }
+              try {
+                var _bp = JSON.parse(cfgData2[ci2][1]);
+                promoHorario = _bp.horario || '8:00 AM a 4:00 PM';
+                promoRestricciones = _bp.restricciones || '';
+                promoPartner = _bp.partner || '';
+              } catch(e) { promoHorario = '8:00 AM a 4:00 PM'; }
             }
           }
         } catch(e) { promoHorario = '8:00 AM a 4:00 PM'; }
         if (!promoHorario) promoHorario = '8:00 AM a 4:00 PM';
+
+        // Build restrictions HTML block
+        var _restrictBlock = '';
+        if (promoRestricciones) {
+          var _lines = promoRestricciones.split('\n').filter(function(l) { return l.trim(); });
+          _restrictBlock = '<div style="background:rgba(0,0,0,0.03);border-radius:8px;padding:10px 12px;margin-bottom:14px;text-align:left;border-left:3px solid #6c757d;">' +
+            '<p style="font-size:11px;font-weight:700;color:#495057;margin:0 0 6px 0;text-transform:uppercase;letter-spacing:0.5px;">Condiciones</p>' +
+            _lines.map(function(l) { return '<p style="margin:3px 0;font-size:12px;color:#6c757d;">• ' + l.trim() + '</p>'; }).join('') +
+            '</div>';
+        }
+
+        // Build included description block
+        var _includesBlock = '';
+        if (promoDesc) {
+          _includesBlock = '<div style="background:rgba(46,125,50,0.08);border-radius:8px;padding:10px 12px;margin-bottom:14px;text-align:left;border-left:3px solid #2e7d32;">' +
+            '<p style="font-size:11px;font-weight:700;color:#2e7d32;margin:0 0 4px 0;text-transform:uppercase;letter-spacing:0.5px;">🍽️ Incluye</p>' +
+            '<p style="margin:0;font-size:13px;color:#333;line-height:1.4;">' + promoDesc + '</p>' +
+            (promoPartner ? '<p style="margin:6px 0 0 0;font-size:11px;color:#6c757d;">📍 ' + promoPartner + '</p>' : '') +
+            '</div>';
+        }
 
         // Guest info block (reused in multiple states)
         var _guestBlock =
@@ -4021,10 +4049,11 @@
               '<p style="font-size:20px;font-weight:700;color:#0d47a1;">Válido para ' + enDias + '</p>' +
               '<p style="font-size:14px;color:#1565c0;margin-top:4px;">Este código es para el <strong>' + formatDate(fecha) + '</strong></p>' +
               '<p style="font-size:13px;color:#1565c0;margin-top:2px;">🕐 Horario: <strong>' + promoHorario + '</strong></p>' +
-              (promoDesc ? '<div style="text-align:center;padding:8px 10px;background:rgba(255,255,255,0.6);border-radius:8px;margin:12px 0;font-size:13px;color:#1565c0;border-left:3px solid #1976d2;">🍽️ ' + promoDesc + '</div>' : '') +
-              '<div style="margin-top:12px">' + _guestBlock + '</div>' +
-              '<p style="font-size:12px;color:#1565c0;margin-top:8px;font-style:italic;">No se puede marcar como consumido hasta el día indicado.</p>' +
-            '</div>';
+            '</div>' +
+            '<div style="margin-top:14px">' + _includesBlock + '</div>' +
+            _guestBlock +
+            _restrictBlock +
+            '<p style="font-size:12px;color:#1565c0;margin-top:8px;font-style:italic;text-align:center;">No se puede marcar como consumido hasta el día indicado.</p>';
           return;
         }
 
@@ -4038,15 +4067,16 @@
               '<p style="font-size:14px;color:#2e7d32;margin-bottom:4px;">Desayuno cortesía del hotel</p>' +
               '<p style="font-size:13px;color:#2e7d32;margin-bottom:12px;">🕐 Horario: <strong>' + promoHorario + '</strong></p>' +
             '</div>' +
-            (promoDesc ? '<div style="text-align:center;padding:8px 10px;background:rgba(255,255,255,0.6);border-radius:8px;margin-bottom:12px;font-size:13px;color:#2e7d32;border-left:3px solid #2e7d32;">🍽️ ' + promoDesc + '</div>' : '') +
+            _includesBlock +
             _guestBlock +
+            _restrictBlock +
             '<button onclick="confirmarDesayuno(\'' + code + '\')" ' +
               'style="width:100%;padding:14px;background:#1b5e20;color:white;border:none;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;letter-spacing:0.5px;">' +
               '🍳 Marcar como consumido</button>' +
           '</div>';
 
       } catch(err) {
-        resultDiv.innerHTML = '<p style="color:var(--danger);text-align:center;">Error: ' + err.message + '</p>';
+        resultDiv.innerHTML = '<p style="color:#dc3545;text-align:center;">Error: ' + err.message + '</p>';
       }
 
       document.getElementById('validarCode').value = '';
@@ -8946,6 +8976,11 @@
       h += '<div style="margin-bottom:12px"><label class="form-label" style="font-size:11px">Horario de desayuno</label>';
       h += '<input type="text" id="bfHorario" class="login-input" value="' + (promo.horario || '8:00 AM a 4:00 PM') + '" placeholder="Ej: 8:00 AM a 4:00 PM" oninput="updateBreakfastField(\'horario\',this.value)" style="padding:8px;font-size:12px">';
       h += '<div style="font-size:10px;color:var(--text2);margin-top:2px">Se muestra en los mensajes de desayuno al huésped</div></div>';
+
+      // Restricciones
+      h += '<div style="margin-bottom:12px"><label class="form-label" style="font-size:11px">Restricciones y condiciones</label>';
+      h += '<textarea id="bfRestricciones" class="login-input" rows="4" placeholder="Ej: Válido únicamente para huéspedes registrados.\nNo transferible ni acumulable." oninput="updateBreakfastField(\'restricciones\',this.value)" style="padding:8px;font-size:12px;resize:vertical;width:100%;box-sizing:border-box;font-family:inherit">' + (promo.restricciones || '') + '</textarea>';
+      h += '<div style="font-size:10px;color:var(--text2);margin-top:2px">Se muestran al validar el código QR en el restaurante. Usa un punto por línea.</div></div>';
 
       // Price per person
       h += '<div style="margin-bottom:12px"><label class="form-label" style="font-size:11px">Precio real del desayuno por persona (MXN)</label>';
