@@ -2597,6 +2597,15 @@
             { type: 'append', sheet: '⚙️ Config', values: ['breakfastPromo', jsonVal] }
           ]);
         }
+        // Also sync PIN as separate key for reliable reading
+        if (promo.pinRestaurante) {
+          var pinExists = configData.some(function(row) { return row[0] === 'validarPin'; });
+          if (pinExists) {
+            await sheets.multi([{ type: 'updateById', sheet: '⚙️ Config', id: 'validarPin', values: ['validarPin', promo.pinRestaurante] }]);
+          } else {
+            await sheets.multi([{ type: 'append', sheet: '⚙️ Config', values: ['validarPin', promo.pinRestaurante] }]);
+          }
+        }
         toast('✅ Configuración guardada y sincronizada');
       } catch(e) {
         toast('Error al sincronizar: ' + (e.message || e), true);
@@ -3953,21 +3962,25 @@
         }
       } catch(e) {}
       if (!promoHorario) promoHorario = '8:00 AM a 4:00 PM';
-      // Fallback: if PIN not found in Sheet, try localStorage (same device as PMS)
+      // Read PIN from dedicated config key (simple string, no JSON parsing)
+      try {
+        var cfgData2 = await _rd('⚙️ Config', 'A2:B50');
+        for (var ci2 = 0; ci2 < cfgData2.length; ci2++) {
+          if (cfgData2[ci2][0] === 'validarPin') {
+            promoPin = String(cfgData2[ci2][1] || '').trim();
+            break;
+          }
+        }
+      } catch(e) {}
+      // Fallback: try from breakfastPromo JSON or localStorage
       if (!promoPin) {
         try { promoPin = String(JSON.parse(localStorage.getItem('breakfastPromo') || '{}').pinRestaurante || ''); } catch(e) {}
       }
       window._lastValidatedPin = promoPin;
-      console.log('[VALIDAR DEBUG] promoPin="' + promoPin + '" len=' + (promoPin||'').length + ' publicMode=' + S._publicMode);
 
       // Check PIN authorization — always enforce on ?validar screen
       var pinRequired = promoPin && promoPin.length === 4;
       var pinAuthed = !pinRequired || _isRestaurantPinAuthed();
-      console.log('[VALIDAR DEBUG] pinRequired=' + pinRequired + ' pinAuthed=' + pinAuthed);
-      // Temporary debug banner — REMOVE after fixing
-      var _dbg = document.getElementById('pinDebugBanner');
-      if (!_dbg) { _dbg = document.createElement('div'); _dbg.id = 'pinDebugBanner'; _dbg.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:#333;color:#0f0;font-family:monospace;font-size:10px;padding:6px 10px;z-index:99999;'; document.body.appendChild(_dbg); }
-      _dbg.textContent = 'PIN="' + promoPin + '" req=' + pinRequired + ' auth=' + pinAuthed + ' pub=' + S._publicMode;
 
       try {
         var data = await _rd('🍳 Desayunos', 'A2:I5000');
@@ -9125,7 +9138,7 @@
       // PIN del restaurante
       h += '<div style="margin-bottom:12px;background:var(--surface3);padding:14px;border-radius:var(--radius);">';
       h += '<label class="form-label" style="font-size:11px">🔒 PIN de seguridad del restaurante</label>';
-      h += '<input type="text" id="bfPin" class="login-input" value="' + (promo.pinRestaurante || '') + '" maxlength="4" inputmode="numeric" pattern="[0-9]*" placeholder="4 dígitos" oninput="this.value=this.value.replace(/[^0-9]/g,\'\').substring(0,4);updateBreakfastField(\'pinRestaurante\',this.value)" style="padding:8px;font-size:16px;text-align:center;letter-spacing:8px;width:120px;font-family:monospace;font-weight:700">';
+      h += '<input type="text" id="bfPin" class="login-input" value="' + (promo.pinRestaurante || '') + '" maxlength="4" inputmode="numeric" pattern="[0-9]*" placeholder="4 dígitos" oninput="this.value=this.value.replace(/[^0-9]/g,\'\').substring(0,4);updateBreakfastField(\'pinRestaurante\',this.value);syncValidarPin(this.value)" style="padding:8px;font-size:16px;text-align:center;letter-spacing:8px;width:120px;font-family:monospace;font-weight:700">';
       h += '<div style="font-size:10px;color:var(--text2);margin-top:6px">Sin PIN: cualquiera que escanee el QR puede marcar como consumido.<br>Con PIN: solo el personal autorizado del restaurante puede validar códigos. El PIN se recuerda 24 hrs en cada dispositivo.</div>';
       h += '</div>';
 
@@ -9183,6 +9196,28 @@
     }
 
     // Debounced auto-sync: saves to Sheet after 2s of inactivity
+    var _pinSyncTimer = null;
+    function syncValidarPin(pin) {
+      if (_pinSyncTimer) clearTimeout(_pinSyncTimer);
+      _pinSyncTimer = setTimeout(async function() {
+        if (!S.scriptUrl) return;
+        try {
+          var configData = await sheets.read('⚙️ Config', 'A2:B50').catch(function() { return []; });
+          var exists = configData.some(function(row) { return row[0] === 'validarPin'; });
+          if (exists) {
+            await sheets.multi([
+              { type: 'updateById', sheet: '⚙️ Config', id: 'validarPin', values: ['validarPin', pin] }
+            ]);
+          } else {
+            await sheets.multi([
+              { type: 'append', sheet: '⚙️ Config', values: ['validarPin', pin] }
+            ]);
+          }
+          console.log('PIN synced to Sheet: ' + pin);
+        } catch(e) { console.error('PIN sync error:', e); }
+      }, 1000);
+    }
+
     var _bfSyncTimer = null;
     function _debouncedBfSync() {
       if (_bfSyncTimer) clearTimeout(_bfSyncTimer);
