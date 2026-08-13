@@ -3949,8 +3949,9 @@
       if (!promoHorario) promoHorario = '8:00 AM a 4:00 PM';
       window._lastValidatedPin = promoPin;
 
-      // Check PIN authorization
-      var pinRequired = promoPin && promoPin.length === 4;
+      // Check PIN authorization — only enforce on public ?validar page
+      // PMS users are already logged in = trusted staff
+      var pinRequired = S._publicMode && promoPin && promoPin.length === 4;
       var pinAuthed = !pinRequired || _isRestaurantPinAuthed();
 
       try {
@@ -4068,12 +4069,21 @@
 
         if (diffDays < 0) {
           var diasPasados = Math.abs(diffDays);
-          resultDiv.innerHTML =
+          var _expHtml =
             '<div style="text-align:center;padding:20px;background:#f8d7da;border-radius:12px;border:2px solid #dc3545;">' +
               '<div style="font-size:48px;margin-bottom:8px;">⏰</div>' +
               '<p style="font-size:20px;font-weight:700;color:#842029;">Código expirado</p>' +
               '<p style="font-size:14px;color:#842029;margin-top:4px;">Era válido el <strong>' + formatDate(fecha) + '</strong> (hace ' + diasPasados + ' día' + (diasPasados > 1 ? 's' : '') + ')</p>' +
             '</div>';
+          if (pinAuthed) {
+            _expHtml += '<div style="margin-top:12px">' + _guestBlock + '</div>' +
+              '<button onclick="confirmarDesayuno(\'' + code + '\')" ' +
+                'style="width:100%;padding:12px;background:#b71c1c;color:white;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px;">' +
+                '⏰ Marcar como consumido (expirado)</button>';
+          } else if (pinRequired) {
+            _expHtml += _pinPromptBlock;
+          }
+          resultDiv.innerHTML = _expHtml;
           return;
         }
 
