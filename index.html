@@ -3953,11 +3953,14 @@
         }
       } catch(e) {}
       if (!promoHorario) promoHorario = '8:00 AM a 4:00 PM';
+      // Fallback: if PIN not found in Sheet, try localStorage (same device as PMS)
+      if (!promoPin) {
+        try { promoPin = String(JSON.parse(localStorage.getItem('breakfastPromo') || '{}').pinRestaurante || ''); } catch(e) {}
+      }
       window._lastValidatedPin = promoPin;
 
-      // Check PIN authorization — only enforce on public ?validar page
-      // PMS users are already logged in = trusted staff
-      var pinRequired = S._publicMode && promoPin && promoPin.length === 4;
+      // Check PIN authorization — always enforce on ?validar screen
+      var pinRequired = promoPin && promoPin.length === 4;
       var pinAuthed = !pinRequired || _isRestaurantPinAuthed();
 
       try {
