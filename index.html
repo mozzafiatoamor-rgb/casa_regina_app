@@ -3958,10 +3958,16 @@
         try { promoPin = String(JSON.parse(localStorage.getItem('breakfastPromo') || '{}').pinRestaurante || ''); } catch(e) {}
       }
       window._lastValidatedPin = promoPin;
+      console.log('[VALIDAR DEBUG] promoPin="' + promoPin + '" len=' + (promoPin||'').length + ' publicMode=' + S._publicMode);
 
       // Check PIN authorization — always enforce on ?validar screen
       var pinRequired = promoPin && promoPin.length === 4;
       var pinAuthed = !pinRequired || _isRestaurantPinAuthed();
+      console.log('[VALIDAR DEBUG] pinRequired=' + pinRequired + ' pinAuthed=' + pinAuthed);
+      // Temporary debug banner — REMOVE after fixing
+      var _dbg = document.getElementById('pinDebugBanner');
+      if (!_dbg) { _dbg = document.createElement('div'); _dbg.id = 'pinDebugBanner'; _dbg.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:#333;color:#0f0;font-family:monospace;font-size:10px;padding:6px 10px;z-index:99999;'; document.body.appendChild(_dbg); }
+      _dbg.textContent = 'PIN="' + promoPin + '" req=' + pinRequired + ' auth=' + pinAuthed + ' pub=' + S._publicMode;
 
       try {
         var data = await _rd('🍳 Desayunos', 'A2:I5000');
