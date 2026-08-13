@@ -3936,12 +3936,18 @@
         for (var ci = 0; ci < cfgData.length; ci++) {
           if (cfgData[ci][0] === 'breakfastPromo') {
             try {
-              var _bp = JSON.parse(cfgData[ci][1]);
-              promoDesc = _bp.descripcion || '';
-              promoHorario = _bp.horario || '8:00 AM a 4:00 PM';
-              promoRestricciones = _bp.restricciones || '';
-              promoPartner = _bp.partner || '';
-              promoPin = _bp.pinRestaurante || '';
+              var _bpRaw = cfgData[ci][1];
+              var _bp = _bpRaw;
+              for (var _pi = 0; _pi < 3; _pi++) {
+                if (typeof _bp === 'string') { try { _bp = JSON.parse(_bp); } catch(e2) { break; } } else { break; }
+              }
+              if (typeof _bp === 'object' && _bp !== null) {
+                promoDesc = _bp.descripcion || '';
+                promoHorario = _bp.horario || '8:00 AM a 4:00 PM';
+                promoRestricciones = _bp.restricciones || '';
+                promoPartner = _bp.partner || '';
+                promoPin = String(_bp.pinRestaurante || '');
+              }
             } catch(e) {}
           }
         }
