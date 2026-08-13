@@ -87,6 +87,7 @@
     .global-search-overlay.open { display:flex }
     .global-search-box { width:100%;max-width:480px;background:var(--surface);border-radius:16px;overflow:hidden;max-height:80vh;display:flex;flex-direction:column;animation:slideDown .2s ease }
     @keyframes slideDown { from{opacity:0;transform:translateY(-20px)} to{opacity:1;transform:translateY(0)} }
+    @keyframes shake { 0%,100%{transform:translateX(0)} 20%,60%{transform:translateX(-8px)} 40%,80%{transform:translateX(8px)} }
     .global-search-input { width:100%;padding:16px 18px;border:none;background:var(--surface);color:var(--text);font-size:16px;font-family:inherit;outline:none;border-bottom:1px solid var(--surface2) }
     .global-search-input::placeholder { color:var(--text2) }
     .global-search-results { overflow-y:auto;padding:8px;flex:1 }
@@ -2518,6 +2519,7 @@
       descripcion: 'Desayuno continental: jugo natural, fruta de temporada, pan artesanal, café o té ilimitado',
       horario: '8:00 AM a 4:00 PM',
       restricciones: 'Válido únicamente para huéspedes registrados del hotel.\nNo aplica para acompañantes externos.\nPresentar código QR al momento de ordenar.\nSujeto a disponibilidad.\nNo transferible ni acumulable.',
+      pinRestaurante: '',
       precioPorPersona: 150,
       rules: [
         { tipo: 'Doble', personas: 2 },
@@ -3901,6 +3903,17 @@
       });
     }
 
+    function _isRestaurantPinAuthed() {
+      try {
+        var auth = JSON.parse(localStorage.getItem('_bfPinAuth') || '{}');
+        if (auth.ts && (Date.now() - auth.ts) < 24 * 60 * 60 * 1000) return true;
+      } catch(e) {}
+      return false;
+    }
+    function _setRestaurantPinAuthed() {
+      localStorage.setItem('_bfPinAuth', JSON.stringify({ ts: Date.now() }));
+    }
+
     async function validarDesayunoCode() {
       var code = (document.getElementById('validarCode').value || '').trim().toUpperCase();
       var resultDiv = document.getElementById('validarResult');
@@ -3912,16 +3925,33 @@
         ? function(sh, rg) { return publicRead(S.scriptUrl, sh, rg); }
         : function(sh, rg) { return sheets.read(sh, rg); };
 
-      // Load promo description for display
+      // Load promo config
       var promoDesc = '';
+      var promoHorario = '8:00 AM a 4:00 PM';
+      var promoRestricciones = '';
+      var promoPartner = '';
+      var promoPin = '';
       try {
         var cfgData = await _rd('⚙️ Config', 'A2:B50');
         for (var ci = 0; ci < cfgData.length; ci++) {
           if (cfgData[ci][0] === 'breakfastPromo') {
-            try { promoDesc = JSON.parse(cfgData[ci][1]).descripcion || ''; } catch(e) {}
+            try {
+              var _bp = JSON.parse(cfgData[ci][1]);
+              promoDesc = _bp.descripcion || '';
+              promoHorario = _bp.horario || '8:00 AM a 4:00 PM';
+              promoRestricciones = _bp.restricciones || '';
+              promoPartner = _bp.partner || '';
+              promoPin = _bp.pinRestaurante || '';
+            } catch(e) {}
           }
         }
       } catch(e) {}
+      if (!promoHorario) promoHorario = '8:00 AM a 4:00 PM';
+      window._lastValidatedPin = promoPin;
+
+      // Check PIN authorization
+      var pinRequired = promoPin && promoPin.length === 4;
+      var pinAuthed = !pinRequired || _isRestaurantPinAuthed();
 
       try {
         var data = await _rd('🍳 Desayunos', 'A2:I5000');
@@ -3945,28 +3975,8 @@
         var habitacion = String(found[3]);
         var fecha = String(found[4]).substring(0, 10);
         var personas = parseInt(found[5]) || 1;
-        // Use LOCAL date (not UTC) to avoid timezone issues
         var _now = new Date();
         var today = _now.getFullYear() + '-' + String(_now.getMonth() + 1).padStart(2, '0') + '-' + String(_now.getDate()).padStart(2, '0');
-
-        // Load promo hours and restrictions
-        var promoHorario = '';
-        var promoRestricciones = '';
-        var promoPartner = '';
-        try {
-          var cfgData2 = await _rd('⚙️ Config', 'A2:B50');
-          for (var ci2 = 0; ci2 < cfgData2.length; ci2++) {
-            if (cfgData2[ci2][0] === 'breakfastPromo') {
-              try {
-                var _bp = JSON.parse(cfgData2[ci2][1]);
-                promoHorario = _bp.horario || '8:00 AM a 4:00 PM';
-                promoRestricciones = _bp.restricciones || '';
-                promoPartner = _bp.partner || '';
-              } catch(e) { promoHorario = '8:00 AM a 4:00 PM'; }
-            }
-          }
-        } catch(e) { promoHorario = '8:00 AM a 4:00 PM'; }
-        if (!promoHorario) promoHorario = '8:00 AM a 4:00 PM';
 
         // Build restrictions HTML block
         var _restrictBlock = '';
@@ -3988,15 +3998,45 @@
             '</div>';
         }
 
-        // Guest info block (reused in multiple states)
-        var _guestBlock =
-          '<div style="background:rgba(0,0,0,0.04);border-radius:10px;padding:12px;margin-bottom:14px;text-align:left">' +
-            '<p style="margin:5px 0;font-size:14px;color:#333;">👤 Huésped: <strong>' + huesped + '</strong></p>' +
-            '<p style="margin:5px 0;font-size:14px;color:#333;">🚪 Habitación: <strong>' + habitacion + '</strong></p>' +
-            '<p style="margin:5px 0;font-size:14px;color:#333;">👥 Personas: <strong>' + personas + '</strong></p>' +
-            '<p style="margin:5px 0;font-size:14px;color:#333;">📅 Fecha: <strong>' + formatDate(fecha) + '</strong></p>' +
-            '<p style="margin:5px 0;font-size:14px;color:#333;">🕐 Horario: <strong>' + promoHorario + '</strong></p>' +
-          '</div>';
+        // Guest info block — full or limited based on PIN auth
+        var _guestBlock;
+        if (pinAuthed) {
+          _guestBlock =
+            '<div style="background:rgba(0,0,0,0.04);border-radius:10px;padding:12px;margin-bottom:14px;text-align:left">' +
+              '<p style="margin:5px 0;font-size:14px;color:#333;">👤 Huésped: <strong>' + huesped + '</strong></p>' +
+              '<p style="margin:5px 0;font-size:14px;color:#333;">🚪 Habitación: <strong>' + habitacion + '</strong></p>' +
+              '<p style="margin:5px 0;font-size:14px;color:#333;">👥 Personas: <strong>' + personas + '</strong></p>' +
+              '<p style="margin:5px 0;font-size:14px;color:#333;">📅 Fecha: <strong>' + formatDate(fecha) + '</strong></p>' +
+              '<p style="margin:5px 0;font-size:14px;color:#333;">🕐 Horario: <strong>' + promoHorario + '</strong></p>' +
+            '</div>';
+        } else {
+          _guestBlock =
+            '<div style="background:rgba(0,0,0,0.04);border-radius:10px;padding:12px;margin-bottom:14px;text-align:left">' +
+              '<p style="margin:5px 0;font-size:14px;color:#333;">📅 Fecha: <strong>' + formatDate(fecha) + '</strong></p>' +
+              '<p style="margin:5px 0;font-size:14px;color:#333;">🕐 Horario: <strong>' + promoHorario + '</strong></p>' +
+            '</div>';
+        }
+
+        // PIN prompt block — shown when code is valid today but user is not authed
+        var _pinPromptBlock = '';
+        if (pinRequired && !pinAuthed) {
+          _pinPromptBlock =
+            '<div style="background:#fff8e1;border:2px solid #f0ad4e;border-radius:12px;padding:16px;margin-top:14px;text-align:center;">' +
+              '<div style="font-size:32px;margin-bottom:6px;">🔒</div>' +
+              '<p style="font-size:14px;font-weight:700;color:#664d03;margin-bottom:4px;">Acceso solo para personal autorizado</p>' +
+              '<p style="font-size:12px;color:#8a6d00;margin-bottom:12px;">Ingresa el PIN del restaurante para ver los detalles y marcar como consumido</p>' +
+              '<div style="display:flex;justify-content:center;gap:8px;align-items:center;margin-bottom:10px;">' +
+                '<input type="text" id="pinRestInput" maxlength="4" inputmode="numeric" pattern="[0-9]*" placeholder="• • • •" ' +
+                  'oninput="this.value=this.value.replace(/[^0-9]/g,\'\').substring(0,4)" ' +
+                  'onkeydown="if(event.key===\'Enter\')verificarPinRestaurante(\'' + code + '\')" ' +
+                  'style="width:120px;padding:10px;font-size:20px;text-align:center;letter-spacing:8px;border:2px solid #ccc;border-radius:10px;font-family:monospace;font-weight:700;">' +
+              '</div>' +
+              '<button onclick="verificarPinRestaurante(\'' + code + '\')" ' +
+                'style="width:100%;padding:12px;background:#e65100;color:white;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;">' +
+                '🔓 Verificar PIN</button>' +
+              '<div id="pinError" style="margin-top:8px;font-size:12px;color:#dc3545;display:none;"></div>' +
+            '</div>';
+        }
 
         if (estado === 'Consumido') {
           var validadoPor = String(found[7] || '');
@@ -4005,7 +4045,7 @@
             '<div style="text-align:center;padding:20px;background:#fff3cd;border-radius:12px;border:2px solid #f0ad4e;">' +
               '<div style="font-size:48px;margin-bottom:8px;">⚠️</div>' +
               '<p style="font-size:20px;font-weight:700;color:#664d03;">Ya fue consumido</p>' +
-              '<p style="margin-top:4px;font-size:13px;color:#664d03;">Validado: ' + horaVal + (validadoPor ? ' por ' + validadoPor : '') + '</p>' +
+              (pinAuthed ? '<p style="margin-top:4px;font-size:13px;color:#664d03;">Validado: ' + horaVal + (validadoPor ? ' por ' + validadoPor : '') + '</p>' : '') +
               '<div style="margin-top:12px">' + _guestBlock + '</div>' +
             '</div>';
           return;
@@ -4017,63 +4057,73 @@
               '<div style="font-size:48px;margin-bottom:8px;">🚫</div>' +
               '<p style="font-size:20px;font-weight:700;color:#842029;">Código cancelado</p>' +
               '<p style="font-size:13px;color:#842029;margin-top:4px;">Este código ya no es válido</p>' +
-              '<div style="margin-top:12px">' + _guestBlock + '</div>' +
             '</div>';
           return;
         }
 
         // Calculate date difference
-        var fechaDate = new Date(fecha + 'T12:00:00'); // noon to avoid TZ edge cases
+        var fechaDate = new Date(fecha + 'T12:00:00');
         var todayDate = new Date(today + 'T12:00:00');
         var diffDays = Math.round((fechaDate - todayDate) / (1000 * 60 * 60 * 24));
 
         if (diffDays < 0) {
-          // Past date — expired
           var diasPasados = Math.abs(diffDays);
           resultDiv.innerHTML =
             '<div style="text-align:center;padding:20px;background:#f8d7da;border-radius:12px;border:2px solid #dc3545;">' +
               '<div style="font-size:48px;margin-bottom:8px;">⏰</div>' +
               '<p style="font-size:20px;font-weight:700;color:#842029;">Código expirado</p>' +
               '<p style="font-size:14px;color:#842029;margin-top:4px;">Era válido el <strong>' + formatDate(fecha) + '</strong> (hace ' + diasPasados + ' día' + (diasPasados > 1 ? 's' : '') + ')</p>' +
-              '<div style="margin-top:12px">' + _guestBlock + '</div>' +
             '</div>';
           return;
         }
 
         if (diffDays > 0) {
-          // Future date — show info but don't allow marking as consumed
           var enDias = diffDays === 1 ? 'mañana' : 'en ' + diffDays + ' días';
-          resultDiv.innerHTML =
+          var _futureHtml =
             '<div style="text-align:center;padding:20px;background:linear-gradient(135deg,#e3f2fd,#bbdefb);border-radius:12px;border:2px solid #1976d2;">' +
               '<div style="font-size:48px;margin-bottom:8px;">📅</div>' +
               '<p style="font-size:20px;font-weight:700;color:#0d47a1;">Válido para ' + enDias + '</p>' +
               '<p style="font-size:14px;color:#1565c0;margin-top:4px;">Este código es para el <strong>' + formatDate(fecha) + '</strong></p>' +
               '<p style="font-size:13px;color:#1565c0;margin-top:2px;">🕐 Horario: <strong>' + promoHorario + '</strong></p>' +
-            '</div>' +
-            '<div style="margin-top:14px">' + _includesBlock + '</div>' +
-            _guestBlock +
-            _restrictBlock +
-            '<p style="font-size:12px;color:#1565c0;margin-top:8px;font-style:italic;text-align:center;">No se puede marcar como consumido hasta el día indicado.</p>';
+            '</div>';
+          if (pinAuthed) {
+            _futureHtml += '<div style="margin-top:14px">' + _includesBlock + '</div>' + _guestBlock + _restrictBlock;
+          }
+          _futureHtml += '<p style="font-size:12px;color:#1565c0;margin-top:8px;font-style:italic;text-align:center;">No se puede marcar como consumido hasta el día indicado.</p>';
+          resultDiv.innerHTML = _futureHtml;
           return;
         }
 
-        // TODAY — Valid! Show confirmation
-        resultDiv.innerHTML =
-          '<div style="padding:20px;background:linear-gradient(135deg,#d4edda,#c8e6c9);border-radius:12px;border:2px solid #2e7d32;position:relative;overflow:hidden;">' +
-            '<div style="position:absolute;top:8px;right:-28px;background:#2e7d32;color:#fff;font-size:9px;font-weight:700;padding:3px 32px;transform:rotate(45deg);letter-spacing:1px;">GRATIS</div>' +
-            '<div style="text-align:center;">' +
+        // TODAY — Valid!
+        if (pinAuthed) {
+          // Authorized — show full info + consume button
+          resultDiv.innerHTML =
+            '<div style="padding:20px;background:linear-gradient(135deg,#d4edda,#c8e6c9);border-radius:12px;border:2px solid #2e7d32;position:relative;overflow:hidden;">' +
+              '<div style="position:absolute;top:8px;right:-28px;background:#2e7d32;color:#fff;font-size:9px;font-weight:700;padding:3px 32px;transform:rotate(45deg);letter-spacing:1px;">GRATIS</div>' +
+              '<div style="text-align:center;">' +
+                '<div style="font-size:48px;margin-bottom:4px;">✅</div>' +
+                '<p style="font-size:22px;font-weight:800;color:#1b5e20;margin-bottom:2px;">¡Válido hoy!</p>' +
+                '<p style="font-size:14px;color:#2e7d32;margin-bottom:4px;">Desayuno cortesía del hotel</p>' +
+                '<p style="font-size:13px;color:#2e7d32;margin-bottom:12px;">🕐 Horario: <strong>' + promoHorario + '</strong></p>' +
+              '</div>' +
+              _includesBlock +
+              _guestBlock +
+              _restrictBlock +
+              '<button onclick="confirmarDesayuno(\'' + code + '\')" ' +
+                'style="width:100%;padding:14px;background:#1b5e20;color:white;border:none;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;letter-spacing:0.5px;">' +
+                '🍳 Marcar como consumido</button>' +
+            '</div>';
+        } else {
+          // Not authorized — show basic status + PIN prompt
+          resultDiv.innerHTML =
+            '<div style="text-align:center;padding:20px;background:linear-gradient(135deg,#d4edda,#c8e6c9);border-radius:12px;border:2px solid #2e7d32;">' +
               '<div style="font-size:48px;margin-bottom:4px;">✅</div>' +
-              '<p style="font-size:22px;font-weight:800;color:#1b5e20;margin-bottom:2px;">¡Válido hoy!</p>' +
-              '<p style="font-size:14px;color:#2e7d32;margin-bottom:4px;">Desayuno cortesía del hotel</p>' +
-              '<p style="font-size:13px;color:#2e7d32;margin-bottom:12px;">🕐 Horario: <strong>' + promoHorario + '</strong></p>' +
+              '<p style="font-size:22px;font-weight:800;color:#1b5e20;margin-bottom:2px;">Código válido</p>' +
+              '<p style="font-size:14px;color:#2e7d32;margin-bottom:4px;">Este código es válido para hoy</p>' +
+              '<p style="font-size:13px;color:#2e7d32;">🕐 Horario: <strong>' + promoHorario + '</strong></p>' +
             '</div>' +
-            _includesBlock +
-            _guestBlock +
-            _restrictBlock +
-            '<button onclick="confirmarDesayuno(\'' + code + '\')" ' +
-              'style="width:100%;padding:14px;background:#1b5e20;color:white;border:none;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;letter-spacing:0.5px;">' +
-              '🍳 Marcar como consumido</button>' +
-          '</div>';
+            _pinPromptBlock;
+        }
 
       } catch(err) {
         resultDiv.innerHTML = '<p style="color:#dc3545;text-align:center;">Error: ' + err.message + '</p>';
@@ -4081,6 +4131,36 @@
 
       document.getElementById('validarCode').value = '';
       document.getElementById('validarCode').focus();
+    }
+
+    // Store PIN temporarily and re-validate the same code
+    window._lastValidatedPin = '';
+    function verificarPinRestaurante(code) {
+      var pinInput = document.getElementById('pinRestInput');
+      var pinErr = document.getElementById('pinError');
+      var enteredPin = (pinInput ? pinInput.value : '').trim();
+      if (enteredPin.length !== 4) {
+        pinErr.textContent = 'Ingresa los 4 dígitos del PIN';
+        pinErr.style.display = 'block';
+        return;
+      }
+      // We need to verify against the stored PIN — re-read from config
+      // The PIN was already loaded during validarDesayunoCode, so we store it
+      if (enteredPin === window._lastValidatedPin) {
+        _setRestaurantPinAuthed();
+        // Re-run validation — now pinAuthed will be true
+        document.getElementById('validarCode').value = code;
+        validarDesayunoCode();
+      } else {
+        pinErr.textContent = 'PIN incorrecto';
+        pinErr.style.display = 'block';
+        pinInput.value = '';
+        pinInput.focus();
+        // Shake animation
+        pinInput.style.animation = 'none';
+        pinInput.offsetHeight; // trigger reflow
+        pinInput.style.animation = 'shake 0.4s ease';
+      }
     }
 
     async function confirmarDesayuno(code) {
@@ -4119,7 +4199,6 @@
         var scriptUrl = S.scriptUrl;
         var res = await fetch(scriptUrl, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body)
         });
 
@@ -9017,6 +9096,13 @@
       h += '<div style="margin-bottom:12px"><label class="form-label" style="font-size:11px">Restricciones y condiciones</label>';
       h += '<textarea id="bfRestricciones" class="login-input" rows="4" placeholder="Ej: Válido únicamente para huéspedes registrados.\nNo transferible ni acumulable." oninput="updateBreakfastField(\'restricciones\',this.value)" style="padding:8px;font-size:12px;resize:vertical;width:100%;box-sizing:border-box;font-family:inherit">' + (promo.restricciones || '') + '</textarea>';
       h += '<div style="font-size:10px;color:var(--text2);margin-top:2px">Se muestran al validar el código QR en el restaurante. Usa un punto por línea.</div></div>';
+
+      // PIN del restaurante
+      h += '<div style="margin-bottom:12px;background:var(--surface3);padding:14px;border-radius:var(--radius);">';
+      h += '<label class="form-label" style="font-size:11px">🔒 PIN de seguridad del restaurante</label>';
+      h += '<input type="text" id="bfPin" class="login-input" value="' + (promo.pinRestaurante || '') + '" maxlength="4" inputmode="numeric" pattern="[0-9]*" placeholder="4 dígitos" oninput="this.value=this.value.replace(/[^0-9]/g,\'\').substring(0,4);updateBreakfastField(\'pinRestaurante\',this.value)" style="padding:8px;font-size:16px;text-align:center;letter-spacing:8px;width:120px;font-family:monospace;font-weight:700">';
+      h += '<div style="font-size:10px;color:var(--text2);margin-top:6px">Sin PIN: cualquiera que escanee el QR puede marcar como consumido.<br>Con PIN: solo el personal autorizado del restaurante puede validar códigos. El PIN se recuerda 24 hrs en cada dispositivo.</div>';
+      h += '</div>';
 
       // Price per person
       h += '<div style="margin-bottom:12px"><label class="form-label" style="font-size:11px">Precio real del desayuno por persona (MXN)</label>';
