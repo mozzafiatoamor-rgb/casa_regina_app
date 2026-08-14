@@ -1661,6 +1661,105 @@
     .text-center {
       text-align: center;
     }
+    /* ============ WELCOME BOOK (guía del huésped) ============ */
+    #welcomeBookScreen { display:none; }
+    #welcomeBookScreen.active {
+      display:block; position:fixed; inset:0; z-index:500;
+      overflow-y:auto; -webkit-overflow-scrolling:touch;
+      background:#e9e2d6;
+      background-image:radial-gradient(circle at 20% 0%, #f3ecdf 0%, #e6ddce 55%, #ddd2bf 100%);
+      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+    }
+    .wb-phone {
+      max-width:440px; margin:0 auto; min-height:100vh; box-sizing:border-box;
+      padding:26px 20px 40px; color:#4a3f2f;
+      display:flex; flex-direction:column;
+    }
+    .wb-loading { max-width:440px; margin:0 auto; text-align:center; padding:80px 20px; color:#8a7a5f; font-size:15px; }
+    .wb-head { text-align:center; margin-bottom:22px; }
+    .wb-logo { height:52px; width:auto; object-fit:contain; margin-bottom:10px; opacity:.95; }
+    .wb-title {
+      font-family:'Georgia','Times New Roman',serif; font-style:italic;
+      font-size:32px; font-weight:600; color:#3d3324; letter-spacing:.3px; line-height:1.1;
+    }
+    .wb-sub { font-size:13px; color:#8a7a5f; margin-top:2px; font-weight:600; }
+    .wb-flags { display:flex; justify-content:center; gap:6px; margin-top:14px; flex-wrap:wrap; }
+    .wb-flag {
+      font-size:19px; line-height:1; width:38px; height:28px; border-radius:6px; cursor:pointer;
+      background:rgba(255,255,255,.5); border:1px solid rgba(122,105,74,.25);
+      display:flex; align-items:center; justify-content:center; transition:transform .12s,border-color .12s,background .12s;
+    }
+    .wb-flag.active { border-color:#b99a5b; background:#fff; transform:translateY(-1px); box-shadow:0 3px 8px rgba(122,90,40,.18); }
+    .wb-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-top:6px; }
+    .wb-tile {
+      background:linear-gradient(180deg,#fffdf8 0%,#f6efe1 100%);
+      border:1px solid rgba(150,120,70,.28); border-radius:16px;
+      padding:16px 8px 12px; cursor:pointer; text-align:center;
+      display:flex; flex-direction:column; align-items:center; gap:9px;
+      box-shadow:0 2px 6px rgba(120,95,50,.10); transition:transform .12s,box-shadow .12s;
+      -webkit-tap-highlight-color:transparent;
+    }
+    .wb-tile:active { transform:scale(.96); }
+    .wb-tile:hover { box-shadow:0 6px 16px rgba(120,95,50,.18); transform:translateY(-2px); }
+    .wb-tile-ic { width:34px; height:34px; color:#a9843f; display:flex; align-items:center; justify-content:center; }
+    .wb-tile-ic svg { width:32px; height:32px; }
+    .wb-tile-lb { font-size:10.5px; font-weight:700; letter-spacing:.3px; text-transform:uppercase; color:#5a4c37; line-height:1.15; }
+    .wb-detail { animation:wbFade .2s ease; }
+    @keyframes wbFade { from{opacity:0;transform:translateY(6px);} to{opacity:1;transform:none;} }
+    .wb-back {
+      background:rgba(255,255,255,.6); border:1px solid rgba(122,105,74,.25); color:#6a5a3f;
+      border-radius:20px; padding:7px 16px; font-size:13px; font-weight:600; cursor:pointer; margin-bottom:14px;
+    }
+    .wb-dtitle {
+      display:flex; align-items:center; gap:10px; font-size:22px; font-weight:700; color:#3d3324; margin:0 0 16px;
+      font-family:'Georgia',serif;
+    }
+    .wb-dic { width:26px; height:26px; color:#a9843f; }
+    .wb-dic svg { width:26px; height:26px; }
+    .wb-card {
+      background:#fffdf8; border:1px solid rgba(150,120,70,.22); border-radius:14px;
+      padding:14px 16px; margin-bottom:12px; box-shadow:0 1px 4px rgba(120,95,50,.07);
+    }
+    .wb-body { font-size:14.5px; line-height:1.6; color:#4a3f2f; }
+    .wb-muted { font-size:13.5px; color:#9a8a6f; font-style:italic; }
+    .wb-kv { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:4px 0; font-size:14px; color:#6a5a3f; }
+    .wb-kv b { color:#3d3324; font-size:15px; }
+    .wb-kv-col span { display:block; font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; color:#a9843f; margin-bottom:4px; }
+    .wb-mono { font-family:'Space Mono',ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.5px; }
+    .wb-btn {
+      display:block; width:100%; box-sizing:border-box; text-align:center; text-decoration:none;
+      background:linear-gradient(180deg,#c9a765 0%,#b1893f 100%); color:#fff; font-weight:700; font-size:14px;
+      border:none; border-radius:12px; padding:13px 16px; margin-bottom:10px; cursor:pointer;
+      box-shadow:0 3px 8px rgba(150,110,40,.28);
+    }
+    .wb-btn:active { transform:scale(.98); }
+    .wb-btn.wb-wa { background:linear-gradient(180deg,#3ecb6a 0%,#25a752 100%); box-shadow:0 3px 8px rgba(30,150,70,.28); }
+    .wb-place { }
+    .wb-place-name { font-size:15px; font-weight:700; color:#3d3324; margin-bottom:4px; }
+    .wb-place-desc { font-size:13.5px; line-height:1.5; color:#5a4c37; margin-bottom:8px; }
+    .wb-place-acts { display:flex; flex-wrap:wrap; gap:8px; }
+    .wb-chip {
+      display:inline-flex; align-items:center; gap:4px; text-decoration:none;
+      background:#f3ece0; border:1px solid rgba(150,120,70,.3); color:#7a5a20;
+      border-radius:20px; padding:6px 12px; font-size:12.5px; font-weight:600;
+    }
+    .wb-chip-red { background:#fdeeee; border-color:rgba(200,60,60,.3); color:#b23838; }
+    .wb-foot { text-align:center; font-size:11px; color:#9a8a6f; margin-top:auto; padding-top:24px; letter-spacing:.5px; }
+    /* Welcome Book — bloques por huésped */
+    .wb-guest { background:linear-gradient(180deg,#fffdf8,#f4ecdd); border:1px solid rgba(150,120,70,.28); border-radius:14px; padding:12px 16px; margin-bottom:14px; text-align:center; box-shadow:0 2px 6px rgba(120,95,50,.10); }
+    .wb-guest-hi { font-size:17px; font-weight:800; color:#3d3324; }
+    .wb-guest-meta { font-size:12.5px; color:#8a7a5f; margin-top:2px; font-weight:600; }
+    .wb-tile { position:relative; }
+    .wb-badge { position:absolute; top:8px; right:10px; background:#b1893f; color:#fff; font-size:10px; font-weight:800; min-width:18px; height:18px; line-height:18px; text-align:center; border-radius:9px; padding:0 5px; box-shadow:0 1px 3px rgba(0,0,0,.2); }
+    .wb-access { text-align:center; background:linear-gradient(180deg,#fff8ec,#f3e6cc); border-color:rgba(177,137,63,.5); }
+    .wb-access-lb { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.6px; color:#a9843f; margin-bottom:8px; }
+    .wb-access-code { font-family:'Space Mono',ui-monospace,SFMono-Regular,Menlo,monospace; font-size:34px; font-weight:700; letter-spacing:6px; color:#3d3324; }
+    .wb-bf { text-align:center; }
+    .wb-bf-qr { width:180px; height:180px; background:#fff; border-radius:10px; padding:8px; margin:0 auto 8px; display:block; box-shadow:0 1px 4px rgba(120,95,50,.12); }
+    .wb-bf-code { font-family:'Space Mono',ui-monospace,monospace; font-size:18px; font-weight:700; letter-spacing:2px; color:#3d3324; }
+    .wb-bf-meta { font-size:12px; color:#8a7a5f; margin-top:4px; }
+    .wb-bf-used { opacity:.5; }
+    .wb-bf-used .wb-bf-qr { filter:grayscale(1); }
   </style>
 </head>
 <body>
@@ -1727,6 +1826,9 @@
   <div class="login-screen" id="guestScreen" style="padding:0;justify-content:flex-start;overflow-y:auto;-webkit-overflow-scrolling:touch;height:100vh;">
     <div style="width:100%;max-width:420px;padding:60px 20px 40px;" id="guestFormContainer"></div>
   </div>
+
+  <!-- Welcome Book (Guía del Huésped) Screen -->
+  <div id="welcomeBookScreen"></div>
 
   <!-- Main App -->
   <div style="flex: 1; display: flex; flex-direction: column;" id="appContainer" class="hidden">
@@ -2887,7 +2989,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var CONFIG_KEYS = ['hotelInfo', 'hotelTerms', 'dailyRoutine', 'msgTemplates', 'emergencyContacts', 'breakfastPromo'];
+    var CONFIG_KEYS = ['hotelInfo', 'hotelTerms', 'dailyRoutine', 'msgTemplates', 'emergencyContacts', 'breakfastPromo', 'guestGuide'];
 
     // Cache raw Sheet config so getBreakfastPromo can fallback to it
     var _sheetConfigCache = {};
@@ -3161,6 +3263,7 @@
       var guestRegId = urlParams.get('registro');
       var guestBooking = urlParams.has('reservar');
       var guestValidar = urlParams.has('validar');
+      var guestGuia = urlParams.has('guia');
       var guestCfg = urlParams.get('cfg');
 
       // Legacy full cfg= base64 links (backward compat)
@@ -3175,7 +3278,7 @@
         } catch(e) {}
       }
       // Secure links: ?reservar&u=SCRIPT_URL (reads via Apps Script, no API key)
-      if ((guestRegId || guestBooking || guestValidar) && !guestCfg) {
+      if ((guestRegId || guestBooking || guestValidar || guestGuia) && !guestCfg) {
         var urlU = urlParams.get('u');
         var urlS = urlParams.get('s');
         var urlK = urlParams.get('k');
@@ -3204,6 +3307,11 @@
       if (guestValidar && (S._publicMode || (S.sheetId && S.apiKey))) {
         if (_isInAppBrowser) { _showOpenInBrowserBanner(); }
         showValidarMode();
+        return;
+      }
+      if (guestGuia && (S._publicMode || (S.sheetId && S.apiKey))) {
+        if (_isInAppBrowser) { _showOpenInBrowserBanner(); }
+        showWelcomeBook(urlParams.get('guia') || null);
         return;
       }
 
@@ -3478,6 +3586,574 @@
       document.body.prepend(banner);
       // Add top padding so content isn't hidden behind banner
       document.body.style.paddingTop = '60px';
+    }
+
+    // ============================================================
+    // WELCOME BOOK · Guía digital interactiva para huéspedes
+    // Híbrido: base común del hotel + bloques personales por reserva
+    // (Aditivo — no modifica lógica existente)
+    // ============================================================
+    var DEFAULT_GUEST_GUIDE = {
+      langs: ['es', 'en', 'fr', 'it', 'de'],
+      welcome:      { es: '¡Bienvenido a Hotel Casa Regina! Nos alegra recibirte. Aquí encontrarás toda la información para disfrutar tu estancia.', en: 'Welcome to Hotel Casa Regina! We are delighted to have you. Here you will find everything you need for a great stay.', fr: '', it: '', de: '' },
+      checkin:      { es: 'El check-in es a partir de las 3:00 PM. Preséntate en recepción con una identificación oficial. Si llegas antes, con gusto guardamos tu equipaje.', en: 'Check-in is from 3:00 PM. Please come to the reception desk with a valid ID. If you arrive early, we are happy to store your luggage.', fr: '', it: '', de: '' },
+      checkout:     { es: 'El check-out es antes de las 12:00 PM. Entrega tu llave en recepción. ¡Gracias por tu visita!', en: 'Check-out is before 12:00 PM. Please return your key at reception. Thank you for staying with us!', fr: '', it: '', de: '' },
+      mapLink:      '',
+      ubicacionNotas: { es: '', en: '', fr: '', it: '', de: '' },
+      wifiNotas:    { es: '', en: '', fr: '', it: '', de: '' },
+      reglas:       { es: 'Horario de silencio: 10:00 PM a 8:00 AM.\nNo se permite fumar dentro de las habitaciones.\nCuida las áreas comunes.\nRegistra a todas las visitas en recepción.', en: 'Quiet hours: 10:00 PM to 8:00 AM.\nNo smoking inside the rooms.\nPlease take care of common areas.\nAll visitors must register at reception.', fr: '', it: '', de: '' },
+      transporte:   { es: 'Taxis disponibles en recepción.\nEstacionamiento cercano.\nParada de autobús a 2 cuadras.', en: 'Taxis available at reception.\nParking nearby.\nBus stop 2 blocks away.', fr: '', it: '', de: '' },
+      servicios:    { es: 'Aire acondicionado: usa el control remoto de la habitación.\nTV: enciende con el control; canales locales y streaming.\nAgua caliente disponible 24h.', en: 'Air conditioning: use the in-room remote.\nTV: turn on with the remote; local channels and streaming.\nHot water available 24h.', fr: '', it: '', de: '' },
+      informacion:  { es: 'Recepción abierta 24 horas.\nDesayuno disponible según promoción vigente.\nSolicita toallas o amenidades extra en recepción.', en: 'Reception open 24 hours.\nBreakfast available per current promotion.\nAsk reception for extra towels or amenities.', fr: '', it: '', de: '' },
+      contactoNotas: { es: '', en: '', fr: '', it: '', de: '' },
+      accesoInstr:  { es: 'Tu código personal de acceso aparece abajo. Ingrésalo en el teclado de la cerradura principal seguido de la tecla de confirmación.', en: 'Your personal access code is shown below. Enter it on the main lock keypad followed by the confirm key.', fr: '', it: '', de: '' },
+      restaurantes: [],
+      bares: [],
+      compras: [],
+      actividades: []
+    };
+
+    function getGuestGuide() {
+      try {
+        var saved = localStorage.getItem('guestGuide');
+        if (saved) {
+          var parsed = _parseConfigVal(saved);
+          if (typeof parsed === 'object' && parsed !== null) {
+            var g = Object.assign({}, DEFAULT_GUEST_GUIDE, parsed);
+            ['restaurantes', 'bares', 'compras', 'actividades'].forEach(function(k) {
+              if (!Array.isArray(g[k])) g[k] = [];
+            });
+            if (!Array.isArray(g.langs) || !g.langs.length) g.langs = DEFAULT_GUEST_GUIDE.langs.slice();
+            return g;
+          }
+        }
+      } catch (e) { console.warn('getGuestGuide parse error:', e.message); }
+      if (_sheetConfigCache['guestGuide']) {
+        try {
+          var fromSheet = _parseConfigVal(_sheetConfigCache['guestGuide']);
+          if (typeof fromSheet === 'object' && fromSheet !== null) {
+            localStorage.setItem('guestGuide', JSON.stringify(fromSheet));
+            return Object.assign({}, DEFAULT_GUEST_GUIDE, fromSheet);
+          }
+        } catch (e2) {}
+      }
+      return JSON.parse(JSON.stringify(DEFAULT_GUEST_GUIDE));
+    }
+
+    function saveGuestGuide(guide) {
+      localStorage.setItem('guestGuide', JSON.stringify(guide));
+      syncConfigToSheet('guestGuide', guide);
+    }
+    function saveGuestGuideLocal(guide) {
+      localStorage.setItem('guestGuide', JSON.stringify(guide));
+    }
+
+    // UI dictionary (5 idiomas) — controla toda la navegación
+    var WB_I18N = {
+      es: { welcome:'Bienvenida', checkin:'Check-In', ubicacion:'Ubicación', wifi:'WiFi', reglas:'Reglas', transporte:'Transporte', servicios:'Servicios', actividades:'Actividades', informacion:'Información', bares:'Bares y Clubs', restaurantes:'Restaurantes', compras:'Compras', emergencias:'Emergencias', checkout:'Check-Out', contacto:'Contacto', desayuno:'Desayuno', back:'Volver', menu:'Menú', callNow:'Llamar', copyPass:'Copiar contraseña', copied:'¡Copiado!', openMap:'Ver en el mapa', network:'Red', password:'Contraseña', whatsapp:'WhatsApp', phone:'Teléfono', email:'Correo', checkinTime:'Hora de entrada', checkoutTime:'Hora de salida', address:'Dirección', noInfo:'Información no disponible por el momento.', loading:'Cargando…', subtitle:'Guía del huésped', hello:'Hola', room:'Habitación', accessCode:'Tu código de acceso', breakfastShow:'Presenta este código en el restaurante', pending:'Pendiente', used:'Usado', pax:'personas' },
+      en: { welcome:'Welcome', checkin:'Check-In', ubicacion:'Location', wifi:'WiFi', reglas:'House Rules', transporte:'Transport', servicios:'Services', actividades:'Activities', informacion:'Information', bares:'Bars & Clubs', restaurantes:'Restaurants', compras:'Shopping', emergencias:'Emergencies', checkout:'Check-Out', contacto:'Contact', desayuno:'Breakfast', back:'Back', menu:'Menu', callNow:'Call', copyPass:'Copy password', copied:'Copied!', openMap:'Open in maps', network:'Network', password:'Password', whatsapp:'WhatsApp', phone:'Phone', email:'Email', checkinTime:'Check-in time', checkoutTime:'Check-out time', address:'Address', noInfo:'No information available at the moment.', loading:'Loading…', subtitle:'Guest guide', hello:'Hello', room:'Room', accessCode:'Your access code', breakfastShow:'Show this code at the restaurant', pending:'Pending', used:'Used', pax:'guests' },
+      fr: { welcome:'Bienvenue', checkin:'Arrivée', ubicacion:'Emplacement', wifi:'WiFi', reglas:'Règlement', transporte:'Transport', servicios:'Services', actividades:'Activités', informacion:'Informations', bares:'Bars & Clubs', restaurantes:'Restaurants', compras:'Shopping', emergencias:'Urgences', checkout:'Départ', contacto:'Contact', desayuno:'Petit-déjeuner', back:'Retour', menu:'Menu', callNow:'Appeler', copyPass:'Copier le mot de passe', copied:'Copié !', openMap:'Voir sur la carte', network:'Réseau', password:'Mot de passe', whatsapp:'WhatsApp', phone:'Téléphone', email:'E-mail', checkinTime:'Heure d\'arrivée', checkoutTime:'Heure de départ', address:'Adresse', noInfo:'Aucune information disponible pour le moment.', loading:'Chargement…', subtitle:'Guide du client', hello:'Bonjour', room:'Chambre', accessCode:'Votre code d\'accès', breakfastShow:'Présentez ce code au restaurant', pending:'En attente', used:'Utilisé', pax:'personnes' },
+      it: { welcome:'Benvenuto', checkin:'Check-In', ubicacion:'Posizione', wifi:'WiFi', reglas:'Regole', transporte:'Trasporti', servicios:'Servizi', actividades:'Attività', informacion:'Informazioni', bares:'Bar e Club', restaurantes:'Ristoranti', compras:'Shopping', emergencias:'Emergenze', checkout:'Check-Out', contacto:'Contatto', desayuno:'Colazione', back:'Indietro', menu:'Menu', callNow:'Chiama', copyPass:'Copia password', copied:'Copiato!', openMap:'Apri nella mappa', network:'Rete', password:'Password', whatsapp:'WhatsApp', phone:'Telefono', email:'Email', checkinTime:'Orario di arrivo', checkoutTime:'Orario di partenza', address:'Indirizzo', noInfo:'Nessuna informazione disponibile al momento.', loading:'Caricamento…', subtitle:'Guida dell\'ospite', hello:'Ciao', room:'Camera', accessCode:'Il tuo codice di accesso', breakfastShow:'Mostra questo codice al ristorante', pending:'In attesa', used:'Usato', pax:'persone' },
+      de: { welcome:'Willkommen', checkin:'Check-In', ubicacion:'Standort', wifi:'WLAN', reglas:'Hausregeln', transporte:'Transport', servicios:'Services', actividades:'Aktivitäten', informacion:'Informationen', bares:'Bars & Clubs', restaurantes:'Restaurants', compras:'Einkaufen', emergencias:'Notfälle', checkout:'Check-Out', contacto:'Kontakt', desayuno:'Frühstück', back:'Zurück', menu:'Menü', callNow:'Anrufen', copyPass:'Passwort kopieren', copied:'Kopiert!', openMap:'Auf Karte öffnen', network:'Netzwerk', password:'Passwort', whatsapp:'WhatsApp', phone:'Telefon', email:'E-Mail', checkinTime:'Check-in-Zeit', checkoutTime:'Check-out-Zeit', address:'Adresse', noInfo:'Derzeit keine Informationen verfügbar.', loading:'Laden…', subtitle:'Gästeführer', hello:'Hallo', room:'Zimmer', accessCode:'Ihr Zugangscode', breakfastShow:'Zeigen Sie diesen Code im Restaurant', pending:'Ausstehend', used:'Verwendet', pax:'Gäste' }
+    };
+    var WB_FLAGS = { es:'🇲🇽', en:'🇬🇧', fr:'🇫🇷', it:'🇮🇹', de:'🇩🇪' };
+
+    // Iconos SVG (trazo dorado, estilo del kit)
+    var WB_ICONS = {
+      welcome:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9.5 21v-6h5v6"/></svg>',
+      checkin:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/></svg>',
+      ubicacion:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.2-7-11a7 7 0 1 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>',
+      wifi:        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8.5a15 15 0 0 1 20 0"/><path d="M5 12a10 10 0 0 1 14 0"/><path d="M8.5 15.5a5 5 0 0 1 7 0"/><circle cx="12" cy="19" r="1"/></svg>',
+      reglas:      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v4h4"/><path d="M9 12h6"/><path d="M9 16h6"/></svg>',
+      transporte:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="12" rx="2"/><path d="M4 10h16"/><circle cx="8" cy="19" r="1.5"/><circle cx="16" cy="19" r="1.5"/></svg>',
+      servicios:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4l-6 6 2 2 6-6a4 4 0 0 0 5.4-5.4l-2.3 2.3-2-2z"/></svg>',
+      actividades: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v3"/><path d="M12 19v3"/><path d="M5 12H2"/><path d="M22 12h-3"/><circle cx="12" cy="12" r="5"/><path d="M12 9v3l2 1"/></svg>',
+      informacion: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><circle cx="12" cy="8" r="0.6" fill="currentColor"/></svg>',
+      bares:       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h14l-7 8z"/><path d="M12 12v7"/><path d="M8 21h8"/></svg>',
+      restaurantes:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3v7a2 2 0 0 0 4 0V3"/><path d="M8 3v18"/><path d="M17 3c-1.5 0-2.5 1.8-2.5 4s1 4 2.5 4v10"/></svg>',
+      compras:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 7h12l1 13H5z"/><path d="M9 7a3 3 0 0 1 6 0"/></svg>',
+      emergencias: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4v5c0 4.5-3.2 7.8-8 9-4.8-1.2-8-4.5-8-9V7z"/><path d="M12 8v4"/><circle cx="12" cy="15.5" r="0.6" fill="currentColor"/></svg>',
+      checkout:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h4"/><path d="M14 17l5-5-5-5"/><path d="M19 12H9"/></svg>',
+      contacto:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5a2 2 0 0 1 2-2h2l1.5 4-2 1.3a12 12 0 0 0 5.7 5.7l1.3-2 4 1.5v2a2 2 0 0 1-2 2A16 16 0 0 1 4 5z"/></svg>',
+      desayuno:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h12a4 4 0 0 1 0 8h-1"/><path d="M4 8v6a4 4 0 0 0 4 4h4a4 4 0 0 0 4-4"/><path d="M7 3c-.5.8-.5 1.5 0 2.3"/><path d="M11 3c-.5.8-.5 1.5 0 2.3"/></svg>'
+    };
+
+    var WB_TILES = ['welcome','checkin','ubicacion','wifi','reglas','transporte','servicios','actividades','informacion','bares','restaurantes','compras','emergencias','checkout','contacto'];
+
+    var _wbLang = 'es';
+    var _wbView = null;
+    var _wbRes = null;        // reserva cargada (modo por-huésped)
+    var _wbBreakfast = [];    // códigos de desayuno del huésped
+    var _wbAccess = '';       // código de acceso personal
+
+    function _wbBaseLang(g) { return (g.langs && g.langs[0]) || 'es'; }
+    function _wbT(obj, g) {
+      if (!obj) return '';
+      if (typeof obj === 'string') return obj;
+      if (obj[_wbLang] && String(obj[_wbLang]).trim()) return obj[_wbLang];
+      var base = _wbBaseLang(g || getGuestGuide());
+      if (obj[base] && String(obj[base]).trim()) return obj[base];
+      for (var k in obj) { if (obj[k] && String(obj[k]).trim()) return obj[k]; }
+      return '';
+    }
+    function _wbLabel(key) { return (WB_I18N[_wbLang] || WB_I18N.es)[key] || (WB_I18N.es[key] || key); }
+    function _wbEsc(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function _wbNl2br(s) { return _wbEsc(s).replace(/\n/g, '<br>'); }
+
+    async function showWelcomeBook(resId) {
+      document.getElementById('setupScreen').classList.remove('active');
+      document.getElementById('loginScreen').classList.remove('active');
+      var gs = document.getElementById('guestScreen'); if (gs) gs.classList.remove('active');
+      var app = document.getElementById('appContainer'); if (app) app.classList.add('hidden');
+      var scr = document.getElementById('welcomeBookScreen');
+      scr.classList.add('active');
+      scr.innerHTML = '<div class="wb-loading">' + _wbLabel('loading') + '</div>';
+
+      _wbRes = null; _wbBreakfast = []; _wbAccess = '';
+      var pub = S._publicMode || (S.sheetId && S.apiKey);
+      if (pub) {
+        try {
+          var _rd = S._publicMode
+            ? function(sh, rg) { return publicRead(S.scriptUrl, sh, rg); }
+            : function(sh, rg) { return sheets.read(sh, rg); };
+          var reads = [ _rd('⚙️ Config', 'A2:B50').catch(function() { return []; }) ];
+          if (resId) {
+            reads.push(_rd('📋 Reservas', 'A2:P5000').catch(function() { return []; }));
+            reads.push(_rd('🍳 Desayunos', 'A2:I5000').catch(function() { return []; }));
+            reads.push(_rd('🔑 Accesos', 'A2:C5000').catch(function() { return []; }));
+          }
+          var out = await Promise.all(reads);
+          var cfgRows = out[0];
+          if (cfgRows && cfgRows.length) {
+            applyConfigFromSheet(cfgRows);
+            cfgRows.forEach(function(row) {
+              if (row[0] === 'scriptUrl' && row[1] && !S._publicMode) {
+                try { S.scriptUrl = JSON.parse(row[1]); } catch (e) { S.scriptUrl = row[1]; }
+              }
+            });
+          }
+          if (resId) {
+            var reservas = out[1] || [], des = out[2] || [], acc = out[3] || [];
+            for (var i = 0; i < reservas.length; i++) {
+              if (String(reservas[i][0]) === String(resId)) {
+                var f = reservas[i];
+                _wbRes = { id: String(f[0]), habitacionNum: String(f[1]), huesped: String(f[2] || ''),
+                           fechaEntrada: String(f[5] || '').substring(0, 10), fechaSalida: String(f[6] || '').substring(0, 10),
+                           estado: String(f[11] || '') };
+                break;
+              }
+            }
+            _wbBreakfast = des.filter(function(d) { return String(d[1]) === String(resId); }).map(function(d) {
+              return { codigo: String(d[0] || ''), fecha: String(d[4] || ''), personas: d[5] || '', estado: String(d[6] || 'Pendiente') };
+            });
+            for (var j = 0; j < acc.length; j++) {
+              if (String(acc[j][0]) === String(resId)) { _wbAccess = String(acc[j][1] || ''); break; }
+            }
+          }
+        } catch (e) { console.warn('WelcomeBook load error:', e.message); }
+      }
+      var g = getGuestGuide();
+      _wbLang = (g.langs && g.langs[0]) || 'es';
+      _wbView = null;
+      renderWelcomeBook();
+    }
+
+    function wbSetLang(lang) { _wbLang = lang; renderWelcomeBook(); }
+    function wbOpen(view) { _wbView = view; renderWelcomeBook(); window.scrollTo(0, 0); }
+    function wbHome() { _wbView = null; renderWelcomeBook(); window.scrollTo(0, 0); }
+
+    function _wbActiveTiles() {
+      var tiles = WB_TILES.slice();
+      if (_wbRes && _wbBreakfast.length) tiles.splice(1, 0, 'desayuno');
+      return tiles;
+    }
+
+    function renderWelcomeBook() {
+      var g = getGuestGuide();
+      var hi = getHotelInfo();
+      var scr = document.getElementById('welcomeBookScreen');
+      var langs = (g.langs && g.langs.length) ? g.langs : ['es'];
+
+      var flags = langs.map(function(l) {
+        return '<button class="wb-flag ' + (l === _wbLang ? 'active' : '') + '" onclick="wbSetLang(\'' + l + '\')" aria-label="' + l + '">' + (WB_FLAGS[l] || l) + '</button>';
+      }).join('');
+
+      var logo = (typeof LOGO_V_DARK !== 'undefined' && LOGO_V_DARK) ? LOGO_V_DARK : '';
+      var head = '<div class="wb-head">';
+      if (logo) head += '<img class="wb-logo" src="' + logo + '" alt="logo">';
+      head += '<div class="wb-title">Welcome book</div>';
+      head += '<div class="wb-sub">' + _wbEsc(hi.nombre || '') + '</div>';
+      head += '<div class="wb-flags">' + flags + '</div>';
+      head += '</div>';
+
+      // Banner personal (modo por-huésped)
+      var guestBanner = '';
+      if (_wbRes) {
+        var meta = _wbLabel('room') + ' ' + _wbEsc(_wbRes.habitacionNum);
+        if (_wbRes.fechaEntrada) meta += ' · ' + _wbEsc(_wbRes.fechaEntrada) + ' → ' + _wbEsc(_wbRes.fechaSalida);
+        guestBanner = '<div class="wb-guest"><div class="wb-guest-hi">' + _wbEsc(_wbLabel('hello')) + ', ' + _wbEsc(_wbRes.huesped) + ' 👋</div><div class="wb-guest-meta">' + meta + '</div></div>';
+      }
+
+      var body;
+      if (!_wbView) {
+        body = guestBanner + '<div class="wb-grid">' + _wbActiveTiles().map(function(key) {
+          var badge = (key === 'desayuno' && _wbBreakfast.length) ? '<span class="wb-badge">' + _wbBreakfast.length + '</span>' : '';
+          return '<button class="wb-tile" onclick="wbOpen(\'' + key + '\')">' + badge +
+                 '<span class="wb-tile-ic">' + (WB_ICONS[key] || '') + '</span>' +
+                 '<span class="wb-tile-lb">' + _wbEsc(_wbLabel(key)) + '</span></button>';
+        }).join('') + '</div>';
+      } else {
+        body = '<div class="wb-detail">' +
+               '<button class="wb-back" onclick="wbHome()">&larr; ' + _wbEsc(_wbLabel('menu')) + '</button>' +
+               '<h2 class="wb-dtitle"><span class="wb-dic">' + (WB_ICONS[_wbView] || '') + '</span>' + _wbEsc(_wbLabel(_wbView)) + '</h2>' +
+               _wbSection(_wbView, g, hi) + '</div>';
+      }
+
+      scr.innerHTML = '<div class="wb-phone">' + head + body + '<div class="wb-foot">' + _wbEsc(hi.subtitulo || _wbLabel('subtitle')) + '</div></div>';
+    }
+
+    function _wbCard(inner) { return '<div class="wb-card">' + inner + '</div>'; }
+    function _wbText(obj, g) {
+      var t = _wbT(obj, g);
+      if (!t || !String(t).trim()) return _wbCard('<div class="wb-muted">' + _wbEsc(_wbLabel('noInfo')) + '</div>');
+      return _wbCard('<div class="wb-body">' + _wbNl2br(t) + '</div>');
+    }
+
+    function _wbList(items, g) {
+      if (!items || !items.length) return _wbCard('<div class="wb-muted">' + _wbEsc(_wbLabel('noInfo')) + '</div>');
+      return items.map(function(it) {
+        var h = '<div class="wb-place">';
+        h += '<div class="wb-place-name">' + _wbEsc(it.nombre || '') + '</div>';
+        var d = _wbT(it.desc, g);
+        if (d) h += '<div class="wb-place-desc">' + _wbNl2br(d) + '</div>';
+        var acts = '';
+        if (it.mapLink) acts += '<a class="wb-chip" href="' + _wbEsc(it.mapLink) + '" target="_blank" rel="noopener">📍 ' + _wbEsc(_wbLabel('openMap')) + '</a>';
+        if (it.tel) acts += '<a class="wb-chip" href="tel:' + _wbEsc(it.tel) + '">📞 ' + _wbEsc(it.tel) + '</a>';
+        if (acts) h += '<div class="wb-place-acts">' + acts + '</div>';
+        h += '</div>';
+        return _wbCard(h);
+      }).join('');
+    }
+
+    function _wbBreakfastSection(g) {
+      if (!_wbBreakfast.length) return _wbText(null, g);
+      var order = { 'Pendiente': 0, 'Pending': 0 };
+      var list = _wbBreakfast.slice().sort(function(a, b) { return (order[a.estado] != null ? 0 : 1) - (order[b.estado] != null ? 0 : 1); });
+      var intro = _wbCard('<div class="wb-body">🍳 ' + _wbEsc(_wbLabel('breakfastShow')) + '</div>');
+      return intro + list.map(function(b) {
+        var used = /consum|used|usa/i.test(b.estado);
+        var qr = 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' + encodeURIComponent(b.codigo);
+        var h = '<div class="wb-bf' + (used ? ' wb-bf-used' : '') + '">';
+        h += '<img class="wb-bf-qr" src="' + qr + '" alt="QR">';
+        h += '<div class="wb-bf-code">' + _wbEsc(b.codigo) + '</div>';
+        var meta = [];
+        if (b.fecha) meta.push(_wbEsc(b.fecha));
+        if (b.personas) meta.push(_wbEsc(b.personas) + ' ' + _wbEsc(_wbLabel('pax')));
+        meta.push('<b>' + _wbEsc(used ? _wbLabel('used') : _wbLabel('pending')) + '</b>');
+        h += '<div class="wb-bf-meta">' + meta.join(' · ') + '</div></div>';
+        return _wbCard(h);
+      }).join('');
+    }
+
+    function _wbSection(key, g, hi) {
+      if (key === 'welcome') {
+        var hw0 = '';
+        if (_wbRes) hw0 += _wbCard('<div class="wb-body"><b>' + _wbEsc(_wbLabel('hello')) + ', ' + _wbEsc(_wbRes.huesped) + '!</b></div>');
+        return hw0 + _wbText(g.welcome, g);
+      }
+      if (key === 'reglas')      return _wbText(g.reglas, g);
+      if (key === 'transporte')  return _wbText(g.transporte, g);
+      if (key === 'servicios')   return _wbText(g.servicios, g);
+      if (key === 'informacion') return _wbText(g.informacion, g);
+      if (key === 'actividades') return _wbList(g.actividades, g);
+      if (key === 'bares')       return _wbList(g.bares, g);
+      if (key === 'restaurantes')return _wbList(g.restaurantes, g);
+      if (key === 'compras')     return _wbList(g.compras, g);
+      if (key === 'desayuno')    return _wbBreakfastSection(g);
+
+      if (key === 'checkin') {
+        var h = '';
+        if (_wbAccess) {
+          h += '<div class="wb-card wb-access"><div class="wb-access-lb">🔑 ' + _wbEsc(_wbLabel('accessCode')) + '</div><div class="wb-access-code">' + _wbEsc(_wbAccess) + '</div></div>';
+          var ai = _wbT(g.accesoInstr, g);
+          if (ai) h += _wbCard('<div class="wb-body">' + _wbNl2br(ai) + '</div>');
+        }
+        if (hi.checkin_hora) h += _wbCard('<div class="wb-kv"><span>' + _wbEsc(_wbLabel('checkinTime')) + '</span><b>' + _wbEsc(formatHoraDisplay(hi.checkin_hora)) + '</b></div>');
+        h += _wbText(g.checkin, g);
+        return h;
+      }
+      if (key === 'checkout') {
+        var hc = '';
+        if (hi.checkout_hora) hc += _wbCard('<div class="wb-kv"><span>' + _wbEsc(_wbLabel('checkoutTime')) + '</span><b>' + _wbEsc(formatHoraDisplay(hi.checkout_hora)) + '</b></div>');
+        hc += _wbText(g.checkout, g);
+        return hc;
+      }
+      if (key === 'ubicacion') {
+        var hu = '';
+        if (hi.direccion) hu += _wbCard('<div class="wb-kv-col"><span>' + _wbEsc(_wbLabel('address')) + '</span><div class="wb-body">' + _wbEsc(hi.direccion) + '</div></div>');
+        var mapUrl = g.mapLink || (hi.direccion ? ('https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(hi.direccion)) : '');
+        if (mapUrl) hu += '<a class="wb-btn" href="' + _wbEsc(mapUrl) + '" target="_blank" rel="noopener">📍 ' + _wbEsc(_wbLabel('openMap')) + '</a>';
+        var un = _wbT(g.ubicacionNotas, g);
+        if (un) hu += _wbCard('<div class="wb-body">' + _wbNl2br(un) + '</div>');
+        return hu || _wbText(null, g);
+      }
+      if (key === 'wifi') {
+        var hwifi = '';
+        if (hi.wifi_red || hi.wifi_pass) {
+          hwifi += '<div class="wb-card">';
+          if (hi.wifi_red) hwifi += '<div class="wb-kv"><span>' + _wbEsc(_wbLabel('network')) + '</span><b>' + _wbEsc(hi.wifi_red) + '</b></div>';
+          if (hi.wifi_pass) {
+            hwifi += '<div class="wb-kv"><span>' + _wbEsc(_wbLabel('password')) + '</span><b class="wb-mono">' + _wbEsc(hi.wifi_pass) + '</b></div>';
+            hwifi += '<button class="wb-btn" onclick="wbCopy(' + JSON.stringify(hi.wifi_pass).replace(/"/g, '&quot;') + ',this)">📋 ' + _wbEsc(_wbLabel('copyPass')) + '</button>';
+          }
+          hwifi += '</div>';
+        } else {
+          hwifi += _wbText(null, g);
+        }
+        var wn = _wbT(g.wifiNotas, g);
+        if (wn) hwifi += _wbCard('<div class="wb-body">' + _wbNl2br(wn) + '</div>');
+        return hwifi;
+      }
+      if (key === 'contacto') {
+        var hcon = '';
+        var wa = (hi.whatsapp || '').replace(/[^0-9]/g, '');
+        if (wa) { if (wa.length === 10) wa = '52' + wa; hcon += '<a class="wb-btn wb-wa" href="https://wa.me/' + wa + '" target="_blank" rel="noopener">💬 ' + _wbEsc(_wbLabel('whatsapp')) + '</a>'; }
+        if (hi.telefono) hcon += '<a class="wb-btn" href="tel:' + _wbEsc(hi.telefono) + '">📞 ' + _wbEsc(_wbLabel('phone')) + ': ' + _wbEsc(hi.telefono) + '</a>';
+        if (hi.email) hcon += '<a class="wb-btn" href="mailto:' + _wbEsc(hi.email) + '">✉️ ' + _wbEsc(hi.email) + '</a>';
+        var cn = _wbT(g.contactoNotas, g);
+        if (cn) hcon += _wbCard('<div class="wb-body">' + _wbNl2br(cn) + '</div>');
+        return hcon || _wbText(null, g);
+      }
+      if (key === 'emergencias') {
+        var contacts = [];
+        try { contacts = getEmergencyContacts(); } catch (e) {}
+        contacts = (contacts || []).filter(function(c) { return c && c.telefono && String(c.telefono).trim(); });
+        if (!contacts.length) return _wbText(null, g);
+        return contacts.map(function(c) {
+          var h = '<div class="wb-place"><div class="wb-place-name">' + _wbEsc(c.nombre || '') + '</div>';
+          h += '<div class="wb-place-acts"><a class="wb-chip wb-chip-red" href="tel:' + _wbEsc(c.telefono) + '">📞 ' + _wbEsc(c.telefono) + '</a></div></div>';
+          return _wbCard(h);
+        }).join('');
+      }
+      return _wbText(null, g);
+    }
+
+    function wbCopy(text, btn) {
+      try {
+        navigator.clipboard.writeText(text).then(function() {
+          if (btn) { var o = btn.innerHTML; btn.innerHTML = '✅ ' + _wbLabel('copied'); setTimeout(function() { btn.innerHTML = o; }, 1500); }
+        });
+      } catch (e) {}
+    }
+
+    // ---------- Enlace / QR del Welcome Book (genérico o por reserva) ----------
+    function getWelcomeBookLink(resId) {
+      var base = window.location.origin + window.location.pathname;
+      var url = S.scriptUrl || localStorage.getItem('scriptUrl') || '';
+      return base + '?guia' + (resId ? ('=' + encodeURIComponent(resId)) : '') + '&u=' + encodeURIComponent(url);
+    }
+    function copyWelcomeBookLink(resId) {
+      var link = getWelcomeBookLink(resId);
+      navigator.clipboard.writeText(link).then(function() { toast('Enlace de la guía copiado'); });
+    }
+    function previewWelcomeBook(resId) { window.open(getWelcomeBookLink(resId), '_blank'); }
+    function shareWelcomeBookWhatsApp(resId) {
+      var res = (S.reservas || []).find(function(r) { return r.id === resId; });
+      if (!res) return;
+      var link = getWelcomeBookLink(resId);
+      var hi = getHotelInfo();
+      var text = '¡Hola ' + res.huesped + '! 🏨\n\nAquí tienes tu guía digital de *' + (hi.nombre || HOTEL_NAME) + '* con todo lo que necesitas para tu estancia: acceso, WiFi, desayuno, recomendaciones locales y contactos.\n\n' + link + '\n\n¡Te esperamos! 🌟';
+      var phone = (typeof getGuestPhone === 'function' ? getGuestPhone(res) : (res.telefono || '')).replace(/[^0-9]/g, '');
+      if (phone.length === 10) phone = '52' + phone;
+      window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(text), '_blank');
+    }
+    function showWelcomeBookQR(resId) {
+      var link = getWelcomeBookLink(resId);
+      var qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=' + encodeURIComponent(link);
+      var res = resId ? (S.reservas || []).find(function(r) { return r.id === resId; }) : null;
+      var sub = res ? (res.huesped + ' · Hab. ' + res.habitacionNum) : 'Guía general del hotel';
+      var h = '<div style="text-align:center;">';
+      h += '<div style="font-size:14px;font-weight:700;margin-bottom:4px;">📖 Guía del huésped</div>';
+      h += '<div style="font-size:12px;color:var(--text2);margin-bottom:12px;">' + _wbEsc(sub) + '</div>';
+      h += '<img src="' + qrUrl + '" style="width:220px;height:220px;border-radius:8px;margin-bottom:12px;background:#fff;padding:8px;" alt="QR">';
+      h += '<div style="font-size:10px;color:var(--text2);word-break:break-all;margin-bottom:12px;">' + link + '</div>';
+      h += '<button class="form-button" onclick="copyWelcomeBookLink(' + (resId ? '\'' + resId + '\'' : '') + ')">📋 Copiar enlace</button>';
+      h += '<button class="form-button secondary" style="margin-top:8px;" onclick="closeModal()">Cerrar</button>';
+      h += '</div>';
+      document.getElementById('taskDetailContent').innerHTML = h;
+      document.getElementById('taskDetailModal').querySelector('.modal-title').textContent = '📖 Guía del huésped';
+      document.getElementById('taskDetailActions').innerHTML = '';
+      openModal('taskDetailModal');
+    }
+
+    // ---------- Código de acceso (hoja 🔑 Accesos) ----------
+    function getAccessCodeFor(resId) {
+      var a = (S.accesos || []).find(function(x) { return String(x.reservaId) === String(resId); });
+      return a ? a.codigo : '';
+    }
+    async function saveAccessCode(resId, code) {
+      code = (code || '').trim();
+      if (!S.accesos) S.accesos = [];
+      var existing = S.accesos.find(function(x) { return String(x.reservaId) === String(resId); });
+      try {
+        var res;
+        if (existing) {
+          existing.codigo = code;
+          res = await sheets.multi([{ type: 'updateById', sheet: '🔑 Accesos', id: resId, values: [resId, code, existing.notas || ''] }]);
+        } else {
+          S.accesos.push({ reservaId: String(resId), codigo: code, notas: '' });
+          res = await sheets.multi([{ type: 'append', sheet: '🔑 Accesos', values: [resId, code, ''] }]);
+        }
+        var ok = res && res.results && res.results[0] && res.results[0].success;
+        if (ok) { toast('🔑 Código de acceso guardado'); }
+        else { toast('⚠️ Crea la hoja "🔑 Accesos" en tu Sheet (columnas: ID, Código, Notas)', true); }
+      } catch (e) {
+        toast('⚠️ No se pudo guardar el código de acceso', true);
+      }
+    }
+
+    // ---------- Editor en Config: "Guía Huésped" ----------
+    var _wbEditLang = 'es';
+    var WB_ALL_LANGS = [ ['es','🇲🇽 Español'], ['en','🇬🇧 English'], ['fr','🇫🇷 Français'], ['it','🇮🇹 Italiano'], ['de','🇩🇪 Deutsch'] ];
+    var WB_TEXT_FIELDS = [
+      ['welcome','Bienvenida','Mensaje de bienvenida para el huésped'],
+      ['checkin','Instrucciones de Check-In','Cómo llegar, recoger llaves, horario'],
+      ['accesoInstr','Instrucciones de acceso (cerradura)','Cómo usar el código de acceso personal (aparece junto al código del huésped)'],
+      ['checkout','Instrucciones de Check-Out','Procedimiento de salida'],
+      ['ubicacionNotas','Ubicación — notas','Indicaciones para llegar (la dirección se toma de Hotel Info)'],
+      ['wifiNotas','WiFi — notas','La red y contraseña se toman de Hotel Info'],
+      ['reglas','Reglas de la casa','Una por línea'],
+      ['transporte','Transporte','Taxis, estacionamiento, transporte público'],
+      ['servicios','Servicios e información','A/C, TV, electrodomésticos, amenidades'],
+      ['informacion','Información general','Recepción, horarios, servicios del hotel'],
+      ['contactoNotas','Contacto — notas','Texto opcional (WhatsApp/tel/email se toman de Hotel Info)']
+    ];
+    var WB_LIST_CATS = [ ['restaurantes','🍽️ Restaurantes'], ['bares','🍸 Bares y Clubs'], ['compras','🛍️ Compras'], ['actividades','🎯 Actividades'] ];
+
+    function renderGuiaConfig() {
+      var g = getGuestGuide();
+      var h = '';
+      h += '<div style="margin-bottom:14px"><div class="section-title">📖 Guía del Huésped (Welcome Book)</div>';
+      h += '<div style="font-size:12px;color:var(--text2);">Página que el huésped abre por QR o enlace, sin instalar nada. Es <b>personal por reserva</b>: incluye su nombre, código de acceso y códigos de desayuno. La dirección, WiFi, WhatsApp y contactos de emergencia se toman automáticamente de las otras secciones de Config. El enlace y QR de cada huésped se generan en la ficha de su reserva.</div></div>';
+
+      // Vista previa genérica
+      h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">';
+      h += '<button class="form-button" onclick="previewWelcomeBook()" style="flex:1;min-width:120px;padding:10px;font-size:12px;">👁️ Vista previa (general)</button>';
+      h += '<button class="form-button secondary" onclick="copyWelcomeBookLink()" style="flex:1;min-width:120px;padding:10px;font-size:12px;">🔗 Copiar enlace general</button>';
+      h += '<button class="form-button secondary" onclick="showWelcomeBookQR()" style="flex:1;min-width:120px;padding:10px;font-size:12px;">📱 QR general</button>';
+      h += '</div>';
+
+      // Idiomas activos
+      h += '<div style="background:var(--surface3);padding:10px 12px;border-radius:var(--radius);margin-bottom:14px;">';
+      h += '<div style="font-size:12px;font-weight:700;margin-bottom:8px;">Idiomas visibles para el huésped</div><div style="display:flex;flex-wrap:wrap;gap:6px;">';
+      WB_ALL_LANGS.forEach(function(l) {
+        var on = g.langs.indexOf(l[0]) !== -1;
+        h += '<button onclick="wbCfgToggleLang(\'' + l[0] + '\')" style="border:1px solid ' + (on ? 'var(--accent)' : 'var(--surface3)') + ';background:' + (on ? 'var(--accent)' : 'var(--surface2)') + ';color:' + (on ? 'var(--bg)' : 'var(--text2)') + ';border-radius:20px;padding:5px 12px;font-size:12px;cursor:pointer;">' + l[1] + '</button>';
+      });
+      h += '</div><div style="font-size:10px;color:var(--text2);margin-top:6px;">El primer idioma activo es el idioma base (respaldo cuando falta traducción).</div></div>';
+
+      // Selector de idioma a editar
+      h += '<div style="font-size:12px;font-weight:700;margin-bottom:6px;">Editando idioma:</div>';
+      h += '<div class="tabs-pills" style="margin-bottom:14px;">';
+      WB_ALL_LANGS.forEach(function(l) {
+        h += '<div class="pill ' + (_wbEditLang === l[0] ? 'active' : '') + '" onclick="_wbEditLang=\'' + l[0] + '\';renderGuiaConfig()">' + l[1] + '</div>';
+      });
+      h += '</div>';
+
+      // mapLink (no depende de idioma)
+      h += _wbCfgField('mapLink', 'Enlace de Google Maps', 'https://maps.google.com/…', (g.mapLink || ''), false);
+
+      // Campos de texto por idioma
+      WB_TEXT_FIELDS.forEach(function(f) {
+        var val = (g[f[0]] && g[f[0]][_wbEditLang]) ? g[f[0]][_wbEditLang] : '';
+        h += _wbCfgField(f[0], f[1], f[2], val, true);
+      });
+
+      // Listas de recomendaciones
+      WB_LIST_CATS.forEach(function(cat) {
+        var items = g[cat[0]] || [];
+        h += '<div style="margin-top:18px;"><div style="font-size:13px;font-weight:700;margin-bottom:8px;">' + cat[1] + '</div>';
+        items.forEach(function(it, i) {
+          h += '<div style="background:var(--surface3);padding:10px;border-radius:var(--radius);margin-bottom:8px;">';
+          h += '<div style="display:flex;gap:6px;margin-bottom:6px;"><input type="text" value="' + _wbEsc(it.nombre || '') + '" placeholder="Nombre" onchange="wbCfgSetItem(\'' + cat[0] + '\',' + i + ',\'nombre\',this.value)" style="flex:1;background:var(--surface2);border:1px solid var(--surface3);border-radius:6px;padding:6px 8px;font-size:12px;color:var(--text);font-weight:600;" />';
+          h += '<button onclick="wbCfgDelItem(\'' + cat[0] + '\',' + i + ')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px;">✕</button></div>';
+          var dv = (it.desc && it.desc[_wbEditLang]) ? it.desc[_wbEditLang] : '';
+          h += '<textarea placeholder="Descripción (' + _wbEditLang + ')" onchange="wbCfgSetItem(\'' + cat[0] + '\',' + i + ',\'desc\',this.value)" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--surface3);border-radius:6px;padding:6px 8px;font-size:12px;color:var(--text);min-height:44px;margin-bottom:6px;resize:vertical;">' + _wbEsc(dv) + '</textarea>';
+          h += '<div style="display:flex;gap:6px;"><input type="text" value="' + _wbEsc(it.mapLink || '') + '" placeholder="Mapa (URL)" onchange="wbCfgSetItem(\'' + cat[0] + '\',' + i + ',\'mapLink\',this.value)" style="flex:1;background:var(--surface2);border:1px solid var(--surface3);border-radius:6px;padding:6px 8px;font-size:11px;color:var(--text);" />';
+          h += '<input type="tel" value="' + _wbEsc(it.tel || '') + '" placeholder="Tel" onchange="wbCfgSetItem(\'' + cat[0] + '\',' + i + ',\'tel\',this.value)" style="width:110px;background:var(--surface2);border:1px solid var(--surface3);border-radius:6px;padding:6px 8px;font-size:11px;color:var(--text);" /></div>';
+          h += '</div>';
+        });
+        h += '<button class="form-button secondary" onclick="wbCfgAddItem(\'' + cat[0] + '\')" style="width:100%;padding:8px;font-size:12px;">+ Agregar a ' + cat[1] + '</button></div>';
+      });
+
+      // Guardar
+      h += '<div style="margin-top:20px;"><button class="form-button" onclick="wbCfgSaveSync()" style="width:100%;background:var(--accent);color:var(--bg);padding:12px;font-size:13px;">☁️ Guardar guía y sincronizar</button></div>';
+
+      document.getElementById('configContent').innerHTML = h;
+    }
+
+    function _wbCfgField(field, label, ph, val, perLang) {
+      var suffix = perLang ? (' <span style="color:var(--text2);font-weight:400;">(' + _wbEditLang + ')</span>') : '';
+      var h = '<div style="margin-bottom:12px;"><div style="font-size:12px;font-weight:700;margin-bottom:4px;">' + label + suffix + '</div>';
+      if (field === 'mapLink') {
+        h += '<input type="text" value="' + _wbEsc(val) + '" placeholder="' + _wbEsc(ph) + '" onchange="wbCfgSetPlain(\'mapLink\',this.value)" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--surface3);border-radius:6px;padding:8px;font-size:12px;color:var(--text);" />';
+      } else {
+        h += '<textarea placeholder="' + _wbEsc(ph) + '" onchange="wbCfgSetText(\'' + field + '\',this.value)" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--surface3);border-radius:6px;padding:8px;font-size:12px;color:var(--text);min-height:60px;resize:vertical;">' + _wbEsc(val) + '</textarea>';
+      }
+      h += '</div>';
+      return h;
+    }
+
+    function wbCfgSetText(field, value) {
+      var g = getGuestGuide();
+      if (!g[field] || typeof g[field] !== 'object') g[field] = {};
+      g[field][_wbEditLang] = value;
+      saveGuestGuideLocal(g);
+    }
+    function wbCfgSetPlain(field, value) {
+      var g = getGuestGuide();
+      g[field] = value;
+      saveGuestGuideLocal(g);
+    }
+    function wbCfgToggleLang(l) {
+      var g = getGuestGuide();
+      var i = g.langs.indexOf(l);
+      if (i === -1) g.langs.push(l);
+      else if (g.langs.length > 1) g.langs.splice(i, 1);
+      var order = ['es', 'en', 'fr', 'it', 'de'];
+      g.langs.sort(function(a, b) { return order.indexOf(a) - order.indexOf(b); });
+      saveGuestGuideLocal(g);
+      renderGuiaConfig();
+    }
+    function wbCfgAddItem(cat) {
+      var g = getGuestGuide();
+      if (!Array.isArray(g[cat])) g[cat] = [];
+      g[cat].push({ nombre: '', desc: {}, mapLink: '', tel: '' });
+      saveGuestGuideLocal(g);
+      renderGuiaConfig();
+    }
+    function wbCfgSetItem(cat, idx, field, value) {
+      var g = getGuestGuide();
+      if (!g[cat] || !g[cat][idx]) return;
+      if (field === 'desc') {
+        if (!g[cat][idx].desc || typeof g[cat][idx].desc !== 'object') g[cat][idx].desc = {};
+        g[cat][idx].desc[_wbEditLang] = value;
+      } else {
+        g[cat][idx][field] = value;
+      }
+      saveGuestGuideLocal(g);
+    }
+    function wbCfgDelItem(cat, idx) {
+      var g = getGuestGuide();
+      if (!g[cat]) return;
+      g[cat].splice(idx, 1);
+      saveGuestGuideLocal(g);
+      renderGuiaConfig();
+    }
+    async function wbCfgSaveSync() {
+      var g = getGuestGuide();
+      saveGuestGuide(g);
+      toast('Guía guardada y sincronizada');
     }
 
     // ============ PUBLIC BOOKING MODE ============
@@ -4502,7 +5178,7 @@
     // ============ DATA LOADING ============
     async function loadData() {
       await busy(async () => {
-        const [roomsData, reservasData, housekeepingData, bitacoraData, usuariosData, cobrosData, clientesData, inventarioData, configData, desayunosData, cotizacionesData] = await Promise.all([
+        const [roomsData, reservasData, housekeepingData, bitacoraData, usuariosData, cobrosData, clientesData, inventarioData, configData, desayunosData, cotizacionesData, accesosData] = await Promise.all([
           sheets.read('🏨 Habitaciones', 'A2:F20'),
           sheets.read('📋 Reservas', 'A2:P5000'),
           sheets.read('🧹 Housekeeping', 'A2:L5000'),
@@ -4513,7 +5189,8 @@
           sheets.read('📦 Inventario', 'A2:H500').catch(function() { return []; }),
           sheets.read('⚙️ Config', 'A2:B50').catch(function() { return []; }),
           sheets.read('🍳 Desayunos', 'A2:I5000').catch(function() { return []; }),
-          sheets.read('📝 Cotizaciones', 'A2:P5000').catch(function() { return []; })
+          sheets.read('📝 Cotizaciones', 'A2:P5000').catch(function() { return []; }),
+          sheets.read('🔑 Accesos', 'A2:C5000').catch(function() { return []; })
         ]);
 
         // Sync config from Sheet → localStorage (Sheet wins on load)
@@ -4562,6 +5239,10 @@
           creadoPor: r[13] || '',
           fechaCreacion: r[14] || ''
         }));
+
+        S.accesos = (accesosData || []).map(function(r) {
+          return { reservaId: String(r[0]), codigo: r[1] || '', notas: r[2] || '' };
+        });
 
         S.housekeeping = housekeepingData.map(h => ({
           id: h[0],
@@ -8981,7 +9662,8 @@
         { id: 'tarifas', label: '💲 Tarifas' },
         { id: 'ocupacion', label: '🛏️ Ocupación' },
         { id: 'desayunos', label: '🍳 Desayunos' },
-        { id: 'app', label: '📱 App' }
+        { id: 'app', label: '📱 App' },
+        { id: 'guia', label: '📖 Guía Huésped' }
       ];
       var ph = pills.map(function(p) {
         return '<div class="pill ' + (S.configTab === p.id ? 'active' : '') + '" onclick="S.configTab=\'' + p.id + '\';renderConfig()">' + p.label + '</div>';
@@ -9013,6 +9695,8 @@
         renderDesayunosConfig();
       } else if (S.configTab === 'app') {
         renderAppConfig();
+      } else if (S.configTab === 'guia') {
+        renderGuiaConfig();
       }
     }
 
@@ -10621,6 +11305,21 @@
         regSection += '<button onclick="closeModal();setTimeout(function(){showGuestQR(\'' + resId + '\')},300)" style="background:var(--surface2);border:1px solid var(--surface3);border-radius:8px;padding:8px 6px;font-size:11px;cursor:pointer;color:var(--text);text-align:center;">📱 QR</button>';
         regSection += '</div></div>';
         document.getElementById('reservaModalContent').insertAdjacentHTML('beforeend', regSection);
+      }
+
+      // Welcome Book (guía del huésped) — enlace personal + código de acceso
+      if (res.estado !== 'Cancelada') {
+        var _acc = getAccessCodeFor(resId);
+        var wbSec = '<div style="background:var(--surface3);padding:12px;border-radius:var(--radius);margin-bottom:12px;">';
+        wbSec += '<div style="font-size:12px;color:var(--text2);margin-bottom:8px;">\uD83D\uDCD6 GU\u00cdA DEL HU\u00c9SPED</div>';
+        wbSec += '<div style="font-size:11px;color:var(--text2);margin-bottom:4px;">C\u00f3digo de acceso (cerradura) para este hu\u00e9sped:</div>';
+        wbSec += '<input id="wbAccessInput_' + resId + '" type="text" value="' + _wbEsc(_acc) + '" placeholder="Ej. 4821" onchange="saveAccessCode(\'' + resId + '\', this.value)" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--surface3);border-radius:8px;padding:10px;font-size:18px;color:var(--text);font-family:Space Mono,monospace;letter-spacing:3px;text-align:center;margin-bottom:10px;">';
+        wbSec += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;">';
+        wbSec += '<button onclick="shareWelcomeBookWhatsApp(\'' + resId + '\')" style="background:#25D366;color:white;border:none;border-radius:8px;padding:8px 6px;font-size:11px;cursor:pointer;text-align:center;">\uD83D\uDCF2 WhatsApp</button>';
+        wbSec += '<button onclick="copyWelcomeBookLink(\'' + resId + '\')" style="background:var(--surface2);border:1px solid var(--surface3);border-radius:8px;padding:8px 6px;font-size:11px;cursor:pointer;color:var(--text);text-align:center;">\uD83D\uDCCB Copiar</button>';
+        wbSec += '<button onclick="closeModal();setTimeout(function(){showWelcomeBookQR(\'' + resId + '\')},300)" style="background:var(--surface2);border:1px solid var(--surface3);border-radius:8px;padding:8px 6px;font-size:11px;cursor:pointer;color:var(--text);text-align:center;">\uD83D\uDCF1 QR</button>';
+        wbSec += '</div></div>';
+        document.getElementById('reservaModalContent').insertAdjacentHTML('beforeend', wbSec);
       }
 
       // Breakfast codes section — wow style
