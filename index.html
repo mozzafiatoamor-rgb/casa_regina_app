@@ -1781,6 +1781,21 @@
     .wb-terms-h, .wb-restr-h { font-size:13px; font-weight:800; color:#a9843f; text-transform:uppercase; letter-spacing:.5px; margin:16px 2px 8px; }
     .wb-restr-h { margin-top:4px; }
     .wb-term-t { font-size:13.5px; font-weight:700; color:#3d3324; margin-bottom:4px; }
+    /* Welcome Book — acordeón de reglas (cápsulas) */
+    .wb-acc { margin-bottom:10px; }
+    .wb-acc-btn {
+      width:100%; box-sizing:border-box; display:flex; justify-content:space-between; align-items:center; gap:10px;
+      background:linear-gradient(180deg,#fffdf8,#f4ead6); border:1px solid rgba(150,120,70,.32);
+      border-radius:26px; padding:13px 18px; cursor:pointer; text-align:left;
+      font-size:13.5px; font-weight:700; color:#3d3324; box-shadow:0 1px 4px rgba(120,95,50,.08);
+      -webkit-tap-highlight-color:transparent; font-family:inherit;
+    }
+    .wb-acc-btn:active { transform:scale(.99); }
+    .wb-acc-chev { color:#a9843f; font-size:13px; transition:transform .25s; flex-shrink:0; }
+    .wb-acc.open .wb-acc-chev { transform:rotate(180deg); }
+    .wb-acc.open .wb-acc-btn { border-color:#b99a5b; border-bottom-left-radius:6px; border-bottom-right-radius:6px; }
+    .wb-acc-body { display:none; padding:12px 18px 4px; font-size:13.5px; line-height:1.65; color:#4a3f2f; }
+    .wb-acc.open .wb-acc-body { display:block; animation:wbFade .2s ease; }
   </style>
 </head>
 <body>
@@ -3617,8 +3632,8 @@
     var DEFAULT_GUEST_GUIDE = {
       langs: ['es', 'en', 'fr', 'it', 'de'],
       welcome:      { es: '¡Bienvenido a Casa Regina Hotel Boutique! Nos alegra recibirte. Aquí encontrarás toda la información para disfrutar tu estancia.', en: 'Welcome to Casa Regina Hotel Boutique! We are delighted to have you. Here you will find everything you need for a great stay.', fr: '', it: '', de: '' },
-      checkin:      { es: 'El check-in es a partir de las 3:00 PM. Preséntate en recepción con una identificación oficial. Si llegas antes, con gusto guardamos tu equipaje.', en: 'Check-in is from 3:00 PM. Please come to the reception desk with a valid ID. If you arrive early, we are happy to store your luggage.', fr: '', it: '', de: '' },
-      checkout:     { es: 'El check-out es antes de las 12:00 PM. Entrega tu llave en recepción. ¡Gracias por tu visita!', en: 'Check-out is before 12:00 PM. Please return your key at reception. Thank you for staying with us!', fr: '', it: '', de: '' },
+      checkin:      { es: '¡Bienvenido! Preséntate en recepción con una identificación oficial para tu registro. Si llegas antes de la hora de entrada, con gusto resguardamos tu equipaje.', en: 'Welcome! Please come to the reception desk with a valid ID to check in. If you arrive before check-in time, we are happy to store your luggage.', fr: '', it: '', de: '' },
+      checkout:     { es: 'Por favor entrega tu llave o tarjeta en recepción a la hora de salida. Si necesitas salida tardía, consúltalo en recepción (sujeto a disponibilidad). ¡Gracias por tu visita!', en: 'Please return your key or card at reception by check-out time. For a late check-out, ask reception (subject to availability). Thank you for your visit!', fr: '', it: '', de: '' },
       mapLink:      '',
       ubicacionNotas: { es: '', en: '', fr: '', it: '', de: '' },
       wifiNotas:    { es: '', en: '', fr: '', it: '', de: '' },
@@ -3690,7 +3705,9 @@
       departureDate:{ es:'Tu salida', en:'Your departure', fr:'Votre départ', it:'La tua partenza', de:'Deine Abreise' },
       guestLbl:     { es:'Huésped', en:'Guest', fr:'Client', it:'Ospite', de:'Gast' },
       wbTitle:      { es:'Tu estancia para recordar', en:'A stay to remember', fr:'Un séjour inoubliable', it:'Un soggiorno da ricordare', de:'Ein Aufenthalt zum Erinnern' },
-      wbTagline:    { es:'Mejora tu experiencia', en:'Enhance your experience', fr:'Sublimez votre expérience', it:'Migliora la tua esperienza', de:'Verbessern Sie Ihr Erlebnis' }
+      wbTagline:    { es:'Mejora tu experiencia', en:'Enhance your experience', fr:'Sublimez votre expérience', it:'Migliora la tua esperienza', de:'Verbessern Sie Ihr Erlebnis' },
+      reglamento:   { es:'Reglamento del hotel', en:'Hotel rules', fr:'Règlement de l\'hôtel', it:'Regolamento dell\'hotel', de:'Hotelordnung' },
+      tapToExpand:  { es:'Toca cada punto para desplegarlo.', en:'Tap each item to expand.', fr:'Touchez chaque élément pour le développer.', it:'Tocca ogni voce per espanderla.', de:'Tippen Sie auf jeden Punkt zum Aufklappen.' }
     };
     // Datos fijos de Mozzafiato (mismos que usa el resto del app)
     var WB_MOZZA_MENU = 'https://mozzafiatoamor-rgb.github.io/mozzafiato-menu/index.html';
@@ -3971,23 +3988,22 @@
         return hw0 + _wbText(g.welcome, g);
       }
       if (key === 'reglas') {
-        var hr = _wbText(g.reglas, g);
-        // Reglas de ocupación (reutiliza config del app)
-        try {
-          var occ = (typeof getOccupancySummary === 'function') ? getOccupancySummary() : '';
-          if (occ) hr += _wbCard('<div class="wb-kv-col"><span>' + _wbEsc(_wbLabel('occupancy')) + '</span><div class="wb-body">' + _wbEsc(occ) + '</div></div>');
-        } catch (e) {}
-        // Términos y condiciones (reutiliza getTerms del app)
+        var items = [];
+        // 1. Reglamento real (Config → Mensajes)
+        var regl = _wbReglamentoText();
+        if (regl) items.push({ title: '📋 ' + _wbLabel('reglamento'), body: regl, open: true });
+        // 2. Políticas de ocupación + Términos y condiciones (getTerms del app) como cápsulas
         try {
           var terms = (typeof getTerms === 'function') ? getTerms() : [];
-          if (terms && terms.length) {
-            hr += '<div class="wb-terms-h">' + _wbEsc(_wbLabel('terms')) + '</div>';
-            hr += terms.map(function(t) {
-              return _wbCard('<div class="wb-term-t">' + _wbEsc(t.title) + '</div><div class="wb-body" style="font-size:13px;">' + _wbNl2br(t.text) + '</div>');
-            }).join('');
-          }
-        } catch (e2) {}
-        return hr;
+          terms.forEach(function(t) { items.push({ title: t.title, body: t.text, open: false }); });
+        } catch (e) {}
+        // Respaldo: si no hay nada, muestra las reglas del guide
+        if (!items.length) {
+          var custom = _wbT(g.reglas, g);
+          if (custom) return _wbCard('<div class="wb-body">' + _wbNl2br(custom) + '</div>');
+          return _wbText(null, g);
+        }
+        return '<div class="wb-body" style="margin:0 2px 12px;color:#8a7a5f;font-size:12.5px;">' + _wbEsc(_wbLabel('tapToExpand')) + '</div>' + _wbAccordion(items);
       }
       if (key === 'transporte')  return _wbText(g.transporte, g);
       if (key === 'servicios')   return _wbText(g.servicios, g);
@@ -4105,6 +4121,39 @@
       } catch (e) {}
     }
 
+    // Reglamento real tomado de Config → Mensajes (plantilla mp_reglamento)
+    function _wbReglamentoText() {
+      try {
+        var tpls = (typeof getMsgTemplates === 'function') ? getMsgTemplates() : null;
+        var tpl = tpls && tpls['mp_reglamento'];
+        if (!tpl || !tpl.texto) return '';
+        var hi = getHotelInfo();
+        var txt = tpl.texto.replace(/\{hotel\}/g, hi.nombre || '');
+        txt = txt.replace(/[\*_]/g, ''); // quitar marcadores de WhatsApp
+        // quitar línea de título y pie de agradecimiento/firma
+        var lines = txt.split('\n').filter(function(l) {
+          var s = l.trim();
+          if (!s) return false;
+          if (/^📋?\s*Reglamento/i.test(s)) return false;
+          if (/gracias/i.test(s)) return false;
+          if (s.indexOf('🌿') !== -1) return false;
+          return true;
+        });
+        return lines.join('\n');
+      } catch (e) { return ''; }
+    }
+    function wbToggleAcc(i) {
+      var el = document.getElementById('wbacc' + i);
+      if (el) el.classList.toggle('open');
+    }
+    function _wbAccordion(items) {
+      return items.map(function(it, i) {
+        return '<div class="wb-acc' + (it.open ? ' open' : '') + '" id="wbacc' + i + '">' +
+          '<button class="wb-acc-btn" onclick="wbToggleAcc(' + i + ')"><span>' + _wbEsc(it.title) + '</span><span class="wb-acc-chev">▾</span></button>' +
+          '<div class="wb-acc-body">' + _wbNl2br(it.body) + '</div></div>';
+      }).join('');
+    }
+
     // ---------- Enlace / QR del Welcome Book (genérico o por reserva) ----------
     function getWelcomeBookLink(resId) {
       var base = window.location.origin + window.location.pathname;
@@ -4181,7 +4230,6 @@
       ['checkout','Instrucciones de Check-Out','Procedimiento de salida'],
       ['ubicacionNotas','Ubicación — notas','Indicaciones para llegar (la dirección se toma de Hotel Info)'],
       ['wifiNotas','WiFi — notas','La red y contraseña se toman de Hotel Info'],
-      ['reglas','Reglas de la casa','Una por línea'],
       ['transporte','Transporte','Taxis, estacionamiento, transporte público'],
       ['servicios','Servicios e información','A/C, TV, electrodomésticos, amenidades'],
       ['informacion','Información general','Recepción, horarios, servicios del hotel'],
