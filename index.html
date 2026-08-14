@@ -1760,6 +1760,12 @@
     .wb-bf-meta { font-size:12px; color:#8a7a5f; margin-top:4px; }
     .wb-bf-used { opacity:.5; }
     .wb-bf-used .wb-bf-qr { filter:grayscale(1); }
+    /* Welcome Book — Mozzafiato / términos */
+    .wb-mozza-name { font-size:18px; font-weight:800; color:#3d3324; }
+    .wb-mozza-tag { font-size:12px; color:#a9843f; font-weight:600; margin-top:2px; }
+    .wb-terms-h, .wb-restr-h { font-size:13px; font-weight:800; color:#a9843f; text-transform:uppercase; letter-spacing:.5px; margin:16px 2px 8px; }
+    .wb-restr-h { margin-top:4px; }
+    .wb-term-t { font-size:13.5px; font-weight:700; color:#3d3324; margin-bottom:4px; }
   </style>
 </head>
 <body>
@@ -3657,6 +3663,18 @@
       de: { welcome:'Willkommen', checkin:'Check-In', ubicacion:'Standort', wifi:'WLAN', reglas:'Hausregeln', transporte:'Transport', servicios:'Services', actividades:'Aktivitäten', informacion:'Informationen', bares:'Bars & Clubs', restaurantes:'Restaurants', compras:'Einkaufen', emergencias:'Notfälle', checkout:'Check-Out', contacto:'Kontakt', desayuno:'Frühstück', back:'Zurück', menu:'Menü', callNow:'Anrufen', copyPass:'Passwort kopieren', copied:'Kopiert!', openMap:'Auf Karte öffnen', network:'Netzwerk', password:'Passwort', whatsapp:'WhatsApp', phone:'Telefon', email:'E-Mail', checkinTime:'Check-in-Zeit', checkoutTime:'Check-out-Zeit', address:'Adresse', noInfo:'Derzeit keine Informationen verfügbar.', loading:'Laden…', subtitle:'Gästeführer', hello:'Hallo', room:'Zimmer', accessCode:'Ihr Zugangscode', breakfastShow:'Zeigen Sie diesen Code im Restaurant', pending:'Ausstehend', used:'Verwendet', pax:'Gäste' }
     };
     var WB_FLAGS = { es:'🇲🇽', en:'🇬🇧', fr:'🇫🇷', it:'🇮🇹', de:'🇩🇪' };
+    // Etiquetas extra (multi-idioma) para info reutilizada del app
+    var WB_I18N_EXTRA = {
+      menu:         { es:'Menú digital', en:'Digital menu', fr:'Menu numérique', it:'Menu digitale', de:'Digitale Speisekarte' },
+      occupancy:    { es:'Reglas de ocupación', en:'Occupancy rules', fr:"Règles d'occupation", it:'Regole di occupazione', de:'Belegungsregeln' },
+      terms:        { es:'Términos y condiciones', en:'Terms & conditions', fr:'Conditions générales', it:'Termini e condizioni', de:'Allgemeine Geschäftsbedingungen' },
+      restrictions: { es:'Restricciones', en:'Restrictions', fr:'Restrictions', it:'Restrizioni', de:'Einschränkungen' },
+      scheduleLbl:  { es:'Horario', en:'Hours', fr:'Horaires', it:'Orario', de:'Öffnungszeiten' },
+      partnerRest:  { es:'Nuestro restaurante asociado', en:'Our partner restaurant', fr:'Notre restaurant partenaire', it:'Il nostro ristorante partner', de:'Unser Partnerrestaurant' }
+    };
+    // Datos fijos de Mozzafiato (mismos que usa el resto del app)
+    var WB_MOZZA_MENU = 'https://mozzafiatoamor-rgb.github.io/mozzafiato-menu/index.html';
+    var WB_MOZZA_WA   = 'https://wa.me/529984088897';
 
     // Iconos SVG (trazo dorado, estilo del kit)
     var WB_ICONS = {
@@ -3696,7 +3714,13 @@
       for (var k in obj) { if (obj[k] && String(obj[k]).trim()) return obj[k]; }
       return '';
     }
-    function _wbLabel(key) { return (WB_I18N[_wbLang] || WB_I18N.es)[key] || (WB_I18N.es[key] || key); }
+    function _wbLabel(key) {
+      var d = WB_I18N[_wbLang] || WB_I18N.es;
+      if (d[key] != null) return d[key];
+      if (WB_I18N.es[key] != null) return WB_I18N.es[key];
+      if (WB_I18N_EXTRA[key]) return WB_I18N_EXTRA[key][_wbLang] || WB_I18N_EXTRA[key].es;
+      return key;
+    }
     function _wbEsc(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
     function _wbNl2br(s) { return _wbEsc(s).replace(/\n/g, '<br>'); }
 
@@ -3762,9 +3786,17 @@
     function wbOpen(view) { _wbView = view; renderWelcomeBook(); window.scrollTo(0, 0); }
     function wbHome() { _wbView = null; renderWelcomeBook(); window.scrollTo(0, 0); }
 
+    function _wbBreakfastPromo() {
+      try { return (typeof getBreakfastPromo === 'function') ? getBreakfastPromo() : null; } catch (e) { return null; }
+    }
+    function _wbShowDesayuno() {
+      if (_wbBreakfast.length) return true;
+      var p = _wbBreakfastPromo();
+      return !!(p && p.partner);
+    }
     function _wbActiveTiles() {
       var tiles = WB_TILES.slice();
-      if (_wbRes && _wbBreakfast.length) tiles.splice(1, 0, 'desayuno');
+      if (_wbShowDesayuno()) tiles.splice(1, 0, 'desayuno');
       return tiles;
     }
 
@@ -3835,24 +3867,52 @@
       }).join('');
     }
 
+    function _wbValidarUrl(code) {
+      var base = window.location.origin + window.location.pathname;
+      var url = S.scriptUrl || localStorage.getItem('scriptUrl') || '';
+      return base + '?validar&u=' + encodeURIComponent(url) + '&code=' + encodeURIComponent(code);
+    }
     function _wbBreakfastSection(g) {
-      if (!_wbBreakfast.length) return _wbText(null, g);
-      var order = { 'Pendiente': 0, 'Pending': 0 };
-      var list = _wbBreakfast.slice().sort(function(a, b) { return (order[a.estado] != null ? 0 : 1) - (order[b.estado] != null ? 0 : 1); });
-      var intro = _wbCard('<div class="wb-body">🍳 ' + _wbEsc(_wbLabel('breakfastShow')) + '</div>');
-      return intro + list.map(function(b) {
-        var used = /consum|used|usa/i.test(b.estado);
-        var qr = 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' + encodeURIComponent(b.codigo);
-        var h = '<div class="wb-bf' + (used ? ' wb-bf-used' : '') + '">';
-        h += '<img class="wb-bf-qr" src="' + qr + '" alt="QR">';
-        h += '<div class="wb-bf-code">' + _wbEsc(b.codigo) + '</div>';
-        var meta = [];
-        if (b.fecha) meta.push(_wbEsc(b.fecha));
-        if (b.personas) meta.push(_wbEsc(b.personas) + ' ' + _wbEsc(_wbLabel('pax')));
-        meta.push('<b>' + _wbEsc(used ? _wbLabel('used') : _wbLabel('pending')) + '</b>');
-        h += '<div class="wb-bf-meta">' + meta.join(' · ') + '</div></div>';
-        return _wbCard(h);
-      }).join('');
+      var out = '';
+      var promo = _wbBreakfastPromo();
+
+      // Tarjeta del restaurante asociado (Mozzafiato)
+      if (promo && promo.partner) {
+        var pc = '<div class="wb-mozza-name">☕ ' + _wbEsc(promo.partner) + '</div>';
+        pc += '<div class="wb-mozza-tag">' + _wbEsc(_wbLabel('partnerRest')) + '</div>';
+        if (promo.descripcion) pc += '<div class="wb-body" style="margin-top:8px;">🍽️ ' + _wbNl2br(promo.descripcion) + '</div>';
+        if (promo.horario) pc += '<div class="wb-kv" style="margin-top:8px;"><span>🕐 ' + _wbEsc(_wbLabel('scheduleLbl')) + '</span><b>' + _wbEsc(promo.horario) + '</b></div>';
+        out += _wbCard(pc);
+        out += '<a class="wb-btn" href="' + WB_MOZZA_MENU + '" target="_blank" rel="noopener">📖 ' + _wbEsc(_wbLabel('menu')) + '</a>';
+        out += '<a class="wb-btn wb-wa" href="' + WB_MOZZA_WA + '" target="_blank" rel="noopener">💬 WhatsApp</a>';
+      }
+
+      // Códigos personales del huésped (QR → página real de validación)
+      if (_wbBreakfast.length) {
+        out += _wbCard('<div class="wb-body">🍳 ' + _wbEsc(_wbLabel('breakfastShow')) + '</div>');
+        var order = { 'Pendiente': 0, 'Pending': 0 };
+        var list = _wbBreakfast.slice().sort(function(a, b) { return (order[a.estado] != null ? 0 : 1) - (order[b.estado] != null ? 0 : 1); });
+        out += list.map(function(b) {
+          var used = /consum|used|usa/i.test(b.estado);
+          var qr = 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' + encodeURIComponent(_wbValidarUrl(b.codigo));
+          var h = '<div class="wb-bf' + (used ? ' wb-bf-used' : '') + '">';
+          h += '<img class="wb-bf-qr" src="' + qr + '" alt="QR">';
+          h += '<div class="wb-bf-code">' + _wbEsc(b.codigo) + '</div>';
+          var meta = [];
+          if (b.fecha) meta.push(_wbEsc(b.fecha));
+          if (b.personas) meta.push(_wbEsc(b.personas) + ' ' + _wbEsc(_wbLabel('pax')));
+          meta.push('<b>' + _wbEsc(used ? _wbLabel('used') : _wbLabel('pending')) + '</b>');
+          h += '<div class="wb-bf-meta">' + meta.join(' · ') + '</div></div>';
+          return _wbCard(h);
+        }).join('');
+      }
+
+      // Restricciones de la promoción
+      if (promo && promo.restricciones) {
+        out += _wbCard('<div class="wb-restr-h">' + _wbEsc(_wbLabel('restrictions')) + '</div><div class="wb-body" style="font-size:12.5px;color:#7a6a4f;">' + _wbNl2br(promo.restricciones) + '</div>');
+      }
+
+      return out || _wbText(null, g);
     }
 
     function _wbSection(key, g, hi) {
@@ -3861,7 +3921,25 @@
         if (_wbRes) hw0 += _wbCard('<div class="wb-body"><b>' + _wbEsc(_wbLabel('hello')) + ', ' + _wbEsc(_wbRes.huesped) + '!</b></div>');
         return hw0 + _wbText(g.welcome, g);
       }
-      if (key === 'reglas')      return _wbText(g.reglas, g);
+      if (key === 'reglas') {
+        var hr = _wbText(g.reglas, g);
+        // Reglas de ocupación (reutiliza config del app)
+        try {
+          var occ = (typeof getOccupancySummary === 'function') ? getOccupancySummary() : '';
+          if (occ) hr += _wbCard('<div class="wb-kv-col"><span>' + _wbEsc(_wbLabel('occupancy')) + '</span><div class="wb-body">' + _wbEsc(occ) + '</div></div>');
+        } catch (e) {}
+        // Términos y condiciones (reutiliza getTerms del app)
+        try {
+          var terms = (typeof getTerms === 'function') ? getTerms() : [];
+          if (terms && terms.length) {
+            hr += '<div class="wb-terms-h">' + _wbEsc(_wbLabel('terms')) + '</div>';
+            hr += terms.map(function(t) {
+              return _wbCard('<div class="wb-term-t">' + _wbEsc(t.title) + '</div><div class="wb-body" style="font-size:13px;">' + _wbNl2br(t.text) + '</div>');
+            }).join('');
+          }
+        } catch (e2) {}
+        return hr;
+      }
       if (key === 'transporte')  return _wbText(g.transporte, g);
       if (key === 'servicios')   return _wbText(g.servicios, g);
       if (key === 'informacion') return _wbText(g.informacion, g);
