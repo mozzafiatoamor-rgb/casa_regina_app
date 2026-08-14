@@ -9,7 +9,7 @@
   <meta name="theme-color" content="#0f1410">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="application-name" content="Casa Regina PMS">
-  <title>Hotel Casa Regina - PMS</title>
+  <title>Casa Regina Hotel Boutique - PMS</title>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -1677,10 +1677,14 @@
     }
     .wb-loading { max-width:440px; margin:0 auto; text-align:center; padding:80px 20px; color:#8a7a5f; font-size:15px; }
     .wb-head { text-align:center; margin-bottom:22px; }
-    .wb-logo { height:52px; width:auto; object-fit:contain; margin-bottom:10px; opacity:.95; }
+    .wb-logo { height:104px; width:auto; max-width:82%; object-fit:contain; margin:0 auto 8px; display:block; }
+    .wb-hotelname {
+      font-size:15px; font-weight:800; color:#5a4c37; letter-spacing:2.5px; text-transform:uppercase;
+      margin-bottom:2px;
+    }
     .wb-title {
       font-family:'Georgia','Times New Roman',serif; font-style:italic;
-      font-size:32px; font-weight:600; color:#3d3324; letter-spacing:.3px; line-height:1.1;
+      font-size:30px; font-weight:600; color:#3d3324; letter-spacing:.3px; line-height:1.1; margin-top:2px;
     }
     .wb-sub { font-size:13px; color:#8a7a5f; margin-top:2px; font-weight:600; }
     .wb-flags { display:flex; justify-content:center; gap:6px; margin-top:14px; flex-wrap:wrap; }
@@ -1744,7 +1748,9 @@
       border-radius:20px; padding:6px 12px; font-size:12.5px; font-weight:600;
     }
     .wb-chip-red { background:#fdeeee; border-color:rgba(200,60,60,.3); color:#b23838; }
-    .wb-foot { text-align:center; font-size:11px; color:#9a8a6f; margin-top:auto; padding-top:24px; letter-spacing:.5px; }
+    .wb-foot { text-align:center; margin-top:auto; padding-top:28px; }
+    .wb-foot-logo { height:56px; width:auto; max-width:60%; object-fit:contain; opacity:.85; margin:0 auto 6px; display:block; }
+    .wb-foot-txt { font-size:11px; color:#9a8a6f; letter-spacing:.5px; }
     /* Welcome Book — bloques por huésped */
     .wb-guest { background:linear-gradient(180deg,#fffdf8,#f4ecdd); border:1px solid rgba(150,120,70,.28); border-radius:14px; padding:12px 16px; margin-bottom:14px; text-align:center; box-shadow:0 2px 6px rgba(120,95,50,.10); }
     .wb-guest-hi { font-size:17px; font-weight:800; color:#3d3324; }
@@ -1761,8 +1767,16 @@
     .wb-bf-used { opacity:.5; }
     .wb-bf-used .wb-bf-qr { filter:grayscale(1); }
     /* Welcome Book — Mozzafiato / términos */
-    .wb-mozza-name { font-size:18px; font-weight:800; color:#3d3324; }
-    .wb-mozza-tag { font-size:12px; color:#a9843f; font-weight:600; margin-top:2px; }
+    .wb-mozza {
+      background:linear-gradient(180deg,#fffdf8,#f4ead6); border:1px solid rgba(150,120,70,.3);
+      border-radius:16px; padding:18px 16px 16px; margin-bottom:12px; text-align:center;
+      box-shadow:0 2px 8px rgba(120,95,50,.12);
+    }
+    .wb-mozza-logo { width:110px; height:110px; object-fit:contain; border-radius:14px; background:#fff; padding:8px; margin:0 auto 10px; display:block; box-shadow:0 1px 4px rgba(120,95,50,.12); }
+    .wb-mozza-name { font-size:19px; font-weight:800; color:#3d3324; }
+    .wb-mozza-tag { font-size:12.5px; color:#a9843f; font-weight:600; font-style:italic; margin-top:2px; }
+    .wb-featured-lb { font-size:12px; font-weight:800; color:#a9843f; text-transform:uppercase; letter-spacing:.6px; margin:2px 2px 10px; text-align:center; }
+    .wb-btn.wb-fb { background:linear-gradient(180deg,#3b82f6,#1d4ed8); box-shadow:0 3px 8px rgba(30,80,200,.25); }
     .wb-terms-h, .wb-restr-h { font-size:13px; font-weight:800; color:#a9843f; text-transform:uppercase; letter-spacing:.5px; margin:16px 2px 8px; }
     .wb-restr-h { margin-top:4px; }
     .wb-term-t { font-size:13.5px; font-weight:700; color:#3d3324; margin-bottom:4px; }
@@ -2557,7 +2571,7 @@
 
     // ============ HOTEL INFO (centralizada) ============
     const DEFAULT_HOTEL_INFO = {
-      nombre: 'Hotel Casa Regina',
+      nombre: 'Casa Regina Hotel Boutique',
       subtitulo: 'Hotel Boutique',
       direccion: 'Avenida Lázaro Cárdenas Num. 773, entre Calle 68 y Calle 66, Calle 69, Col. Centro, CP 77200, Quintana Roo',
       telefono: '',
@@ -3601,7 +3615,7 @@
     // ============================================================
     var DEFAULT_GUEST_GUIDE = {
       langs: ['es', 'en', 'fr', 'it', 'de'],
-      welcome:      { es: '¡Bienvenido a Hotel Casa Regina! Nos alegra recibirte. Aquí encontrarás toda la información para disfrutar tu estancia.', en: 'Welcome to Hotel Casa Regina! We are delighted to have you. Here you will find everything you need for a great stay.', fr: '', it: '', de: '' },
+      welcome:      { es: '¡Bienvenido a Casa Regina Hotel Boutique! Nos alegra recibirte. Aquí encontrarás toda la información para disfrutar tu estancia.', en: 'Welcome to Casa Regina Hotel Boutique! We are delighted to have you. Here you will find everything you need for a great stay.', fr: '', it: '', de: '' },
       checkin:      { es: 'El check-in es a partir de las 3:00 PM. Preséntate en recepción con una identificación oficial. Si llegas antes, con gusto guardamos tu equipaje.', en: 'Check-in is from 3:00 PM. Please come to the reception desk with a valid ID. If you arrive early, we are happy to store your luggage.', fr: '', it: '', de: '' },
       checkout:     { es: 'El check-out es antes de las 12:00 PM. Entrega tu llave en recepción. ¡Gracias por tu visita!', en: 'Check-out is before 12:00 PM. Please return your key at reception. Thank you for staying with us!', fr: '', it: '', de: '' },
       mapLink:      '',
@@ -3670,11 +3684,46 @@
       terms:        { es:'Términos y condiciones', en:'Terms & conditions', fr:'Conditions générales', it:'Termini e condizioni', de:'Allgemeine Geschäftsbedingungen' },
       restrictions: { es:'Restricciones', en:'Restrictions', fr:'Restrictions', it:'Restrizioni', de:'Einschränkungen' },
       scheduleLbl:  { es:'Horario', en:'Hours', fr:'Horaires', it:'Orario', de:'Öffnungszeiten' },
-      partnerRest:  { es:'Nuestro restaurante asociado', en:'Our partner restaurant', fr:'Notre restaurant partenaire', it:'Il nostro ristorante partner', de:'Unser Partnerrestaurant' }
+      partnerRest:  { es:'Nuestro restaurante asociado', en:'Our partner restaurant', fr:'Notre restaurant partenaire', it:'Il nostro ristorante partner', de:'Unser Partnerrestaurant' },
+      arrivalDate:  { es:'Tu llegada', en:'Your arrival', fr:'Votre arrivée', it:'Il tuo arrivo', de:'Deine Ankunft' },
+      departureDate:{ es:'Tu salida', en:'Your departure', fr:'Votre départ', it:'La tua partenza', de:'Deine Abreise' },
+      guestLbl:     { es:'Huésped', en:'Guest', fr:'Client', it:'Ospite', de:'Gast' }
     };
     // Datos fijos de Mozzafiato (mismos que usa el resto del app)
     var WB_MOZZA_MENU = 'https://mozzafiatoamor-rgb.github.io/mozzafiato-menu/index.html';
     var WB_MOZZA_WA   = 'https://wa.me/529984088897';
+    var WB_MOZZA_LOGO = 'https://mozzafiatoamor-rgb.github.io/mozzafiato-menu/images/logo.png';
+    var WB_MOZZA_FB   = 'https://www.facebook.com/share/1DjnHqK2HF/';
+    var WB_MOZZA_ADDR = 'Andador 65 × calle 66 y 68, Felipe Carrillo Puerto, Quintana Roo';
+    var WB_MOZZA_TAG  = 'El placer del buen café';
+
+    // Tarjeta reutilizable del restaurante asociado (Mozzafiato)
+    function _wbMozzaCard(promo, opts) {
+      opts = opts || {};
+      var name = (promo && promo.partner) || 'Mozzafiato';
+      var desc = (promo && promo.descripcion) ? promo.descripcion : '';
+      var addr = (promo && promo.partnerDireccion) || WB_MOZZA_ADDR;
+      var logo = (promo && promo.partnerLogo) || WB_MOZZA_LOGO;
+      var mapUrl = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(name + ' ' + addr);
+      var h = '<div class="wb-mozza">';
+      h += '<img class="wb-mozza-logo" src="' + logo + '" alt="' + _wbEsc(name) + '" onerror="this.style.display=\'none\'">';
+      h += '<div class="wb-mozza-name">' + _wbEsc(name) + '</div>';
+      h += '<div class="wb-mozza-tag">' + _wbEsc(WB_MOZZA_TAG) + '</div>';
+      if (desc) h += '<div class="wb-body" style="margin-top:10px;">🍽️ ' + _wbNl2br(desc) + '</div>';
+      if (promo && promo.horario) h += '<div class="wb-kv" style="margin-top:8px;"><span>🕐 ' + _wbEsc(_wbLabel('scheduleLbl')) + '</span><b>' + _wbEsc(promo.horario) + '</b></div>';
+      if (opts.address) h += '<div class="wb-body" style="margin-top:8px;font-size:13px;">📍 ' + _wbEsc(addr) + '</div>';
+      h += '</div>';
+      h += '<a class="wb-btn" href="' + WB_MOZZA_MENU + '" target="_blank" rel="noopener">📖 ' + _wbEsc(_wbLabel('menu')) + '</a>';
+      h += '<a class="wb-btn wb-wa" href="' + WB_MOZZA_WA + '" target="_blank" rel="noopener">💬 WhatsApp</a>';
+      if (opts.map) h += '<a class="wb-btn" href="' + mapUrl + '" target="_blank" rel="noopener">📍 ' + _wbEsc(_wbLabel('openMap')) + '</a>';
+      if (opts.fb) h += '<a class="wb-btn wb-fb" href="' + WB_MOZZA_FB + '" target="_blank" rel="noopener">👍 Facebook</a>';
+      return h;
+    }
+    function _wbMozzaMapUrl(promo) {
+      var name = (promo && promo.partner) || 'Mozzafiato';
+      var addr = (promo && promo.partnerDireccion) || WB_MOZZA_ADDR;
+      return 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(name + ' ' + addr);
+    }
 
     // Iconos SVG (trazo dorado, estilo del kit)
     var WB_ICONS = {
@@ -3812,9 +3861,9 @@
 
       var logo = (typeof LOGO_V_DARK !== 'undefined' && LOGO_V_DARK) ? LOGO_V_DARK : '';
       var head = '<div class="wb-head">';
-      if (logo) head += '<img class="wb-logo" src="' + logo + '" alt="logo">';
+      if (logo) head += '<img class="wb-logo" src="' + logo + '" alt="' + _wbEsc(hi.nombre || '') + '" onerror="this.style.display=\'none\'">';
+      head += '<div class="wb-hotelname">' + _wbEsc(hi.nombre || '') + '</div>';
       head += '<div class="wb-title">Welcome book</div>';
-      head += '<div class="wb-sub">' + _wbEsc(hi.nombre || '') + '</div>';
       head += '<div class="wb-flags">' + flags + '</div>';
       head += '</div>';
 
@@ -3841,7 +3890,10 @@
                _wbSection(_wbView, g, hi) + '</div>';
       }
 
-      scr.innerHTML = '<div class="wb-phone">' + head + body + '<div class="wb-foot">' + _wbEsc(hi.subtitulo || _wbLabel('subtitle')) + '</div></div>';
+      var foot = '<div class="wb-foot">';
+      if (logo) foot += '<img class="wb-foot-logo" src="' + logo + '" alt="' + _wbEsc(hi.nombre || '') + '" onerror="this.style.display=\'none\'">';
+      foot += '<div class="wb-foot-txt">' + _wbEsc(hi.nombre || _wbLabel('subtitle')) + '</div></div>';
+      scr.innerHTML = '<div class="wb-phone">' + head + body + foot + '</div>';
     }
 
     function _wbCard(inner) { return '<div class="wb-card">' + inner + '</div>'; }
@@ -3876,15 +3928,9 @@
       var out = '';
       var promo = _wbBreakfastPromo();
 
-      // Tarjeta del restaurante asociado (Mozzafiato)
+      // Tarjeta del restaurante asociado (Mozzafiato) con logo
       if (promo && promo.partner) {
-        var pc = '<div class="wb-mozza-name">☕ ' + _wbEsc(promo.partner) + '</div>';
-        pc += '<div class="wb-mozza-tag">' + _wbEsc(_wbLabel('partnerRest')) + '</div>';
-        if (promo.descripcion) pc += '<div class="wb-body" style="margin-top:8px;">🍽️ ' + _wbNl2br(promo.descripcion) + '</div>';
-        if (promo.horario) pc += '<div class="wb-kv" style="margin-top:8px;"><span>🕐 ' + _wbEsc(_wbLabel('scheduleLbl')) + '</span><b>' + _wbEsc(promo.horario) + '</b></div>';
-        out += _wbCard(pc);
-        out += '<a class="wb-btn" href="' + WB_MOZZA_MENU + '" target="_blank" rel="noopener">📖 ' + _wbEsc(_wbLabel('menu')) + '</a>';
-        out += '<a class="wb-btn wb-wa" href="' + WB_MOZZA_WA + '" target="_blank" rel="noopener">💬 WhatsApp</a>';
+        out += _wbMozzaCard(promo, { address: false, map: false, fb: false });
       }
 
       // Códigos personales del huésped (QR → página real de validación)
@@ -3945,24 +3991,49 @@
       if (key === 'informacion') return _wbText(g.informacion, g);
       if (key === 'actividades') return _wbList(g.actividades, g);
       if (key === 'bares')       return _wbList(g.bares, g);
-      if (key === 'restaurantes')return _wbList(g.restaurantes, g);
+      if (key === 'restaurantes') {
+        var hr2 = '';
+        var promoR = _wbBreakfastPromo();
+        if (promoR && promoR.partner) {
+          hr2 += '<div class="wb-featured-lb">⭐ ' + _wbEsc(_wbLabel('partnerRest')) + '</div>';
+          hr2 += _wbMozzaCard(promoR, { address: true, map: true, fb: true });
+        }
+        var rest = _wbList(g.restaurantes, g);
+        // Solo añade la lista si el anfitrión capturó restaurantes (evita el "no disponible" redundante)
+        if (g.restaurantes && g.restaurantes.length) hr2 += rest;
+        return hr2 || rest;
+      }
       if (key === 'compras')     return _wbList(g.compras, g);
       if (key === 'desayuno')    return _wbBreakfastSection(g);
 
       if (key === 'checkin') {
         var h = '';
+        // Datos reales del cliente
+        if (_wbRes) {
+          var ci = '<div class="wb-kv"><span>' + _wbEsc(_wbLabel('guestLbl')) + '</span><b>' + _wbEsc(_wbRes.huesped) + '</b></div>';
+          ci += '<div class="wb-kv"><span>' + _wbEsc(_wbLabel('room')) + '</span><b>' + _wbEsc(_wbRes.habitacionNum) + '</b></div>';
+          if (_wbRes.fechaEntrada) ci += '<div class="wb-kv"><span>' + _wbEsc(_wbLabel('arrivalDate')) + '</span><b>' + _wbEsc(_wbRes.fechaEntrada) + (hi.checkin_hora ? ' · ' + _wbEsc(formatHoraDisplay(hi.checkin_hora)) : '') + '</b></div>';
+          h += _wbCard(ci);
+        } else if (hi.checkin_hora) {
+          h += _wbCard('<div class="wb-kv"><span>' + _wbEsc(_wbLabel('checkinTime')) + '</span><b>' + _wbEsc(formatHoraDisplay(hi.checkin_hora)) + '</b></div>');
+        }
         if (_wbAccess) {
           h += '<div class="wb-card wb-access"><div class="wb-access-lb">🔑 ' + _wbEsc(_wbLabel('accessCode')) + '</div><div class="wb-access-code">' + _wbEsc(_wbAccess) + '</div></div>';
           var ai = _wbT(g.accesoInstr, g);
           if (ai) h += _wbCard('<div class="wb-body">' + _wbNl2br(ai) + '</div>');
         }
-        if (hi.checkin_hora) h += _wbCard('<div class="wb-kv"><span>' + _wbEsc(_wbLabel('checkinTime')) + '</span><b>' + _wbEsc(formatHoraDisplay(hi.checkin_hora)) + '</b></div>');
         h += _wbText(g.checkin, g);
         return h;
       }
       if (key === 'checkout') {
         var hc = '';
-        if (hi.checkout_hora) hc += _wbCard('<div class="wb-kv"><span>' + _wbEsc(_wbLabel('checkoutTime')) + '</span><b>' + _wbEsc(formatHoraDisplay(hi.checkout_hora)) + '</b></div>');
+        if (_wbRes) {
+          var co = '<div class="wb-kv"><span>' + _wbEsc(_wbLabel('guestLbl')) + '</span><b>' + _wbEsc(_wbRes.huesped) + '</b></div>';
+          if (_wbRes.fechaSalida) co += '<div class="wb-kv"><span>' + _wbEsc(_wbLabel('departureDate')) + '</span><b>' + _wbEsc(_wbRes.fechaSalida) + (hi.checkout_hora ? ' · ' + _wbEsc(formatHoraDisplay(hi.checkout_hora)) : '') + '</b></div>';
+          hc += _wbCard(co);
+        } else if (hi.checkout_hora) {
+          hc += _wbCard('<div class="wb-kv"><span>' + _wbEsc(_wbLabel('checkoutTime')) + '</span><b>' + _wbEsc(formatHoraDisplay(hi.checkout_hora)) + '</b></div>');
+        }
         hc += _wbText(g.checkout, g);
         return hc;
       }
@@ -3973,6 +4044,13 @@
         if (mapUrl) hu += '<a class="wb-btn" href="' + _wbEsc(mapUrl) + '" target="_blank" rel="noopener">📍 ' + _wbEsc(_wbLabel('openMap')) + '</a>';
         var un = _wbT(g.ubicacionNotas, g);
         if (un) hu += _wbCard('<div class="wb-body">' + _wbNl2br(un) + '</div>');
+        // Ubicación del restaurante asociado (Mozzafiato)
+        var promoU = _wbBreakfastPromo();
+        if (promoU && promoU.partner) {
+          var addrU = promoU.partnerDireccion || WB_MOZZA_ADDR;
+          hu += _wbCard('<div class="wb-kv-col"><span>☕ ' + _wbEsc(promoU.partner) + '</span><div class="wb-body">📍 ' + _wbEsc(addrU) + '</div></div>');
+          hu += '<a class="wb-btn" href="' + _wbMozzaMapUrl(promoU) + '" target="_blank" rel="noopener">📍 ' + _wbEsc(promoU.partner) + ' — ' + _wbEsc(_wbLabel('openMap')) + '</a>';
+        }
         return hu || _wbText(null, g);
       }
       if (key === 'wifi') {
@@ -14812,7 +14890,7 @@
         var messages = [
           name + ', preparando todo para ti 🏨',
           'Un momento ' + name + ', actualizando... ❤️',
-          'Hotel Casa Regina trabajando ✨',
+          'Casa Regina Hotel Boutique trabajando ✨',
           'Ya casi, ' + name + '... paciencia ⏳',
           name + ', la hospitalidad es nuestra pasión 🌿',
           'Registrando... ¡' + name + ' al 100%! 💪',
@@ -15109,7 +15187,7 @@
     function registerPWA() {
       // Generate manifest as blob URL
       var manifest = {
-        name: 'Hotel Casa Regina PMS',
+        name: 'Casa Regina Hotel Boutique PMS',
         short_name: 'Casa Regina',
         description: 'Sistema de Gestión Hotelera',
         start_url: location.href.split('?')[0],
