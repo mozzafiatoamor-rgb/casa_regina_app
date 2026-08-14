@@ -3991,20 +3991,15 @@
       }
       if (key === 'reglas') {
         var regl = _wbReglamentoText();
-        var occ = [], other = [];
+        // Políticas de ocupación: SIEMPRE desde la config real de Ocupación
+        var occ = _wbOccupancyPolicies();
+        // Términos y condiciones: la lista del usuario, excluyendo las de ocupación para no duplicar
+        var other = [];
         try {
           var terms = (typeof getTerms === 'function') ? getTerms() : [];
-          terms.forEach(function(t) {
-            if (/ocupaci|persona adicional|menores|capacidad/i.test(t.title)) occ.push({ title: t.title, body: t.text });
-            else other.push({ title: t.title, body: t.text });
-          });
+          var occExclude = /ocupaci[oó]n base|persona adicional|capacidad m[aá]xima|pol[ií]tica de menores/i;
+          terms.forEach(function(t) { if (!occExclude.test(t.title)) other.push({ title: t.title, body: t.text }); });
         } catch (e) {}
-        // Respaldo: si no hay nada de config, usa reglas del guide
-        if (!regl && !occ.length && !other.length) {
-          var custom = _wbT(g.reglas, g);
-          if (custom) return _wbCard('<div class="wb-body">' + _wbNl2br(custom) + '</div>');
-          return _wbText(null, g);
-        }
         var out = '<div class="wb-body" style="margin:0 2px 12px;color:#8a7a5f;font-size:12.5px;">' + _wbEsc(_wbLabel('tapToExpand')) + '</div>';
         if (regl) out += _wbAccordion([{ title: '📋 ' + _wbLabel('reglamento'), body: regl, open: true }], 'regl');
         if (occ.length) {
@@ -4155,6 +4150,25 @@
         });
         return lines.join('\n');
       } catch (e) { return ''; }
+    }
+    // Políticas de ocupación construidas desde la config real (Hotel Info / Ocupación),
+    // independientes de la lista de Términos que el usuario pudo recortar.
+    function _wbOccupancyPolicies() {
+      var hi = getHotelInfo();
+      var base = hi.ocupacionBase || 2;
+      var extra = (hi.persona_extra != null ? hi.persona_extra : 150);
+      var menores = hi.menoresEdadLimite || 11;
+      var rules = (hi.occupancyRules && hi.occupancyRules.length) ? hi.occupancyRules
+                  : (typeof DEFAULT_HOTEL_INFO !== 'undefined' ? DEFAULT_HOTEL_INFO.occupancyRules : []);
+      var cap = (rules || []).map(function(r) { return r.tipo + ': máximo ' + r.maxPersonas + ' personas'; }).join('. ');
+      var pe = '$' + extra + '.00 MXN + impuestos';
+      var out = [
+        { title: 'Ocupación base', body: 'La tarifa base publicada ampara la estadía de un máximo de ' + base + ' persona(s) por habitación.' },
+        { title: 'Cargo por persona adicional', body: 'Toda persona extra que pernocte o haga uso de la habitación superando la ocupación base de ' + base + ' persona(s) estará sujeta a un cargo adicional obligatorio de ' + pe + ' por persona, por noche. El pago de esta tarifa no garantiza automáticamente la instalación de una cama supletoria, la cual estará sujeta a disponibilidad y al espacio físico asignado en la habitación.' },
+        { title: 'Política de menores', body: 'Niños menores de ' + menores + ' años pueden hospedarse sin costo adicional compartiendo las camas existentes con sus padres o tutores (máximo 1 menor gratis por habitación). A partir de los ' + (menores + 1) + ' años, todo huésped será considerado como adulto para efectos de la tarifa y aplicará el cargo por persona extra de ' + pe + ' por noche.' }
+      ];
+      if (cap) out.push({ title: 'Capacidad máxima por habitación', body: 'Por disposiciones legales y normativas de seguridad e incendios: ' + cap + '. El hotel se reserva el derecho de rechazar el ingreso o requerir una habitación adicional si se supera la capacidad máxima.' });
+      return out;
     }
     function wbToggleAcc(id) {
       var el = document.getElementById('wbacc-' + id);
