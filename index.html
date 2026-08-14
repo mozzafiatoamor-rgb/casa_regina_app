@@ -1684,8 +1684,9 @@
     }
     .wb-title {
       font-family:'Georgia','Times New Roman',serif; font-style:italic;
-      font-size:30px; font-weight:600; color:#3d3324; letter-spacing:.3px; line-height:1.1; margin-top:2px;
+      font-size:26px; font-weight:600; color:#3d3324; letter-spacing:.3px; line-height:1.15; margin-top:2px;
     }
+    .wb-tagline { font-size:12.5px; color:#a9843f; font-weight:600; letter-spacing:.6px; margin-top:5px; text-transform:uppercase; }
     .wb-sub { font-size:13px; color:#8a7a5f; margin-top:2px; font-weight:600; }
     .wb-flags { display:flex; justify-content:center; gap:6px; margin-top:14px; flex-wrap:wrap; }
     .wb-flag {
@@ -1772,7 +1773,7 @@
       border-radius:16px; padding:18px 16px 16px; margin-bottom:12px; text-align:center;
       box-shadow:0 2px 8px rgba(120,95,50,.12);
     }
-    .wb-mozza-logo { width:110px; height:110px; object-fit:contain; border-radius:14px; background:#fff; padding:8px; margin:0 auto 10px; display:block; box-shadow:0 1px 4px rgba(120,95,50,.12); }
+    .wb-mozza-logo { width:210px; max-width:82%; height:auto; object-fit:contain; margin:6px auto 12px; display:block; }
     .wb-mozza-name { font-size:19px; font-weight:800; color:#3d3324; }
     .wb-mozza-tag { font-size:12.5px; color:#a9843f; font-weight:600; font-style:italic; margin-top:2px; }
     .wb-featured-lb { font-size:12px; font-weight:800; color:#a9843f; text-transform:uppercase; letter-spacing:.6px; margin:2px 2px 10px; text-align:center; }
@@ -3687,7 +3688,9 @@
       partnerRest:  { es:'Nuestro restaurante asociado', en:'Our partner restaurant', fr:'Notre restaurant partenaire', it:'Il nostro ristorante partner', de:'Unser Partnerrestaurant' },
       arrivalDate:  { es:'Tu llegada', en:'Your arrival', fr:'Votre arrivée', it:'Il tuo arrivo', de:'Deine Ankunft' },
       departureDate:{ es:'Tu salida', en:'Your departure', fr:'Votre départ', it:'La tua partenza', de:'Deine Abreise' },
-      guestLbl:     { es:'Huésped', en:'Guest', fr:'Client', it:'Ospite', de:'Gast' }
+      guestLbl:     { es:'Huésped', en:'Guest', fr:'Client', it:'Ospite', de:'Gast' },
+      wbTitle:      { es:'Tu estancia para recordar', en:'A stay to remember', fr:'Un séjour inoubliable', it:'Un soggiorno da ricordare', de:'Ein Aufenthalt zum Erinnern' },
+      wbTagline:    { es:'Mejora tu experiencia', en:'Enhance your experience', fr:'Sublimez votre expérience', it:'Migliora la tua esperienza', de:'Verbessern Sie Ihr Erlebnis' }
     };
     // Datos fijos de Mozzafiato (mismos que usa el resto del app)
     var WB_MOZZA_MENU = 'https://mozzafiatoamor-rgb.github.io/mozzafiato-menu/index.html';
@@ -3706,10 +3709,10 @@
       var logo = (promo && promo.partnerLogo) || WB_MOZZA_LOGO;
       var mapUrl = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(name + ' ' + addr);
       var h = '<div class="wb-mozza">';
-      h += '<img class="wb-mozza-logo" src="' + logo + '" alt="' + _wbEsc(name) + '" onerror="this.style.display=\'none\'">';
-      h += '<div class="wb-mozza-name">' + _wbEsc(name) + '</div>';
-      h += '<div class="wb-mozza-tag">' + _wbEsc(WB_MOZZA_TAG) + '</div>';
-      if (desc) h += '<div class="wb-body" style="margin-top:10px;">🍽️ ' + _wbNl2br(desc) + '</div>';
+      // Logo grande y transparente (ya contiene el nombre y el lema). Si falla, muestra el nombre como respaldo.
+      h += '<img class="wb-mozza-logo" src="' + logo + '" alt="' + _wbEsc(name) + '" onerror="this.style.display=\'none\';var n=this.nextElementSibling;if(n)n.style.display=\'block\';">';
+      h += '<div class="wb-mozza-name" style="display:none;">' + _wbEsc(name) + '</div>';
+      if (desc) h += '<div class="wb-body" style="margin-top:6px;">🍽️ ' + _wbNl2br(desc) + '</div>';
       if (promo && promo.horario) h += '<div class="wb-kv" style="margin-top:8px;"><span>🕐 ' + _wbEsc(_wbLabel('scheduleLbl')) + '</span><b>' + _wbEsc(promo.horario) + '</b></div>';
       if (opts.address) h += '<div class="wb-body" style="margin-top:8px;font-size:13px;">📍 ' + _wbEsc(addr) + '</div>';
       h += '</div>';
@@ -3862,8 +3865,8 @@
       var logo = (typeof LOGO_V_DARK !== 'undefined' && LOGO_V_DARK) ? LOGO_V_DARK : '';
       var head = '<div class="wb-head">';
       if (logo) head += '<img class="wb-logo" src="' + logo + '" alt="' + _wbEsc(hi.nombre || '') + '" onerror="this.style.display=\'none\'">';
-      head += '<div class="wb-hotelname">' + _wbEsc(hi.nombre || '') + '</div>';
-      head += '<div class="wb-title">Welcome book</div>';
+      head += '<div class="wb-title">' + _wbEsc(_wbLabel('wbTitle')) + '</div>';
+      head += '<div class="wb-tagline">' + _wbEsc(_wbLabel('wbTagline')) + '</div>';
       head += '<div class="wb-flags">' + flags + '</div>';
       head += '</div>';
 
@@ -3891,8 +3894,8 @@
       }
 
       var foot = '<div class="wb-foot">';
-      if (logo) foot += '<img class="wb-foot-logo" src="' + logo + '" alt="' + _wbEsc(hi.nombre || '') + '" onerror="this.style.display=\'none\'">';
-      foot += '<div class="wb-foot-txt">' + _wbEsc(hi.nombre || _wbLabel('subtitle')) + '</div></div>';
+      if (logo) foot += '<img class="wb-foot-logo" src="' + logo + '" alt="' + _wbEsc(hi.nombre || '') + '" onerror="this.parentNode.style.display=\'none\'">';
+      foot += '</div>';
       scr.innerHTML = '<div class="wb-phone">' + head + body + foot + '</div>';
     }
 
