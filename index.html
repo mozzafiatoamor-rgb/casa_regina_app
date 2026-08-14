@@ -1802,7 +1802,7 @@
     /* Welcome Book — fotos */
     .wb-photo { width:100%; display:block; border-radius:16px; object-fit:cover; box-shadow:0 3px 14px rgba(120,95,50,.16); background:#efe7d7; }
     .wb-hero { aspect-ratio:16/10; margin-bottom:20px; border-radius:20px; }
-    .wb-sec-photo { aspect-ratio:16/10; margin-bottom:14px; }
+    .wb-sec-photo { width:100%; height:auto; margin-bottom:14px; }
     /* Welcome Book — menú de píldoras verticales (estilo referencia) */
     .wb-pills { margin-top:6px; }
     .wb-pills-photo { background-size:cover; background-position:center; border-radius:24px; padding:18px 14px; box-shadow:0 6px 22px rgba(120,95,50,.18); }
@@ -1819,6 +1819,7 @@
     .wb-pill-ic svg { width:25px; height:25px; }
     .wb-pill-lb { flex:1; text-align:center; font-size:13.5px; font-weight:600; letter-spacing:1.8px; text-transform:uppercase; color:#38301f; padding-right:48px; line-height:1.2; }
     .wb-pill .wb-badge { top:50%; right:18px; transform:translateY(-50%); }
+    .wb-photo-full { margin-bottom:14px; }
   </style>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3669,9 +3670,15 @@
       informacion:  { es: 'Recepción abierta 24 horas.\nDesayuno disponible según promoción vigente.\nSolicita toallas o amenidades extra en recepción.', en: 'Reception open 24 hours.\nBreakfast available per current promotion.\nAsk reception for extra towels or amenities.', fr: '', it: '', de: '' },
       contactoNotas: { es: '', en: '', fr: '', it: '', de: '' },
       accesoInstr:  { es: 'Tu código personal de acceso aparece abajo. Ingrésalo en el teclado de la cerradura principal seguido de la tecla de confirmación.', en: 'Your personal access code is shown below. Enter it on the main lock keypad followed by the confirm key.', fr: '', it: '', de: '' },
-      heroPhoto:    '',
-      photos:       { welcome: '', ubicacion: '', servicios: '' },
-      roomPhotos:   {},
+      heroPhoto:    'https://raw.githubusercontent.com/mozzafiatoamor-rgb/casa_regina_app/main/assets/portada.jpg',
+      photos:       { welcome: 'https://raw.githubusercontent.com/mozzafiatoamor-rgb/casa_regina_app/main/assets/bienvenida.jpg', ubicacion: '', servicios: 'https://raw.githubusercontent.com/mozzafiatoamor-rgb/casa_regina_app/main/assets/servicios.jpg', pagos: 'https://raw.githubusercontent.com/mozzafiatoamor-rgb/casa_regina_app/main/assets/transferencias.jpg' },
+      roomPhotos:   { 'Doble Matrimonial': 'https://raw.githubusercontent.com/mozzafiatoamor-rgb/casa_regina_app/main/assets/habitacion-doble-matrimonial.jpg', 'Queen Size': 'https://raw.githubusercontent.com/mozzafiatoamor-rgb/casa_regina_app/main/assets/habitacion-queen-size.jpg' },
+      pagosNotas:   { es: 'Puedes pagar tu reservación por transferencia bancaria con los siguientes datos. Envía tu comprobante por WhatsApp para confirmar.', en: 'You can pay for your reservation by bank transfer using the details below. Send your receipt via WhatsApp to confirm.', fr: '', it: '', de: '' },
+      pagosTel:     '983 321 8940',
+      pagos: [
+        { titulo: 'Transferencias · solo factura', banco: 'BBVA', clabe: '012691004785194553', cuenta: '0478519455' },
+        { titulo: 'Transferencia · sin factura', banco: 'BBVA', clabe: '012691015860349319', cuenta: '1586034931' }
+      ],
       restaurantes: [],
       bares: [],
       compras: [],
@@ -3688,8 +3695,9 @@
             ['restaurantes', 'bares', 'compras', 'actividades'].forEach(function(k) {
               if (!Array.isArray(g[k])) g[k] = [];
             });
-            if (!g.photos || typeof g.photos !== 'object') g.photos = { welcome: '', ubicacion: '', servicios: '' };
+            if (!g.photos || typeof g.photos !== 'object') g.photos = { welcome: '', ubicacion: '', servicios: '', pagos: '' };
             if (!g.roomPhotos || typeof g.roomPhotos !== 'object') g.roomPhotos = {};
+            if (!Array.isArray(g.pagos)) g.pagos = [];
             if (!Array.isArray(g.langs) || !g.langs.length) g.langs = DEFAULT_GUEST_GUIDE.langs.slice();
             return g;
           }
@@ -3740,7 +3748,15 @@
       reglamento:   { es:'Reglamento del hotel', en:'Hotel rules', fr:'Règlement de l\'hôtel', it:'Regolamento dell\'hotel', de:'Hotelordnung' },
       tapToExpand:  { es:'Toca cada punto para desplegarlo.', en:'Tap each item to expand.', fr:'Touchez chaque élément pour le développer.', it:'Tocca ogni voce per espanderla.', de:'Tippen Sie auf jeden Punkt zum Aufklappen.' },
       occupancyPolicies: { es:'Políticas de Ocupación', en:'Occupancy Policies', fr:'Politiques d\'occupation', it:'Politiche di occupazione', de:'Belegungsrichtlinien' },
-      scanToConnect: { es:'Escanea para conectarte al WiFi automáticamente', en:'Scan to connect to WiFi automatically', fr:'Scannez pour vous connecter au WiFi', it:'Scansiona per connetterti al WiFi', de:'Scannen, um automatisch mit dem WLAN zu verbinden' }
+      scanToConnect: { es:'Escanea para conectarte al WiFi automáticamente', en:'Scan to connect to WiFi automatically', fr:'Scannez pour vous connecter au WiFi', it:'Scansiona per connetterti al WiFi', de:'Scannen, um automatisch mit dem WLAN zu verbinden' },
+      habitaciones: { es:'Habitaciones', en:'Rooms', fr:'Chambres', it:'Camere', de:'Zimmer' },
+      yourRoom:     { es:'Tu habitación', en:'Your room', fr:'Votre chambre', it:'La tua camera', de:'Dein Zimmer' },
+      upTo:         { es:'Hasta', en:'Up to', fr:"Jusqu'à", it:'Fino a', de:'Bis zu' },
+      pagos:        { es:'Pagos', en:'Payments', fr:'Paiements', it:'Pagamenti', de:'Zahlungen' },
+      copyClabe:    { es:'Copiar CLABE', en:'Copy CLABE', fr:'Copier la CLABE', it:'Copia CLABE', de:'CLABE kopieren' },
+      copyAccount:  { es:'Copiar cuenta', en:'Copy account', fr:'Copier le compte', it:'Copia conto', de:'Konto kopieren' },
+      bankLbl:      { es:'Banco', en:'Bank', fr:'Banque', it:'Banca', de:'Bank' },
+      accountLbl:   { es:'Cuenta', en:'Account', fr:'Compte', it:'Conto', de:'Konto' }
     };
     // Datos fijos de Mozzafiato (mismos que usa el resto del app)
     var WB_MOZZA_MENU = 'https://mozzafiatoamor-rgb.github.io/mozzafiato-menu/index.html';
@@ -3795,10 +3811,12 @@
       emergencias: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4v5c0 4.5-3.2 7.8-8 9-4.8-1.2-8-4.5-8-9V7z"/><path d="M12 8v4"/><circle cx="12" cy="15.5" r="0.6" fill="currentColor"/></svg>',
       checkout:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h4"/><path d="M14 17l5-5-5-5"/><path d="M19 12H9"/></svg>',
       contacto:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5a2 2 0 0 1 2-2h2l1.5 4-2 1.3a12 12 0 0 0 5.7 5.7l1.3-2 4 1.5v2a2 2 0 0 1-2 2A16 16 0 0 1 4 5z"/></svg>',
-      desayuno:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h12a4 4 0 0 1 0 8h-1"/><path d="M4 8v6a4 4 0 0 0 4 4h4a4 4 0 0 0 4-4"/><path d="M7 3c-.5.8-.5 1.5 0 2.3"/><path d="M11 3c-.5.8-.5 1.5 0 2.3"/></svg>'
+      desayuno:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h12a4 4 0 0 1 0 8h-1"/><path d="M4 8v6a4 4 0 0 0 4 4h4a4 4 0 0 0 4-4"/><path d="M7 3c-.5.8-.5 1.5 0 2.3"/><path d="M11 3c-.5.8-.5 1.5 0 2.3"/></svg>',
+      habitaciones:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18v-5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v5"/><path d="M3 18v2"/><path d="M21 18v2"/><path d="M3 14h18"/><path d="M7 11V9a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v2"/></svg>',
+      pagos:       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/><path d="M6.5 15h4"/></svg>'
     };
 
-    var WB_TILES = ['welcome','checkin','ubicacion','wifi','reglas','transporte','servicios','actividades','informacion','bares','restaurantes','compras','emergencias','checkout','contacto'];
+    var WB_TILES = ['welcome','checkin','habitaciones','ubicacion','wifi','reglas','transporte','servicios','actividades','informacion','bares','restaurantes','compras','pagos','emergencias','checkout','contacto'];
 
     var _wbLang = 'es';
     var _wbView = null;
@@ -4059,6 +4077,30 @@
       }
       if (key === 'transporte')  return _wbText(g.transporte, g);
       if (key === 'servicios')   return _wbPhoto(g.photos && g.photos.servicios, 'wb-sec-photo') + _wbText(g.servicios, g);
+      if (key === 'pagos') {
+        var hp = _wbPhoto(g.photos && g.photos.pagos, 'wb-photo-full');
+        var pn = _wbT(g.pagosNotas, g);
+        if (pn) hp += _wbCard('<div class="wb-body">' + _wbNl2br(pn) + '</div>');
+        var cuentas = Array.isArray(g.pagos) ? g.pagos : [];
+        hp += cuentas.map(function(c) {
+          var h = '<div class="wb-place-name">' + _wbEsc(c.titulo || '') + '</div>';
+          if (c.banco) h += '<div class="wb-kv"><span>' + _wbEsc(_wbLabel('bankLbl')) + '</span><b>' + _wbEsc(c.banco) + '</b></div>';
+          if (c.clabe) {
+            h += '<div class="wb-kv"><span>CLABE</span><b class="wb-mono">' + _wbEsc(c.clabe) + '</b></div>';
+            h += '<button class="wb-btn" onclick="wbCopy(' + JSON.stringify(String(c.clabe)).replace(/"/g, '&quot;') + ',this)">📋 ' + _wbEsc(_wbLabel('copyClabe')) + '</button>';
+          }
+          if (c.cuenta) {
+            h += '<div class="wb-kv"><span>' + _wbEsc(_wbLabel('accountLbl')) + '</span><b class="wb-mono">' + _wbEsc(c.cuenta) + '</b></div>';
+            h += '<button class="wb-btn" onclick="wbCopy(' + JSON.stringify(String(c.cuenta)).replace(/"/g, '&quot;') + ',this)">📋 ' + _wbEsc(_wbLabel('copyAccount')) + '</button>';
+          }
+          return _wbCard(h);
+        }).join('');
+        if (g.pagosTel) {
+          var _pt = String(g.pagosTel).replace(/[^0-9]/g, '');
+          hp += '<a class="wb-btn wb-wa" href="https://wa.me/' + (_pt.length === 10 ? '52' + _pt : _pt) + '" target="_blank" rel="noopener">💬 ' + _wbEsc(_wbLabel('whatsapp')) + ': ' + _wbEsc(g.pagosTel) + '</a>';
+        }
+        return hp || _wbText(null, g);
+      }
       if (key === 'informacion') return _wbText(g.informacion, g);
       if (key === 'actividades') return _wbList(g.actividades, g);
       if (key === 'bares')       return _wbList(g.bares, g);
@@ -4076,6 +4118,24 @@
       }
       if (key === 'compras')     return _wbList(g.compras, g);
       if (key === 'desayuno')    return _wbBreakfastSection(g);
+      if (key === 'habitaciones') {
+        var rules = [];
+        try { rules = getOccupancyRules() || []; } catch (e) {}
+        var order = rules.slice();
+        if (_wbRes && _wbRes.tipo) {
+          order.sort(function(a, b) { if (a.tipo === _wbRes.tipo) return -1; if (b.tipo === _wbRes.tipo) return 1; return 0; });
+        }
+        var cards = order.map(function(r) {
+          var photo = (g.roomPhotos && g.roomPhotos[r.tipo]) || '';
+          var mine = _wbRes && _wbRes.tipo === r.tipo;
+          var h = '';
+          if (photo) h += _wbPhoto(photo, 'wb-sec-photo');
+          h += '<div class="wb-place-name">' + (mine ? '⭐ ' : '') + _wbEsc(r.tipo) + (mine ? ' · ' + _wbEsc(_wbLabel('yourRoom')) : '') + '</div>';
+          h += '<div class="wb-place-desc">' + _wbEsc(_wbLabel('upTo')) + ' ' + _wbEsc(r.maxPersonas) + ' ' + _wbEsc(_wbLabel('pax')) + '</div>';
+          return _wbCard(h);
+        }).join('');
+        return cards || _wbText(null, g);
+      }
 
       if (key === 'checkin') {
         var h = '';
@@ -4357,6 +4417,7 @@
       h += _wbCfgPhotoField('Bienvenida', 'photos.welcome', (g.photos && g.photos.welcome) || '');
       h += _wbCfgPhotoField('Ubicación', 'photos.ubicacion', (g.photos && g.photos.ubicacion) || '');
       h += _wbCfgPhotoField('Servicios', 'photos.servicios', (g.photos && g.photos.servicios) || '');
+      h += _wbCfgPhotoField('Pagos / Transferencias', 'photos.pagos', (g.photos && g.photos.pagos) || '');
       var _wbTypes = [];
       try { _wbTypes = (getOccupancyRules() || []).map(function(r) { return r.tipo; }); } catch (e) {}
       if (_wbTypes.length) {
@@ -4391,10 +4452,46 @@
         h += '<button class="form-button secondary" onclick="wbCfgAddItem(\'' + cat[0] + '\')" style="width:100%;padding:8px;font-size:12px;">+ Agregar a ' + cat[1] + '</button></div>';
       });
 
+      // 💳 Pagos / Transferencias
+      h += '<div style="margin-top:18px;"><div style="font-size:13px;font-weight:700;margin-bottom:8px;">💳 Pagos / Transferencias</div>';
+      h += _wbCfgField('pagosNotas', 'Texto para el huésped', 'Instrucciones de pago (' + _wbEditLang + ')', (g.pagosNotas && g.pagosNotas[_wbEditLang]) || '', true);
+      h += '<div style="margin-bottom:10px;"><div style="font-size:11px;font-weight:600;margin-bottom:3px;">WhatsApp / teléfono de pagos</div>';
+      h += '<input type="text" value="' + _wbEsc(g.pagosTel || '') + '" placeholder="983 321 8940" onchange="wbCfgSetPlain(\'pagosTel\',this.value)" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--surface3);border-radius:6px;padding:8px;font-size:12px;color:var(--text);"></div>';
+      (g.pagos || []).forEach(function(c, i) {
+        h += '<div style="background:var(--surface3);padding:10px;border-radius:var(--radius);margin-bottom:8px;">';
+        h += '<div style="display:flex;gap:6px;margin-bottom:6px;"><input type="text" value="' + _wbEsc(c.titulo || '') + '" placeholder="Título (ej. Solo factura)" onchange="wbCfgSetPago(' + i + ',\'titulo\',this.value)" style="flex:1;background:var(--surface2);border:1px solid var(--surface3);border-radius:6px;padding:6px 8px;font-size:12px;color:var(--text);font-weight:600;" />';
+        h += '<button onclick="wbCfgDelPago(' + i + ')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px;">✕</button></div>';
+        h += '<div style="display:flex;gap:6px;margin-bottom:6px;"><input type="text" value="' + _wbEsc(c.banco || '') + '" placeholder="Banco" onchange="wbCfgSetPago(' + i + ',\'banco\',this.value)" style="width:110px;background:var(--surface2);border:1px solid var(--surface3);border-radius:6px;padding:6px 8px;font-size:12px;color:var(--text);" />';
+        h += '<input type="text" value="' + _wbEsc(c.clabe || '') + '" placeholder="CLABE (18 dígitos)" onchange="wbCfgSetPago(' + i + ',\'clabe\',this.value)" style="flex:1;background:var(--surface2);border:1px solid var(--surface3);border-radius:6px;padding:6px 8px;font-size:12px;color:var(--text);font-family:Space Mono,monospace;" /></div>';
+        h += '<input type="text" value="' + _wbEsc(c.cuenta || '') + '" placeholder="Número de cuenta" onchange="wbCfgSetPago(' + i + ',\'cuenta\',this.value)" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--surface3);border-radius:6px;padding:6px 8px;font-size:12px;color:var(--text);font-family:Space Mono,monospace;" />';
+        h += '</div>';
+      });
+      h += '<button class="form-button secondary" onclick="wbCfgAddPago()" style="width:100%;padding:8px;font-size:12px;">+ Agregar cuenta</button></div>';
+
       // Guardar
       h += '<div style="margin-top:20px;"><button class="form-button" onclick="wbCfgSaveSync()" style="width:100%;background:var(--accent);color:var(--bg);padding:12px;font-size:13px;">☁️ Guardar guía y sincronizar</button></div>';
 
       document.getElementById('configContent').innerHTML = h;
+    }
+    function wbCfgAddPago() {
+      var g = getGuestGuide();
+      if (!Array.isArray(g.pagos)) g.pagos = [];
+      g.pagos.push({ titulo: '', banco: '', clabe: '', cuenta: '' });
+      saveGuestGuideLocal(g);
+      renderGuiaConfig();
+    }
+    function wbCfgSetPago(i, field, value) {
+      var g = getGuestGuide();
+      if (!g.pagos || !g.pagos[i]) return;
+      g.pagos[i][field] = value;
+      saveGuestGuideLocal(g);
+    }
+    function wbCfgDelPago(i) {
+      var g = getGuestGuide();
+      if (!g.pagos) return;
+      g.pagos.splice(i, 1);
+      saveGuestGuideLocal(g);
+      renderGuiaConfig();
     }
 
     function _wbCfgField(field, label, ph, val, perLang) {
