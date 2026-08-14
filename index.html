@@ -1668,8 +1668,11 @@
       overflow-y:auto; -webkit-overflow-scrolling:touch;
       background:#e9e2d6;
       background-image:radial-gradient(circle at 20% 0%, #f3ecdf 0%, #e6ddce 55%, #ddd2bf 100%);
-      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+      font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+      -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+      text-rendering:optimizeLegibility;
     }
+    #welcomeBookScreen ::selection { background:#e6d3a8; }
     .wb-phone {
       max-width:440px; margin:0 auto; min-height:100vh; box-sizing:border-box;
       padding:26px 20px 40px; color:#4a3f2f;
@@ -1683,10 +1686,10 @@
       margin-bottom:2px;
     }
     .wb-title {
-      font-family:'Georgia','Times New Roman',serif; font-style:italic;
-      font-size:26px; font-weight:600; color:#3d3324; letter-spacing:.3px; line-height:1.15; margin-top:2px;
+      font-family:'Cormorant Garamond','Georgia',serif; font-style:italic;
+      font-size:36px; font-weight:600; color:#38301f; letter-spacing:.4px; line-height:1.1; margin-top:2px;
     }
-    .wb-tagline { font-size:12.5px; color:#a9843f; font-weight:600; letter-spacing:.6px; margin-top:5px; text-transform:uppercase; }
+    .wb-tagline { font-size:11px; color:#a9843f; font-weight:600; letter-spacing:2.4px; margin-top:6px; text-transform:uppercase; }
     .wb-sub { font-size:13px; color:#8a7a5f; margin-top:2px; font-weight:600; }
     .wb-flags { display:flex; justify-content:center; gap:6px; margin-top:14px; flex-wrap:wrap; }
     .wb-flag {
@@ -1716,17 +1719,17 @@
       border-radius:20px; padding:7px 16px; font-size:13px; font-weight:600; cursor:pointer; margin-bottom:14px;
     }
     .wb-dtitle {
-      display:flex; align-items:center; gap:10px; font-size:22px; font-weight:700; color:#3d3324; margin:0 0 16px;
-      font-family:'Georgia',serif;
+      display:flex; align-items:center; gap:11px; font-size:29px; font-weight:600; color:#38301f; margin:0 0 18px;
+      font-family:'Cormorant Garamond','Georgia',serif; letter-spacing:.3px;
     }
     .wb-dic { width:26px; height:26px; color:#a9843f; }
     .wb-dic svg { width:26px; height:26px; }
     .wb-card {
-      background:#fffdf8; border:1px solid rgba(150,120,70,.22); border-radius:14px;
-      padding:14px 16px; margin-bottom:12px; box-shadow:0 1px 4px rgba(120,95,50,.07);
+      background:#fffdf8; border:1px solid rgba(150,120,70,.2); border-radius:16px;
+      padding:17px 19px; margin-bottom:13px; box-shadow:0 2px 10px rgba(120,95,50,.06);
     }
-    .wb-body { font-size:14.5px; line-height:1.6; color:#4a3f2f; }
-    .wb-muted { font-size:13.5px; color:#9a8a6f; font-style:italic; }
+    .wb-body { font-size:15px; line-height:1.75; color:#4a3f2c; letter-spacing:.1px; }
+    .wb-muted { font-size:14px; color:#9a8a6f; font-style:italic; }
     .wb-kv { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:4px 0; font-size:14px; color:#6a5a3f; }
     .wb-kv b { color:#3d3324; font-size:15px; }
     .wb-kv-col span { display:block; font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; color:#a9843f; margin-bottom:4px; }
@@ -1740,8 +1743,8 @@
     .wb-btn:active { transform:scale(.98); }
     .wb-btn.wb-wa { background:linear-gradient(180deg,#3ecb6a 0%,#25a752 100%); box-shadow:0 3px 8px rgba(30,150,70,.28); }
     .wb-place { }
-    .wb-place-name { font-size:15px; font-weight:700; color:#3d3324; margin-bottom:4px; }
-    .wb-place-desc { font-size:13.5px; line-height:1.5; color:#5a4c37; margin-bottom:8px; }
+    .wb-place-name { font-size:16px; font-weight:700; color:#38301f; margin-bottom:5px; letter-spacing:.2px; }
+    .wb-place-desc { font-size:14px; line-height:1.6; color:#5a4c37; margin-bottom:9px; }
     .wb-place-acts { display:flex; flex-wrap:wrap; gap:8px; }
     .wb-chip {
       display:inline-flex; align-items:center; gap:4px; text-decoration:none;
@@ -1778,7 +1781,7 @@
     .wb-mozza-tag { font-size:12.5px; color:#a9843f; font-weight:600; font-style:italic; margin-top:2px; }
     .wb-featured-lb { font-size:12px; font-weight:800; color:#a9843f; text-transform:uppercase; letter-spacing:.6px; margin:2px 2px 10px; text-align:center; }
     .wb-btn.wb-fb { background:linear-gradient(180deg,#3b82f6,#1d4ed8); box-shadow:0 3px 8px rgba(30,80,200,.25); }
-    .wb-terms-h, .wb-restr-h { font-size:13px; font-weight:800; color:#a9843f; text-transform:uppercase; letter-spacing:.5px; margin:16px 2px 8px; }
+    .wb-terms-h, .wb-restr-h { font-size:12px; font-weight:700; color:#a9843f; text-transform:uppercase; letter-spacing:1.4px; margin:20px 4px 10px; }
     .wb-restr-h { margin-top:4px; }
     .wb-term-t { font-size:13.5px; font-weight:700; color:#3d3324; margin-bottom:4px; }
     /* Welcome Book — acordeón de reglas (cápsulas) */
@@ -1794,9 +1797,32 @@
     .wb-acc-chev { color:#a9843f; font-size:13px; transition:transform .25s; flex-shrink:0; }
     .wb-acc.open .wb-acc-chev { transform:rotate(180deg); }
     .wb-acc.open .wb-acc-btn { border-color:#b99a5b; border-bottom-left-radius:6px; border-bottom-right-radius:6px; }
-    .wb-acc-body { display:none; padding:12px 18px 4px; font-size:13.5px; line-height:1.65; color:#4a3f2f; }
+    .wb-acc-body { display:none; padding:13px 20px 6px; font-size:14.5px; line-height:1.72; color:#4a3f2c; }
     .wb-acc.open .wb-acc-body { display:block; animation:wbFade .2s ease; }
+    /* Welcome Book — fotos */
+    .wb-photo { width:100%; display:block; border-radius:16px; object-fit:cover; box-shadow:0 3px 14px rgba(120,95,50,.16); background:#efe7d7; }
+    .wb-hero { aspect-ratio:16/10; margin-bottom:20px; border-radius:20px; }
+    .wb-sec-photo { aspect-ratio:16/10; margin-bottom:14px; }
+    /* Welcome Book — menú de píldoras verticales (estilo referencia) */
+    .wb-pills { margin-top:6px; }
+    .wb-pills-photo { background-size:cover; background-position:center; border-radius:24px; padding:18px 14px; box-shadow:0 6px 22px rgba(120,95,50,.18); }
+    .wb-pill {
+      position:relative; display:flex; align-items:center; width:100%; box-sizing:border-box;
+      background:rgba(255,255,255,.94); border:1px solid rgba(150,120,70,.16); border-radius:44px;
+      padding:9px 15px; margin-bottom:12px; cursor:pointer; box-shadow:0 3px 12px rgba(120,95,50,.13);
+      -webkit-tap-highlight-color:transparent; transition:transform .12s, box-shadow .12s;
+    }
+    .wb-pill:last-child { margin-bottom:0; }
+    .wb-pill:active { transform:scale(.985); }
+    .wb-pill:hover { box-shadow:0 6px 18px rgba(120,95,50,.22); }
+    .wb-pill-ic { width:48px; height:48px; border-radius:50%; border:1px solid rgba(120,95,50,.32); background:#fffefb; display:flex; align-items:center; justify-content:center; flex-shrink:0; color:#6a5a3f; }
+    .wb-pill-ic svg { width:25px; height:25px; }
+    .wb-pill-lb { flex:1; text-align:center; font-size:13.5px; font-weight:600; letter-spacing:1.8px; text-transform:uppercase; color:#38301f; padding-right:48px; line-height:1.2; }
+    .wb-pill .wb-badge { top:50%; right:18px; transform:translateY(-50%); }
   </style>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
   <!-- Setup Screen -->
@@ -3643,6 +3669,9 @@
       informacion:  { es: 'Recepción abierta 24 horas.\nDesayuno disponible según promoción vigente.\nSolicita toallas o amenidades extra en recepción.', en: 'Reception open 24 hours.\nBreakfast available per current promotion.\nAsk reception for extra towels or amenities.', fr: '', it: '', de: '' },
       contactoNotas: { es: '', en: '', fr: '', it: '', de: '' },
       accesoInstr:  { es: 'Tu código personal de acceso aparece abajo. Ingrésalo en el teclado de la cerradura principal seguido de la tecla de confirmación.', en: 'Your personal access code is shown below. Enter it on the main lock keypad followed by the confirm key.', fr: '', it: '', de: '' },
+      heroPhoto:    '',
+      photos:       { welcome: '', ubicacion: '', servicios: '' },
+      roomPhotos:   {},
       restaurantes: [],
       bares: [],
       compras: [],
@@ -3659,6 +3688,8 @@
             ['restaurantes', 'bares', 'compras', 'actividades'].forEach(function(k) {
               if (!Array.isArray(g[k])) g[k] = [];
             });
+            if (!g.photos || typeof g.photos !== 'object') g.photos = { welcome: '', ubicacion: '', servicios: '' };
+            if (!g.roomPhotos || typeof g.roomPhotos !== 'object') g.roomPhotos = {};
             if (!Array.isArray(g.langs) || !g.langs.length) g.langs = DEFAULT_GUEST_GUIDE.langs.slice();
             return g;
           }
@@ -3794,6 +3825,10 @@
     }
     function _wbEsc(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
     function _wbNl2br(s) { return _wbEsc(s).replace(/\n/g, '<br>'); }
+    function _wbPhoto(url, cls) {
+      if (!url || !String(url).trim()) return '';
+      return '<img class="wb-photo' + (cls ? ' ' + cls : '') + '" src="' + _wbEsc(url) + '" alt="" loading="lazy" onerror="this.style.display=\'none\'">';
+    }
 
     async function showWelcomeBook(resId) {
       document.getElementById('setupScreen').classList.remove('active');
@@ -3816,6 +3851,7 @@
             reads.push(_rd('📋 Reservas', 'A2:P5000').catch(function() { return []; }));
             reads.push(_rd('🍳 Desayunos', 'A2:I5000').catch(function() { return []; }));
             reads.push(_rd('🔑 Accesos', 'A2:C5000').catch(function() { return []; }));
+            reads.push(_rd('🏨 Habitaciones', 'A2:F30').catch(function() { return []; }));
           }
           var out = await Promise.all(reads);
           var cfgRows = out[0];
@@ -3828,14 +3864,20 @@
             });
           }
           if (resId) {
-            var reservas = out[1] || [], des = out[2] || [], acc = out[3] || [];
+            var reservas = out[1] || [], des = out[2] || [], acc = out[3] || [], habs = out[4] || [];
             for (var i = 0; i < reservas.length; i++) {
               if (String(reservas[i][0]) === String(resId)) {
                 var f = reservas[i];
                 _wbRes = { id: String(f[0]), habitacionNum: String(f[1]), huesped: String(f[2] || ''),
                            fechaEntrada: String(f[5] || '').substring(0, 10), fechaSalida: String(f[6] || '').substring(0, 10),
-                           estado: String(f[11] || '') };
+                           estado: String(f[11] || ''), tipo: '' };
                 break;
+              }
+            }
+            // Tipo de habitación (para foto del cuarto)
+            if (_wbRes) {
+              for (var hk = 0; hk < habs.length; hk++) {
+                if (String(habs[hk][1]) === String(_wbRes.habitacionNum)) { _wbRes.tipo = String(habs[hk][2] || ''); break; }
               }
             }
             _wbBreakfast = des.filter(function(d) { return String(d[1]) === String(resId); }).map(function(d) {
@@ -3899,12 +3941,15 @@
 
       var body;
       if (!_wbView) {
-        body = guestBanner + '<div class="wb-grid">' + _wbActiveTiles().map(function(key) {
+        var pillsInner = _wbActiveTiles().map(function(key) {
           var badge = (key === 'desayuno' && _wbBreakfast.length) ? '<span class="wb-badge">' + _wbBreakfast.length + '</span>' : '';
-          return '<button class="wb-tile" onclick="wbOpen(\'' + key + '\')">' + badge +
-                 '<span class="wb-tile-ic">' + (WB_ICONS[key] || '') + '</span>' +
-                 '<span class="wb-tile-lb">' + _wbEsc(_wbLabel(key)) + '</span></button>';
-        }).join('') + '</div>';
+          return '<button class="wb-pill" onclick="wbOpen(\'' + key + '\')">' +
+                 '<span class="wb-pill-ic">' + (WB_ICONS[key] || '') + '</span>' +
+                 '<span class="wb-pill-lb">' + _wbEsc(_wbLabel(key)) + '</span>' + badge + '</button>';
+        }).join('');
+        var pillsCls = 'wb-pills' + (g.heroPhoto ? ' wb-pills-photo' : '');
+        var pillsStyle = g.heroPhoto ? ' style="background-image:linear-gradient(rgba(249,244,235,.28),rgba(249,244,235,.5)),url(\'' + _wbEsc(g.heroPhoto) + '\')"' : '';
+        body = guestBanner + '<div class="' + pillsCls + '"' + pillsStyle + '>' + pillsInner + '</div>';
       } else {
         body = '<div class="wb-detail">' +
                '<button class="wb-back" onclick="wbHome()">&larr; ' + _wbEsc(_wbLabel('menu')) + '</button>' +
@@ -3985,7 +4030,7 @@
 
     function _wbSection(key, g, hi) {
       if (key === 'welcome') {
-        var hw0 = '';
+        var hw0 = _wbPhoto(g.photos && g.photos.welcome, 'wb-sec-photo');
         if (_wbRes) hw0 += _wbCard('<div class="wb-body"><b>' + _wbEsc(_wbLabel('hello')) + ', ' + _wbEsc(_wbRes.huesped) + '!</b></div>');
         return hw0 + _wbText(g.welcome, g);
       }
@@ -4013,7 +4058,7 @@
         return out;
       }
       if (key === 'transporte')  return _wbText(g.transporte, g);
-      if (key === 'servicios')   return _wbText(g.servicios, g);
+      if (key === 'servicios')   return _wbPhoto(g.photos && g.photos.servicios, 'wb-sec-photo') + _wbText(g.servicios, g);
       if (key === 'informacion') return _wbText(g.informacion, g);
       if (key === 'actividades') return _wbList(g.actividades, g);
       if (key === 'bares')       return _wbList(g.bares, g);
@@ -4036,6 +4081,7 @@
         var h = '';
         // Datos reales del cliente
         if (_wbRes) {
+          if (g.roomPhotos && _wbRes.tipo && g.roomPhotos[_wbRes.tipo]) h += _wbPhoto(g.roomPhotos[_wbRes.tipo], 'wb-sec-photo');
           var ci = '<div class="wb-kv"><span>' + _wbEsc(_wbLabel('guestLbl')) + '</span><b>' + _wbEsc(_wbRes.huesped) + '</b></div>';
           ci += '<div class="wb-kv"><span>' + _wbEsc(_wbLabel('room')) + '</span><b>' + _wbEsc(_wbRes.habitacionNum) + '</b></div>';
           if (_wbRes.fechaEntrada) ci += '<div class="wb-kv"><span>' + _wbEsc(_wbLabel('arrivalDate')) + '</span><b>' + _wbEsc(_wbRes.fechaEntrada) + (hi.checkin_hora ? ' · ' + _wbEsc(formatHoraDisplay(hi.checkin_hora)) : '') + '</b></div>';
@@ -4064,7 +4110,7 @@
         return hc;
       }
       if (key === 'ubicacion') {
-        var hu = '';
+        var hu = _wbPhoto(g.photos && g.photos.ubicacion, 'wb-sec-photo');
         if (hi.direccion) hu += _wbCard('<div class="wb-kv-col"><span>' + _wbEsc(_wbLabel('address')) + '</span><div class="wb-body">' + _wbEsc(hi.direccion) + '</div></div>');
         var mapUrl = g.mapLink || (hi.direccion ? ('https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(hi.direccion)) : '');
         if (mapUrl) hu += '<a class="wb-btn" href="' + _wbEsc(mapUrl) + '" target="_blank" rel="noopener">📍 ' + _wbEsc(_wbLabel('openMap')) + '</a>';
@@ -4303,6 +4349,22 @@
       });
       h += '</div>';
 
+      // 📷 Fotos (URLs alojadas en tu repo /assets)
+      h += '<div style="margin-bottom:16px;background:var(--surface3);padding:12px;border-radius:var(--radius);">';
+      h += '<div style="font-size:13px;font-weight:700;margin-bottom:4px;">📷 Fotos</div>';
+      h += '<div style="font-size:10px;color:var(--text2);margin-bottom:10px;">Sube las fotos a la carpeta <b>assets</b> de tu repo y pega el enlace directo (ej. https://raw.githubusercontent.com/…/assets/portada.jpg).</div>';
+      h += _wbCfgPhotoField('Portada (arriba del menú)', 'heroPhoto', g.heroPhoto || '');
+      h += _wbCfgPhotoField('Bienvenida', 'photos.welcome', (g.photos && g.photos.welcome) || '');
+      h += _wbCfgPhotoField('Ubicación', 'photos.ubicacion', (g.photos && g.photos.ubicacion) || '');
+      h += _wbCfgPhotoField('Servicios', 'photos.servicios', (g.photos && g.photos.servicios) || '');
+      var _wbTypes = [];
+      try { _wbTypes = (getOccupancyRules() || []).map(function(r) { return r.tipo; }); } catch (e) {}
+      if (_wbTypes.length) {
+        h += '<div style="font-size:11px;font-weight:700;margin:12px 0 4px;">🛏️ Fotos de habitación por tipo</div>';
+        _wbTypes.forEach(function(t) { h += _wbCfgPhotoField(t, 'room:' + t, (g.roomPhotos && g.roomPhotos[t]) || ''); });
+      }
+      h += '</div>';
+
       // mapLink (no depende de idioma)
       h += _wbCfgField('mapLink', 'Enlace de Google Maps', 'https://maps.google.com/…', (g.mapLink || ''), false);
 
@@ -4347,6 +4409,22 @@
       return h;
     }
 
+    function _wbCfgPhotoField(label, key, val) {
+      var h = '<div style="margin-bottom:9px;"><div style="font-size:11px;font-weight:600;margin-bottom:3px;">' + _wbEsc(label) + '</div>';
+      h += '<input type="text" value="' + _wbEsc(val) + '" placeholder="https://…/assets/foto.jpg" onchange="wbCfgSetPhoto(\'' + key + '\',this.value)" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--surface3);border-radius:6px;padding:7px 8px;font-size:11px;color:var(--text);">';
+      if (val) h += '<img src="' + _wbEsc(val) + '" style="margin-top:6px;width:100%;max-height:130px;object-fit:cover;border-radius:8px;display:block;" onerror="this.style.display=\'none\'">';
+      h += '</div>';
+      return h;
+    }
+    function wbCfgSetPhoto(key, value) {
+      var g = getGuestGuide();
+      value = (value || '').trim();
+      if (key === 'heroPhoto') g.heroPhoto = value;
+      else if (key.indexOf('photos.') === 0) { if (!g.photos || typeof g.photos !== 'object') g.photos = {}; g.photos[key.slice(7)] = value; }
+      else if (key.indexOf('room:') === 0) { if (!g.roomPhotos || typeof g.roomPhotos !== 'object') g.roomPhotos = {}; g.roomPhotos[key.slice(5)] = value; }
+      saveGuestGuideLocal(g);
+      renderGuiaConfig();
+    }
     function wbCfgSetText(field, value) {
       var g = getGuestGuide();
       if (!g[field] || typeof g[field] !== 'object') g[field] = {};
