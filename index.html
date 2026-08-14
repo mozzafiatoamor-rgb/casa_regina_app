@@ -6960,7 +6960,7 @@
       var tipos = _getCotRoomTypes();
       var keys = Object.keys(tipos);
       var pick = keys.find(function(k) { return !_cotRooms.some(function(r) { return r.tipo === k; }); }) || keys[0];
-      _cotRooms.push({ tipo: pick, cantidad: 1, tarifa: tipos[pick] || 0, huespedesPorHab: 2, personasExtra: 0 });
+      _cotRooms.push({ tipo: pick, cantidad: 1, tarifa: tipos[pick] || 0, huespedesPorHab: 2, personasExtra: 0, numero: '' });
       renderCotizacionForm();
     }
 
@@ -6990,6 +6990,8 @@
         if (peEl) peEl.value = autoExtra;
       } else if (field === 'pe') {
         _cotRooms[idx].personasExtra = Math.max(0, parseInt(document.getElementById('cotPE_' + idx).value) || 0);
+      } else if (field === 'numero') {
+        _cotRooms[idx].numero = (document.getElementById('cotNum_' + idx).value || '').trim();
       }
       calcCotizacion();
     }
@@ -7010,7 +7012,7 @@
         var cot = S.cotizaciones.find(function(c) { return c.id === cotId; });
         if (cot) {
           _cotRooms = (cot.habitaciones || []).map(function(h) {
-            return { tipo: h.tipo, cantidad: h.cantidad, tarifa: h.tarifa, huespedesPorHab: h.huespedesPorHab || 2, personasExtra: h.personasExtra || 0 };
+            return { tipo: h.tipo, cantidad: h.cantidad, tarifa: h.tarifa, huespedesPorHab: h.huespedesPorHab || 2, personasExtra: h.personasExtra || 0, numero: h.numero || '' };
           });
           _cotizacionData = {
             nombre: cot.nombre, telefono: cot.telefono, email: cot.email,
@@ -7109,7 +7111,7 @@
       // Init default room if empty
       if (_cotRooms.length === 0) {
         var firstType = Object.keys(tipos)[0] || '';
-        _cotRooms = [{ tipo: firstType, cantidad: 1, tarifa: tipos[firstType] || 0, huespedesPorHab: 2, personasExtra: 0 }];
+        _cotRooms = [{ tipo: firstType, cantidad: 1, tarifa: tipos[firstType] || 0, huespedesPorHab: 2, personasExtra: 0, numero: '' }];
       }
 
       var h = '';
@@ -7181,6 +7183,9 @@
         h += '<div><label class="form-label" style="font-size:11px;">Cantidad</label>';
         h += '<input type="number" id="cotCant_' + idx + '" class="form-input" value="' + rm.cantidad + '" min="1" max="20" onchange="cotRoomChanged(' + idx + ',\'cantidad\')" style="padding:8px;font-size:12px;" /></div>';
         h += '</div>';
+
+        h += '<div style="margin-bottom:8px;"><label class="form-label" style="font-size:11px;">N\u00fam. de habitaci\u00f3n (opcional)</label>';
+        h += '<input type="text" id="cotNum_' + idx + '" class="form-input" value="' + (rm.numero || '') + '" placeholder="Ej. 101 o 101, 102" onchange="cotRoomChanged(' + idx + ',\'numero\')" style="padding:8px;font-size:12px;" /></div>';
 
         h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">';
         // Tarifa
@@ -7291,7 +7296,7 @@
 
         roomLines.push({
           tipo: rm.tipo, cantidad: rm.cantidad, tarifa: rm.tarifa,
-          personasExtra: rm.personasExtra,
+          personasExtra: rm.personasExtra, numero: rm.numero || '',
           subtotalHab: lineSubHab, subtotalPE: linePE,
           bfPersonas: lineBfPersonas, bfAhorro: lineBfAhorro
         });
@@ -7338,7 +7343,7 @@
       // Room lines detail
       p += '<div style="border-top:1px solid var(--surface3);padding-top:10px;font-size:13px;">';
       roomLines.forEach(function(rl) {
-        var label = rl.tipo + ' × ' + rl.cantidad + ' hab. × ' + nights + ' noches ($' + _fmt(rl.tarifa) + '/noche)';
+        var label = rl.tipo + (rl.numero ? ' (Hab. ' + rl.numero + ')' : '') + ' × ' + rl.cantidad + ' hab. × ' + nights + ' noches ($' + _fmt(rl.tarifa) + '/noche)';
         p += '<div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>' + label + '</span><span>$' + _fmt(rl.subtotalHab) + '</span></div>';
         if (rl.personasExtra > 0 && peRate > 0) {
           p += '<div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:12px;color:var(--text2);padding-left:12px;"><span>↳ Pers. extra: ' + rl.personasExtra + '/hab. × ' + rl.cantidad + ' × $' + _fmt(peRate) + ' × ' + nights + 'n</span><span>$' + _fmt(rl.subtotalPE) + '</span></div>';
@@ -7498,7 +7503,7 @@
       var y = 20;
 
       // Header
-      var logoW = 50;
+      var logoW = 80;
       try { doc.addImage(LOGO_H_DARK_B64 || LOGO_H_DARK, 'PNG', marginX, y, logoW, logoW / LOGO_H_RATIO); } catch(e) {}
       doc.setFont('helvetica', 'bold'); doc.setFontSize(18); doc.setTextColor(55, 71, 79);
       doc.text('COTIZACIÓN', pageW - marginX, y + 5, { align: 'right' });
@@ -7573,7 +7578,7 @@
       }
 
       d.roomLines.forEach(function(rl) {
-        var lbl = rl.tipo + ' × ' + rl.cantidad + ' hab. × ' + d.nights + ' noche' + (d.nights > 1 ? 's' : '') + ' ($' + _fmt(rl.tarifa) + '/noche)';
+        var lbl = rl.tipo + (rl.numero ? ' (Hab. ' + rl.numero + ')' : '') + ' × ' + rl.cantidad + ' hab. × ' + d.nights + ' noche' + (d.nights > 1 ? 's' : '') + ' ($' + _fmt(rl.tarifa) + '/noche)';
         addPricingRow(lbl, rl.subtotalHab, false);
         if (rl.personasExtra > 0 && d.peRate > 0) {
           addPricingRow('Pers. extra: ' + rl.personasExtra + '/hab. × ' + rl.cantidad + ' hab. × $' + _fmt(d.peRate) + ' × ' + d.nights + 'n', rl.subtotalPE, true);
@@ -7821,7 +7826,7 @@
       var cotId = _editingCotId || nextId('COT', S.cotizaciones);
       var fecha = normDate(new Date());
       var habitacionesJSON = JSON.stringify(_cotRooms.map(function(rm) {
-        return { tipo: rm.tipo, cantidad: rm.cantidad, tarifa: rm.tarifa, huespedesPorHab: rm.huespedesPorHab || 2, personasExtra: rm.personasExtra || 0 };
+        return { tipo: rm.tipo, cantidad: rm.cantidad, tarifa: rm.tarifa, huespedesPorHab: rm.huespedesPorHab || 2, personasExtra: rm.personasExtra || 0, numero: rm.numero || '' };
       }));
       var opcionesJSON = JSON.stringify({
         conIVA: d.conIVA, mostrarHorarios: d.mostrarHorarios,
@@ -7844,7 +7849,7 @@
             existing.telefono = d.telefono; existing.email = d.email;
             existing.checkin = d.checkin; existing.checkout = d.checkout;
             existing.adultos = d.adultos; existing.ninos = d.ninos;
-            existing.habitaciones = _cotRooms.map(function(rm) { return { tipo: rm.tipo, cantidad: rm.cantidad, tarifa: rm.tarifa, huespedesPorHab: rm.huespedesPorHab || 2, personasExtra: rm.personasExtra || 0 }; });
+            existing.habitaciones = _cotRooms.map(function(rm) { return { tipo: rm.tipo, cantidad: rm.cantidad, tarifa: rm.tarifa, huespedesPorHab: rm.huespedesPorHab || 2, personasExtra: rm.personasExtra || 0, numero: rm.numero || '' }; });
             existing.opciones = JSON.parse(opcionesJSON);
             existing.subtotal = d.subtotal; existing.iva = d.iva; existing.total = d.total;
           }
@@ -7857,7 +7862,7 @@
             telefono: d.telefono || '', email: d.email || '',
             checkin: d.checkin, checkout: d.checkout,
             adultos: d.adultos, ninos: d.ninos,
-            habitaciones: _cotRooms.map(function(rm) { return { tipo: rm.tipo, cantidad: rm.cantidad, tarifa: rm.tarifa, huespedesPorHab: rm.huespedesPorHab || 2, personasExtra: rm.personasExtra || 0 }; }),
+            habitaciones: _cotRooms.map(function(rm) { return { tipo: rm.tipo, cantidad: rm.cantidad, tarifa: rm.tarifa, huespedesPorHab: rm.huespedesPorHab || 2, personasExtra: rm.personasExtra || 0, numero: rm.numero || '' }; }),
             opciones: JSON.parse(opcionesJSON),
             subtotal: d.subtotal, iva: d.iva, total: d.total, estado: 'Vigente'
           });
@@ -7873,7 +7878,7 @@
       if (!cot) { toast('Cotización no encontrada', true); return; }
       // Restore state and generate
       _cotRooms = (cot.habitaciones || []).map(function(h) {
-        return { tipo: h.tipo, cantidad: h.cantidad, tarifa: h.tarifa, huespedesPorHab: h.huespedesPorHab || 2, personasExtra: h.personasExtra || 0 };
+        return { tipo: h.tipo, cantidad: h.cantidad, tarifa: h.tarifa, huespedesPorHab: h.huespedesPorHab || 2, personasExtra: h.personasExtra || 0, numero: h.numero || '' };
       });
       _cotizacionData = {
         nombre: cot.nombre, telefono: cot.telefono, email: cot.email,
