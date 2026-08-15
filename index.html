@@ -1974,6 +1974,10 @@
     .bk-foot { text-align:center; font-size:11px; color:#a89878; margin-top:18px; letter-spacing:.3px; }
     @media (max-width:380px){ .bk-hero { height:210px; } .bk-hero-name { font-size:30px; } .bk-body { padding-left:14px; padding-right:14px; } }
     .bk-disclaimer { font-size:11px; color:#9a8a6c; text-align:center; margin:-6px 0 14px; padding:8px 12px; background:rgba(255,253,248,.6); border:1px dashed rgba(120,95,50,.22); border-radius:12px; line-height:1.4; }
+    /* Portada de reservas: imagen de bienvenida completa (trae logo + eslogan) */
+    .bk-hero-wrap { position:relative; line-height:0; }
+    .bk-hero-img { display:block; width:100%; height:auto; }
+    .bk-hero-fallback { height:248px; background:linear-gradient(135deg,#c9a765,#8a6d3a); line-height:1.1; }
   </style>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -15794,6 +15798,15 @@
       return '';
     }
 
+    // Respaldo de portada: si la imagen de bienvenida no carga, muestra el texto con el nombre
+    function _bkHeroFallback(img) {
+      try {
+        img.style.display = 'none';
+        var fb = img.parentNode ? img.parentNode.querySelector('.bk-hero-fallback') : null;
+        if (fb) fb.style.display = '';
+      } catch (e) {}
+    }
+
     // Abre el enlace público de reservas en una pestaña nueva (vista previa para el staff)
     function previewBookingLink() {
       try { var l = getBookingLink(); window.open(l, '_blank'); } catch (e) { toast('No se pudo abrir la vista previa', true); }
@@ -15808,13 +15821,20 @@
       var minDate = normDate(new Date());
       var tmw = new Date(); tmw.setDate(tmw.getDate() + 1);
       var minCheckout = normDate(tmw);
-      var heroStyle = (g && g.heroPhoto) ? ("background-image:url('" + _wbEsc(g.heroPhoto) + "')") : 'background:linear-gradient(135deg,#c9a765,#8a6d3a)';
+      // Portada: imagen de bienvenida (ya trae logo + eslogan) → sin texto encima.
+      // El texto solo aparece como respaldo si la imagen no carga.
+      var welcomeImg = (g && g.photos && g.photos.welcome) ? g.photos.welcome : (g && g.heroPhoto ? g.heroPhoto : '');
 
       var h = '<div class="bk-wrap">';
-      h += '<div class="bk-hero" style="' + heroStyle + '"><div class="bk-hero-in">';
+      h += '<div class="bk-hero-wrap">';
+      if (welcomeImg) {
+        h += '<img class="bk-hero-img" src="' + _wbEsc(welcomeImg) + '" alt="' + _wbEsc(hotelName) + '" onerror="_bkHeroFallback(this)">';
+      }
+      h += '<div class="bk-hero bk-hero-fallback"' + (welcomeImg ? ' style="display:none;"' : '') + '><div class="bk-hero-in">';
       h += '<h1 class="bk-hero-name">' + _wbEsc(hotelName) + '</h1>';
       h += '<div class="bk-hero-tag">Reserva tu estancia</div>';
       h += '</div></div>';
+      h += '</div>';
 
       h += '<div class="bk-body">';
       h += '<div class="bk-card">';
