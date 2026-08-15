@@ -3505,6 +3505,7 @@
       if ((guestRegId || guestBooking || guestValidar || guestGuia) && !guestCfg) {
         var urlU = urlParams.get('u');
         var urlB = urlParams.get('b');
+        var urlReservarVal = urlParams.get('reservar');
         var urlS = urlParams.get('s');
         var urlK = urlParams.get('k');
         if (urlU) {
@@ -3513,6 +3514,10 @@
         } else if (urlB) {
           var _dScript = _unb64u(urlB);
           if (_dScript) { S.scriptUrl = _dScript; S._publicMode = true; }
+        } else if (urlReservarVal) {
+          // Enlace de Facebook sin '&': reservar=<base64url del scriptUrl>
+          var _dRes = _unb64u(urlReservarVal);
+          if (/^https?:\/\//.test(_dRes)) { S.scriptUrl = _dRes; S._publicMode = true; }
         } else if (urlS && urlK) {
           // Legacy short links with API key (backward compat)
           S.sheetId = urlS;
@@ -5105,8 +5110,8 @@
     function _b64u(str){ try { return btoa(unescape(encodeURIComponent(String(str)))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); } catch(e){ return encodeURIComponent(String(str)); } }
     function _unb64u(s){ try { s=String(s).replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4) s+='='; return decodeURIComponent(escape(atob(s))); } catch(e){ return ''; } }
     function getBookingLink() {
-      // Enlace público limpio (sin exponer script.google.com): scriptUrl en base64url
-      return window.location.origin + window.location.pathname + '?reservar&b=' + _b64u(S.scriptUrl);
+      // Enlace SIN '&' (Facebook corta el URL en el primer &): todo en un solo parámetro reservar=<base64url>
+      return window.location.origin + window.location.pathname + '?reservar=' + _b64u(S.scriptUrl);
     }
 
     function copyBookingLink() {
