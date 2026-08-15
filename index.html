@@ -1978,6 +1978,9 @@
     .bk-hero-wrap { position:relative; line-height:0; }
     .bk-hero-img { display:block; width:100%; height:auto; }
     .bk-hero-fallback { height:248px; background:linear-gradient(135deg,#c9a765,#8a6d3a); line-height:1.1; }
+    /* Frase bajo la portada (estilo del eslogan de la marca) */
+    .bk-cta-title { font-family:'Cormorant Garamond',Georgia,serif; font-size:30px; font-weight:700; font-style:italic; color:#8a6d3a; text-align:center; margin:16px 4px 14px; line-height:1.12; letter-spacing:.3px; }
+    @media (max-width:380px){ .bk-cta-title { font-size:26px; } }
   </style>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -15832,11 +15835,11 @@
       }
       h += '<div class="bk-hero bk-hero-fallback"' + (welcomeImg ? ' style="display:none;"' : '') + '><div class="bk-hero-in">';
       h += '<h1 class="bk-hero-name">' + _wbEsc(hotelName) + '</h1>';
-      h += '<div class="bk-hero-tag">Reserva tu estancia</div>';
       h += '</div></div>';
       h += '</div>';
 
       h += '<div class="bk-body">';
+      h += '<div class="bk-cta-title">¡Reserva tu estancia!</div>';
       h += '<div class="bk-card">';
       h += '<div class="bk-eyebrow">Elige tus fechas</div>';
       h += '<div class="bk-grid2">';
