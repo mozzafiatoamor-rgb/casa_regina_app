@@ -1856,6 +1856,36 @@
     .wb-nav-ic.active { background:linear-gradient(180deg,#c9a765,#b1893f); color:#fff; border-color:#b1893f; box-shadow:0 3px 9px rgba(150,110,40,.3); }
     .wb-nav-home { background:linear-gradient(180deg,#fffdf8,#f1e6d0); color:#a9843f; }
     .wb-nav-badge { position:absolute; top:-3px; right:-3px; background:#b1893f; color:#fff; font-size:9px; font-weight:800; min-width:16px; height:16px; line-height:16px; text-align:center; border-radius:8px; padding:0 3px; box-shadow:0 1px 3px rgba(0,0,0,.25); }
+    /* Welcome Book — portada: banda crema para que el logo/encabezado no se pierdan */
+    .wb-head-hero {
+      margin:-26px -20px 16px; padding:26px 20px 22px; border-radius:0 0 30px 30px;
+      background:linear-gradient(180deg, #f5f0e6 0%, #f4efe4 52%, rgba(244,239,228,.55) 80%, rgba(244,239,228,0) 100%);
+      box-shadow:0 8px 20px rgba(120,95,50,.06);
+    }
+    .wb-head-hero .wb-tagline { color:#a9843f; }
+    /* Welcome Book — barra de navegación con nombre + home fijo + pista de desliz */
+    .wb-navwrap { position:sticky; top:0; z-index:6; margin:0 -6px 8px; position:-webkit-sticky; }
+    .wb-navwrap { background:linear-gradient(180deg, rgba(236,229,217,.99) 62%, rgba(236,229,217,0)); }
+    .wb-navbar { display:flex; gap:7px; overflow-x:auto; padding:8px 8px 12px; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
+    .wb-navbar::-webkit-scrollbar { display:none; }
+    .wb-nav-ic { flex:0 0 auto; display:flex; flex-direction:column; align-items:center; gap:4px; width:58px; background:none; border:none; border-radius:0; padding:0; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+    .wb-nav-circ { position:relative; width:46px; height:46px; border-radius:50%; border:1px solid rgba(120,95,50,.28); background:rgba(255,255,255,.95); display:flex; align-items:center; justify-content:center; color:#6a5a3f; box-shadow:0 2px 6px rgba(120,95,50,.1); transition:transform .12s, background .15s, color .15s; }
+    .wb-nav-circ svg { width:22px; height:22px; }
+    .wb-nav-ic:active .wb-nav-circ { transform:scale(.92); }
+    .wb-nav-ic.active { background:none; }
+    .wb-nav-ic.active .wb-nav-circ { background:linear-gradient(180deg,#c9a765,#b1893f); color:#fff; border-color:#b1893f; box-shadow:0 3px 9px rgba(150,110,40,.3); }
+    .wb-nav-lb { font-size:8.5px; font-weight:700; text-transform:uppercase; letter-spacing:.1px; color:#7a6a4f; line-height:1.05; text-align:center; width:58px; }
+    .wb-nav-ic.active .wb-nav-lb { color:#3d3324; }
+    .wb-nav-badge { position:absolute; top:-3px; right:-3px; background:#b1893f; color:#fff; font-size:9px; font-weight:800; min-width:16px; height:16px; line-height:16px; text-align:center; border-radius:8px; padding:0 3px; box-shadow:0 1px 3px rgba(0,0,0,.25); }
+    /* Home fijo a la izquierda, siempre visible y destacado */
+    .wb-nav-home { position:sticky; left:0; z-index:3; background:linear-gradient(90deg,#ece5d9 74%, rgba(236,229,217,0)); padding-right:10px; margin-right:-4px; }
+    .wb-nav-home .wb-nav-circ { background:linear-gradient(180deg,#3d3324,#2a2318); color:#f1e6d0; border-color:#3d3324; box-shadow:0 3px 9px rgba(0,0,0,.25); }
+    .wb-nav-home .wb-nav-lb { color:#3d3324; }
+    /* Pista de desliz (fade + flecha) */
+    .wb-navfade { position:absolute; right:0; top:0; height:calc(100% - 6px); width:40px; pointer-events:none; background:linear-gradient(90deg, rgba(236,229,217,0), rgba(236,229,217,.92)); }
+    .wb-navhint { position:absolute; right:8px; top:22px; font-size:10px; font-weight:800; letter-spacing:.4px; text-transform:uppercase; color:#a9843f; pointer-events:none; animation:wbHintPulse 1.5s ease-in-out infinite, wbHintGone .6s ease 6s forwards; }
+    @keyframes wbHintPulse { 0%,100%{transform:translateX(0);opacity:.95;} 50%{transform:translateX(3px);opacity:.55;} }
+    @keyframes wbHintGone { to { opacity:0; visibility:hidden; } }
   </style>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3788,6 +3818,7 @@
       habitaciones: { es:'Habitaciones', en:'Rooms', fr:'Chambres', it:'Camere', de:'Zimmer' },
       yourRoom:     { es:'Tu habitación', en:'Your room', fr:'Votre chambre', it:'La tua camera', de:'Dein Zimmer' },
       upTo:         { es:'Hasta', en:'Up to', fr:"Jusqu'à", it:'Fino a', de:'Bis zu' },
+      swipeHint:    { es:'Desliza', en:'Swipe', fr:'Glissez', it:'Scorri', de:'Wischen' },
       pagos:        { es:'Pagos', en:'Payments', fr:'Paiements', it:'Pagamenti', de:'Zahlungen' },
       copyClabe:    { es:'Copiar CLABE', en:'Copy CLABE', fr:'Copier la CLABE', it:'Copia CLABE', de:'CLABE kopieren' },
       copyAccount:  { es:'Copiar cuenta', en:'Copy account', fr:'Copier le compte', it:'Copia conto', de:'Konto kopieren' },
@@ -3981,7 +4012,7 @@
       var logo = (typeof LOGO_V_DARK !== 'undefined' && LOGO_V_DARK) ? LOGO_V_DARK : '';
       var head;
       if (!_wbView) {
-        head = '<div class="wb-head">';
+        head = '<div class="wb-head' + (g.heroPhoto ? ' wb-head-hero' : '') + '">';
         if (logo) head += '<img class="wb-logo" src="' + logo + '" alt="' + _wbEsc(hi.nombre || '') + '" onerror="this.style.display=\'none\'">';
         head += '<div class="wb-title">' + _wbEsc(_wbLabel('wbTitle')) + '</div>';
         head += '<div class="wb-tagline">' + _wbEsc(_wbLabel('wbTagline')) + '</div>';
@@ -4013,20 +4044,20 @@
         body = guestBanner + '<div class="wb-pills wb-pills-grid">' + pillsInner + '</div>';
       } else {
         // Vista de detalle: barra de íconos deslizable ARRIBA (navegación rápida) + contenido
-        var navHome = '<button class="wb-nav-ic wb-nav-home" onclick="wbHome()" aria-label="' + _wbEsc(_wbLabel('menu')) + '">' + WB_HOME_ICON + '</button>';
+        var navHome = '<button class="wb-nav-ic wb-nav-home" onclick="wbHome()" aria-label="' + _wbEsc(_wbLabel('menu')) + '"><span class="wb-nav-circ">' + WB_HOME_ICON + '</span><span class="wb-nav-lb">' + _wbEsc(_wbLabel('menu')) + '</span></button>';
         var navbar = _wbActiveTiles().map(function(key) {
           var act = key === _wbView ? ' active' : '';
           var bdg = (key === 'desayuno' && _wbBreakfast.length) ? '<span class="wb-nav-badge">' + _wbBreakfast.length + '</span>' : '';
-          return '<button class="wb-nav-ic' + act + '" onclick="wbOpen(\'' + key + '\')" aria-label="' + _wbEsc(_wbLabel(key)) + '">' + bdg + (WB_ICONS[key] || '') + '</button>';
+          return '<button class="wb-nav-ic' + act + '" onclick="wbOpen(\'' + key + '\')" aria-label="' + _wbEsc(_wbLabel(key)) + '"><span class="wb-nav-circ">' + bdg + (WB_ICONS[key] || '') + '</span><span class="wb-nav-lb">' + _wbEsc(_wbLabel(key)) + '</span></button>';
         }).join('');
         var content = '<h2 class="wb-dtitle"><span class="wb-dic">' + (WB_ICONS[_wbView] || '') + '</span>' + _wbEsc(_wbLabel(_wbView)) + '</h2>' + _wbSection(_wbView, g, hi);
-        body = '<div class="wb-navbar">' + navHome + navbar + '</div><div class="wb-detail">' + content + '</div>';
+        body = '<div class="wb-navwrap"><div class="wb-navbar">' + navHome + navbar + '</div><div class="wb-navfade"></div><span class="wb-navhint">' + _wbEsc(_wbLabel('swipeHint')) + ' ›</span></div><div class="wb-detail">' + content + '</div>';
       }
 
       var foot = '<div class="wb-foot">';
       if (logo) foot += '<img class="wb-foot-logo" src="' + logo + '" alt="' + _wbEsc(hi.nombre || '') + '" onerror="this.parentNode.style.display=\'none\'">';
       foot += '</div>';
-      var bg = (!_wbView && g.heroPhoto) ? '<div class="wb-bg" style="background-image:linear-gradient(rgba(248,243,233,.72) 0%, rgba(248,243,233,.34) 26%, rgba(248,243,233,.5) 100%),url(\'' + _wbEsc(g.heroPhoto) + '\')"></div>' : '';
+      var bg = (!_wbView && g.heroPhoto) ? '<div class="wb-bg" style="background-image:linear-gradient(rgba(248,243,233,.44),rgba(248,243,233,.54)),url(\'' + _wbEsc(g.heroPhoto) + '\')"></div>' : '';
       scr.innerHTML = bg + '<div class="wb-phone">' + head + body + foot + '</div>';
       if (_wbView) {
         var _av = scr.querySelector('.wb-nav-ic.active');
