@@ -1904,6 +1904,36 @@
     .wb-navstrip { position:relative; flex:1 1 auto; min-width:0; }
     .wb-navbar { padding-left:2px; }
     .wb-navstrip .wb-navfade { height:calc(100% - 6px); }
+    /* ===== FIX: responsividad + etiquetas de nav que se encimaban ===== */
+    /* El libro ocupa el ancho disponible hasta 440px y nunca desborda horizontal */
+    .wb-phone { width:100%; max-width:440px; overflow-x:hidden; }
+    .wb-detail { min-width:0; }
+    .wb-detail img, .wb-detail iframe { max-width:100%; height:auto; }
+    /* Cada ícono de la barra se ajusta al ancho de su nombre → sin encimarse */
+    .wb-navstrip { overflow:hidden; }
+    .wb-navbar { gap:5px; padding-left:2px; padding-right:8px; }
+    .wb-nav-ic { width:auto; min-width:46px; max-width:100px; padding:0 5px; box-sizing:border-box; }
+    .wb-nav-lb { width:auto; max-width:100%; white-space:nowrap; font-size:8px; letter-spacing:.15px; }
+    .wb-homebtn { padding-left:2px; padding-right:2px; box-sizing:border-box; }
+    .wb-homebtn .wb-nav-lb { white-space:nowrap; }
+    /* Pantallas chicas (~320-380px): menos margen, títulos proporcionales */
+    @media (max-width:380px){
+      .wb-phone { padding:20px 14px 32px; }
+      .wb-dtitle { font-size:21px; }
+      .wb-pills-grid { gap:8px; }
+      .wb-pills-grid .wb-pill { padding:7px 10px; }
+      .wb-pills-grid .wb-pill-lb { font-size:10px; letter-spacing:.4px; }
+      .wb-logo { height:88px; }
+    }
+    /* Pantallas grandes (escritorio/tablet): el libro se ve como una tarjeta centrada */
+    @media (min-width:620px){
+      #welcomeBookScreen.active { padding:24px 0; }
+      .wb-phone {
+        max-width:460px; min-height:auto; border-radius:26px;
+        box-shadow:0 18px 60px rgba(90,70,40,.18); background:rgba(255,255,255,.28);
+        overflow:hidden;
+      }
+    }
   </style>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
