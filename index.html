@@ -1973,6 +1973,7 @@
     .bk-note { font-size:10.5px; color:#8a7a5f; text-align:center; margin-top:9px; }
     .bk-foot { text-align:center; font-size:11px; color:#a89878; margin-top:18px; letter-spacing:.3px; }
     @media (max-width:380px){ .bk-hero { height:210px; } .bk-hero-name { font-size:30px; } .bk-body { padding-left:14px; padding-right:14px; } }
+    .bk-disclaimer { font-size:11px; color:#9a8a6c; text-align:center; margin:-6px 0 14px; padding:8px 12px; background:rgba(255,253,248,.6); border:1px dashed rgba(120,95,50,.22); border-radius:12px; line-height:1.4; }
   </style>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -6454,9 +6455,12 @@
         bkCard += '<div style="font-size:12px;color:var(--text2);margin-bottom:10px;">Comparte este link para que los huéspedes reserven directo</div>';
         bkCard += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">';
         bkCard += '<button class="form-button" onclick="copyBookingLink()" style="font-size:12px;padding:10px;">📋 Copiar Link</button>';
-        bkCard += '<button class="form-button secondary" onclick="showBookingQR()" style="font-size:12px;padding:10px;">📱 Ver QR</button>';
+        bkCard += '<button class="form-button secondary" onclick="previewBookingLink()" style="font-size:12px;padding:10px;">👁️ Vista previa</button>';
         bkCard += '</div>';
-        bkCard += '<button class="form-button" onclick="shareBookingLinkWhatsApp()" style="width:100%;background:#25D366;color:white;font-size:12px;padding:10px;">📲 Enviar por WhatsApp</button>';
+        bkCard += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">';
+        bkCard += '<button class="form-button secondary" onclick="showBookingQR()" style="font-size:12px;padding:10px;">📱 Ver QR</button>';
+        bkCard += '<button class="form-button" onclick="shareBookingLinkWhatsApp()" style="background:#25D366;color:white;font-size:12px;padding:10px;">📲 WhatsApp</button>';
+        bkCard += '</div>';
         bkCard += '</div></div>';
         document.getElementById('dashboardBookingCard').innerHTML = bkCard;
       }
@@ -15753,23 +15757,46 @@
     // misma lógica (showBookingMode carga datos → estas funciones pintan).
     // Al declararse al final del script, sobreescriben las versiones previas.
     // ============================================================
-    function _bkRoomPhoto(tipo) {
-      var g;
-      try { g = getGuestGuide(); } catch (e) { g = null; }
+    // Varias fotos por tipo (pool) → cada habitación muestra una distinta y consistente
+    var _BK_ASSETS = 'https://raw.githubusercontent.com/mozzafiatoamor-rgb/casa_regina_app/main/assets/';
+    var _BK_PHOTO_POOL = {
+      doble: [
+        _BK_ASSETS + 'habitacion-doble-matrimonial.jpg',
+        _BK_ASSETS + 'habitacion-doble-matrimonial-2.jpg',
+        _BK_ASSETS + 'habitacion-doble-matrimonial-3.jpg',
+        _BK_ASSETS + 'habitacion-doble-matrimonial-4.jpg'
+      ],
+      queen: [
+        _BK_ASSETS + 'habitacion-queen-size.jpg'
+      ]
+    };
+    function _bkHash(s) { s = String(s); var h = 5381, i; for (i = 0; i < s.length; i++) { h = ((h * 33) ^ s.charCodeAt(i)) >>> 0; } return h; }
+    // Elige foto por tipo y (opcional) número de habitación: varía entre habitaciones del mismo tipo
+    function _bkRoomPhoto(tipo, roomNum) {
+      var t = String(tipo || '').toLowerCase();
+      var pool = null;
+      if (/queen/.test(t)) pool = _BK_PHOTO_POOL.queen;
+      else if (/doble|matrimon|matri|king|twin|sencill/.test(t)) pool = _BK_PHOTO_POOL.doble;
+      if (pool && pool.length) {
+        if (pool.length === 1) return pool[0];
+        var idx = (roomNum != null && roomNum !== '') ? (_bkHash(roomNum) % pool.length) : 0;
+        return pool[idx];
+      }
+      // Fallback: foto única de la guía del huésped
+      var g; try { g = getGuestGuide(); } catch (e) { g = null; }
       var rp = (g && g.roomPhotos) ? g.roomPhotos : {};
       if (rp[tipo]) return rp[tipo];
-      var t = String(tipo || '').toLowerCase();
-      var keys = Object.keys(rp);
-      var i;
+      var keys = Object.keys(rp), i;
       for (i = 0; i < keys.length; i++) {
         var k = keys[i].toLowerCase();
         if (k && rp[keys[i]] && (t.indexOf(k) !== -1 || k.indexOf(t) !== -1)) return rp[keys[i]];
       }
-      // Heurística por palabra clave (por si el tipo en Config no coincide exacto)
-      function findBy(re) { for (var j = 0; j < keys.length; j++) { if (re.test(keys[j].toLowerCase()) && rp[keys[j]]) return rp[keys[j]]; } return ''; }
-      if (/queen/.test(t)) { var q = findBy(/queen/); if (q) return q; }
-      if (/matrimon|king/.test(t)) { var d = findBy(/matrimon/); if (d) return d; }
       return '';
+    }
+
+    // Abre el enlace público de reservas en una pestaña nueva (vista previa para el staff)
+    function previewBookingLink() {
+      try { var l = getBookingLink(); window.open(l, '_blank'); } catch (e) { toast('No se pudo abrir la vista previa', true); }
     }
 
     function renderBookingDatePicker() {
@@ -15838,9 +15865,10 @@
         h += '</div>';
       } else {
         h += '<div class="bk-avail">' + available.length + ' habitación(es) disponible(s) · ' + nights + ' noche(s)</div>';
+        h += '<div class="bk-disclaimer">📷 Las imágenes son de referencia; la habitación asignada puede variar del cuarto real.</div>';
         available.forEach(function (room) {
           var total = room.tarifa * nights;
-          var photo = _bkRoomPhoto(room.tipo);
+          var photo = _bkRoomPhoto(room.tipo, room.numero);
           var isSel = _bookingSelected === room.numero;
           h += '<div class="bk-room' + (isSel ? ' sel' : '') + '" id="bookRoom_' + room.numero + '">';
           if (photo) {
