@@ -1837,6 +1837,25 @@
     .wb-rail-badge { position:absolute; top:-3px; right:-3px; background:#b1893f; color:#fff; font-size:9px; font-weight:800; min-width:16px; height:16px; line-height:16px; text-align:center; border-radius:8px; padding:0 3px; box-shadow:0 1px 3px rgba(0,0,0,.25); }
     .wb-detail-content { flex:1; min-width:0; }
     .wb-detail-content .wb-dtitle { font-size:24px; margin-bottom:14px; }
+    /* Welcome Book — inicio en 2 columnas (píldoras compactas) */
+    .wb-pills-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:6px; }
+    .wb-pills-grid .wb-pill { margin-bottom:0; padding:8px 12px; border-radius:32px; }
+    .wb-pills-grid .wb-pill-ic { width:38px; height:38px; }
+    .wb-pills-grid .wb-pill-ic svg { width:20px; height:20px; }
+    .wb-pills-grid .wb-pill-lb { padding-right:0; text-align:left; font-size:10.5px; letter-spacing:.7px; line-height:1.15; }
+    /* Encabezado compacto en páginas (conserva el logo) */
+    .wb-head-min { margin-bottom:12px; }
+    .wb-logo-min { height:48px; width:auto; object-fit:contain; margin:0 auto 6px; display:block; }
+    .wb-head-min .wb-flags { margin-top:8px; }
+    /* Barra de íconos deslizable arriba (navegación en páginas) */
+    .wb-navbar { display:flex; gap:8px; overflow-x:auto; padding:8px 2px 12px; margin-bottom:6px; position:sticky; top:0; z-index:6; -webkit-overflow-scrolling:touch; scrollbar-width:none; background:linear-gradient(180deg, rgba(236,229,217,.98) 55%, rgba(236,229,217,0)); }
+    .wb-navbar::-webkit-scrollbar { display:none; }
+    .wb-nav-ic { position:relative; flex:0 0 auto; width:46px; height:46px; border-radius:50%; border:1px solid rgba(120,95,50,.28); background:rgba(255,255,255,.94); display:flex; align-items:center; justify-content:center; color:#6a5a3f; cursor:pointer; box-shadow:0 2px 6px rgba(120,95,50,.1); transition:transform .12s, background .15s, color .15s; -webkit-tap-highlight-color:transparent; }
+    .wb-nav-ic svg { width:22px; height:22px; }
+    .wb-nav-ic:active { transform:scale(.92); }
+    .wb-nav-ic.active { background:linear-gradient(180deg,#c9a765,#b1893f); color:#fff; border-color:#b1893f; box-shadow:0 3px 9px rgba(150,110,40,.3); }
+    .wb-nav-home { background:linear-gradient(180deg,#fffdf8,#f1e6d0); color:#a9843f; }
+    .wb-nav-badge { position:absolute; top:-3px; right:-3px; background:#b1893f; color:#fff; font-size:9px; font-weight:800; min-width:16px; height:16px; line-height:16px; text-align:center; border-radius:8px; padding:0 3px; box-shadow:0 1px 3px rgba(0,0,0,.25); }
   </style>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3960,12 +3979,20 @@
       }).join('');
 
       var logo = (typeof LOGO_V_DARK !== 'undefined' && LOGO_V_DARK) ? LOGO_V_DARK : '';
-      var head = '<div class="wb-head">';
-      if (logo) head += '<img class="wb-logo" src="' + logo + '" alt="' + _wbEsc(hi.nombre || '') + '" onerror="this.style.display=\'none\'">';
-      head += '<div class="wb-title">' + _wbEsc(_wbLabel('wbTitle')) + '</div>';
-      head += '<div class="wb-tagline">' + _wbEsc(_wbLabel('wbTagline')) + '</div>';
-      head += '<div class="wb-flags">' + flags + '</div>';
-      head += '</div>';
+      var head;
+      if (!_wbView) {
+        head = '<div class="wb-head">';
+        if (logo) head += '<img class="wb-logo" src="' + logo + '" alt="' + _wbEsc(hi.nombre || '') + '" onerror="this.style.display=\'none\'">';
+        head += '<div class="wb-title">' + _wbEsc(_wbLabel('wbTitle')) + '</div>';
+        head += '<div class="wb-tagline">' + _wbEsc(_wbLabel('wbTagline')) + '</div>';
+        head += '<div class="wb-flags">' + flags + '</div>';
+        head += '</div>';
+      } else {
+        head = '<div class="wb-head wb-head-min">';
+        if (logo) head += '<img class="wb-logo-min" src="' + logo + '" alt="' + _wbEsc(hi.nombre || '') + '" onerror="this.style.display=\'none\'">';
+        head += '<div class="wb-flags">' + flags + '</div>';
+        head += '</div>';
+      }
 
       // Banner personal (modo por-huésped)
       var guestBanner = '';
@@ -3983,24 +4010,29 @@
                  '<span class="wb-pill-ic">' + (WB_ICONS[key] || '') + '</span>' +
                  '<span class="wb-pill-lb">' + _wbEsc(_wbLabel(key)) + '</span>' + badge + '</button>';
         }).join('');
-        body = guestBanner + '<div class="wb-pills">' + pillsInner + '</div>';
+        body = guestBanner + '<div class="wb-pills wb-pills-grid">' + pillsInner + '</div>';
       } else {
-        // Vista de detalle: columna de íconos a la izquierda (navegación rápida) + contenido
-        var railHome = '<button class="wb-rail-ic wb-rail-home" onclick="wbHome()" aria-label="' + _wbEsc(_wbLabel('menu')) + '"><span class="wb-rail-circ">' + WB_HOME_ICON + '</span><span class="wb-rail-lb">' + _wbEsc(_wbLabel('menu')) + '</span></button>';
-        var rail = _wbActiveTiles().map(function(key) {
+        // Vista de detalle: barra de íconos deslizable ARRIBA (navegación rápida) + contenido
+        var navHome = '<button class="wb-nav-ic wb-nav-home" onclick="wbHome()" aria-label="' + _wbEsc(_wbLabel('menu')) + '">' + WB_HOME_ICON + '</button>';
+        var navbar = _wbActiveTiles().map(function(key) {
           var act = key === _wbView ? ' active' : '';
-          var bdg = (key === 'desayuno' && _wbBreakfast.length) ? '<span class="wb-rail-badge">' + _wbBreakfast.length + '</span>' : '';
-          return '<button class="wb-rail-ic' + act + '" onclick="wbOpen(\'' + key + '\')" aria-label="' + _wbEsc(_wbLabel(key)) + '"><span class="wb-rail-circ">' + bdg + (WB_ICONS[key] || '') + '</span><span class="wb-rail-lb">' + _wbEsc(_wbLabel(key)) + '</span></button>';
+          var bdg = (key === 'desayuno' && _wbBreakfast.length) ? '<span class="wb-nav-badge">' + _wbBreakfast.length + '</span>' : '';
+          return '<button class="wb-nav-ic' + act + '" onclick="wbOpen(\'' + key + '\')" aria-label="' + _wbEsc(_wbLabel(key)) + '">' + bdg + (WB_ICONS[key] || '') + '</button>';
         }).join('');
         var content = '<h2 class="wb-dtitle"><span class="wb-dic">' + (WB_ICONS[_wbView] || '') + '</span>' + _wbEsc(_wbLabel(_wbView)) + '</h2>' + _wbSection(_wbView, g, hi);
-        body = '<div class="wb-detail-wrap"><div class="wb-rail">' + railHome + rail + '</div><div class="wb-detail-content wb-detail">' + content + '</div></div>';
+        body = '<div class="wb-navbar">' + navHome + navbar + '</div><div class="wb-detail">' + content + '</div>';
       }
 
       var foot = '<div class="wb-foot">';
       if (logo) foot += '<img class="wb-foot-logo" src="' + logo + '" alt="' + _wbEsc(hi.nombre || '') + '" onerror="this.parentNode.style.display=\'none\'">';
       foot += '</div>';
-      var bg = (!_wbView && g.heroPhoto) ? '<div class="wb-bg" style="background-image:linear-gradient(rgba(249,244,235,.34),rgba(249,244,235,.56)),url(\'' + _wbEsc(g.heroPhoto) + '\')"></div>' : '';
+      var bg = (!_wbView && g.heroPhoto) ? '<div class="wb-bg" style="background-image:linear-gradient(rgba(248,243,233,.72) 0%, rgba(248,243,233,.34) 26%, rgba(248,243,233,.5) 100%),url(\'' + _wbEsc(g.heroPhoto) + '\')"></div>' : '';
       scr.innerHTML = bg + '<div class="wb-phone">' + head + body + foot + '</div>';
+      if (_wbView) {
+        var _av = scr.querySelector('.wb-nav-ic.active');
+        if (_av && _av.scrollIntoView) { try { _av.scrollIntoView({ inline: 'center', block: 'nearest' }); } catch (e) {} }
+        scr.scrollTop = 0;
+      }
     }
 
     function _wbCard(inner) { return '<div class="wb-card">' + inner + '</div>'; }
