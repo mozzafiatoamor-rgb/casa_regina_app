@@ -7392,7 +7392,8 @@
         var lineBfAhorro = 0;
         if (incluyeDesayuno && bfPrecio > 0) {
           var rule = (promo.rules || []).find(function(r) { return r.tipo === rm.tipo; });
-          lineBfPersonas = rule ? rule.personas : 2;
+          var bfCap = rule ? rule.personas : (rm.huespedesPorHab || 2);
+          lineBfPersonas = Math.min(rm.huespedesPorHab || bfCap, bfCap);
           lineBfAhorro = lineBfPersonas * rm.cantidad * bfPrecio * nights;
           bfAhorroTotal += lineBfAhorro;
         }
@@ -8007,7 +8008,8 @@
         var lineBfPersonas = 0, lineBfAhorro = 0;
         if (cot.opciones.incluyeDesayuno && bfPrecio > 0) {
           var rule = (promo.rules || []).find(function(r) { return r.tipo === rm.tipo; });
-          lineBfPersonas = rule ? rule.personas : 2;
+          var bfCap = rule ? rule.personas : (rm.huespedesPorHab || 2);
+          lineBfPersonas = Math.min(rm.huespedesPorHab || bfCap, bfCap);
           lineBfAhorro = lineBfPersonas * rm.cantidad * bfPrecio * nights;
           bfAhorroTotal += lineBfAhorro;
         }
