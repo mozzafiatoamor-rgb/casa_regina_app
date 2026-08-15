@@ -1886,6 +1886,24 @@
     .wb-navhint { position:absolute; right:8px; top:22px; font-size:10px; font-weight:800; letter-spacing:.4px; text-transform:uppercase; color:#a9843f; pointer-events:none; animation:wbHintPulse 1.5s ease-in-out infinite, wbHintGone .6s ease 6s forwards; }
     @keyframes wbHintPulse { 0%,100%{transform:translateX(0);opacity:.95;} 50%{transform:translateX(3px);opacity:.55;} }
     @keyframes wbHintGone { to { opacity:0; visibility:hidden; } }
+    /* FIX portada: fondo se desplaza con la página (no fijo → no brinca) */
+    .wb-bg { position:absolute; top:0; left:0; right:0; bottom:auto; height:680px; background-size:cover; background-position:center top; background-repeat:no-repeat; z-index:0; }
+    .wb-head, .wb-pills, .wb-guest, .wb-foot { position:relative; z-index:1; }
+    /* Menú separado en la esquina superior izquierda (no encima de los demás) */
+    .wb-navbar { padding-left:64px; }
+    .wb-homebtn { position:absolute; left:2px; top:8px; z-index:5; display:flex; flex-direction:column; align-items:center; gap:4px; width:58px; background:none; border:none; padding:0; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+    .wb-homebtn .wb-nav-circ { width:46px; height:46px; border-radius:50%; background:linear-gradient(180deg,#3d3324,#2a2318); color:#f1e6d0; border:1px solid #3d3324; box-shadow:0 3px 9px rgba(0,0,0,.28); display:flex; align-items:center; justify-content:center; }
+    .wb-homebtn .wb-nav-circ svg { width:22px; height:22px; }
+    .wb-homebtn .wb-nav-lb { font-size:8.5px; font-weight:800; text-transform:uppercase; letter-spacing:.2px; color:#3d3324; }
+    /* Íconos de la barra: círculos parejos y limpios */
+    .wb-nav-circ { flex-shrink:0; box-sizing:border-box; }
+    .wb-nav-ic { background:none !important; border:none !important; }
+    /* Menú fijo como columna flex (no absoluto → nunca se encima con los íconos) */
+    .wb-navwrap { display:flex; align-items:flex-start; gap:6px; }
+    .wb-homebtn { position:static; flex:0 0 auto; padding-top:8px; }
+    .wb-navstrip { position:relative; flex:1 1 auto; min-width:0; }
+    .wb-navbar { padding-left:2px; }
+    .wb-navstrip .wb-navfade { height:calc(100% - 6px); }
   </style>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -4044,21 +4062,21 @@
         body = guestBanner + '<div class="wb-pills wb-pills-grid">' + pillsInner + '</div>';
       } else {
         // Vista de detalle: barra de íconos deslizable ARRIBA (navegación rápida) + contenido
-        var navHome = '<button class="wb-nav-ic wb-nav-home" onclick="wbHome()" aria-label="' + _wbEsc(_wbLabel('menu')) + '"><span class="wb-nav-circ">' + WB_HOME_ICON + '</span><span class="wb-nav-lb">' + _wbEsc(_wbLabel('menu')) + '</span></button>';
+        var homeBtn = '<button class="wb-homebtn" onclick="wbHome()" aria-label="' + _wbEsc(_wbLabel('menu')) + '"><span class="wb-nav-circ">' + WB_HOME_ICON + '</span><span class="wb-nav-lb">' + _wbEsc(_wbLabel('menu')) + '</span></button>';
         var navbar = _wbActiveTiles().map(function(key) {
           var act = key === _wbView ? ' active' : '';
           var bdg = (key === 'desayuno' && _wbBreakfast.length) ? '<span class="wb-nav-badge">' + _wbBreakfast.length + '</span>' : '';
           return '<button class="wb-nav-ic' + act + '" onclick="wbOpen(\'' + key + '\')" aria-label="' + _wbEsc(_wbLabel(key)) + '"><span class="wb-nav-circ">' + bdg + (WB_ICONS[key] || '') + '</span><span class="wb-nav-lb">' + _wbEsc(_wbLabel(key)) + '</span></button>';
         }).join('');
         var content = '<h2 class="wb-dtitle"><span class="wb-dic">' + (WB_ICONS[_wbView] || '') + '</span>' + _wbEsc(_wbLabel(_wbView)) + '</h2>' + _wbSection(_wbView, g, hi);
-        body = '<div class="wb-navwrap"><div class="wb-navbar">' + navHome + navbar + '</div><div class="wb-navfade"></div><span class="wb-navhint">' + _wbEsc(_wbLabel('swipeHint')) + ' ›</span></div><div class="wb-detail">' + content + '</div>';
+        body = '<div class="wb-navwrap">' + homeBtn + '<div class="wb-navstrip"><div class="wb-navbar">' + navbar + '</div><div class="wb-navfade"></div><span class="wb-navhint">' + _wbEsc(_wbLabel('swipeHint')) + ' ›</span></div></div><div class="wb-detail">' + content + '</div>';
       }
 
       var foot = '<div class="wb-foot">';
       if (logo) foot += '<img class="wb-foot-logo" src="' + logo + '" alt="' + _wbEsc(hi.nombre || '') + '" onerror="this.parentNode.style.display=\'none\'">';
       foot += '</div>';
-      var bg = (!_wbView && g.heroPhoto) ? '<div class="wb-bg" style="background-image:linear-gradient(rgba(248,243,233,.44),rgba(248,243,233,.54)),url(\'' + _wbEsc(g.heroPhoto) + '\')"></div>' : '';
-      scr.innerHTML = bg + '<div class="wb-phone">' + head + body + foot + '</div>';
+      var bg = (!_wbView && g.heroPhoto) ? '<div class="wb-bg" style="background-image:linear-gradient(rgba(248,243,233,.40) 0%, rgba(248,243,233,.40) 44%, rgba(233,226,214,.78) 84%, #e9e2d6 100%),url(\'' + _wbEsc(g.heroPhoto) + '\')"></div>' : '';
+      scr.innerHTML = '<div class="wb-phone">' + bg + head + body + foot + '</div>';
       if (_wbView) {
         var _av = scr.querySelector('.wb-nav-ic.active');
         if (_av && _av.scrollIntoView) { try { _av.scrollIntoView({ inline: 'center', block: 'nearest' }); } catch (e) {} }
