@@ -1936,6 +1936,43 @@
     }
     /* FIX: quitar la sombra rectangular del botón (dejaba un "cuadrado" detrás del ícono redondo) */
     .wb-nav-ic, .wb-nav-ic.active { box-shadow:none !important; }
+    /* ============ RESERVAS ONLINE — diseño estilo Welcome Book ============ */
+    #guestScreen.bk-mode { padding:0 !important; align-items:flex-start; background:#e9e2d6; background-image:radial-gradient(circle at 20% 0%, #f3ecdf 0%, #e6ddce 55%, #ddd2bf 100%); font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; color:#4a3f2f; }
+    #guestScreen.bk-mode #guestFormContainer { max-width:480px !important; width:100%; padding:0 !important; }
+    .bk-wrap { position:relative; padding-bottom:36px; overflow-x:hidden; }
+    .bk-hero { position:relative; height:248px; background-size:cover; background-position:center; }
+    .bk-hero::after { content:''; position:absolute; inset:0; background:linear-gradient(180deg, rgba(40,30,15,.18) 0%, rgba(40,30,15,.04) 38%, rgba(233,226,214,.72) 82%, #e9e2d6 100%); }
+    .bk-hero-in { position:absolute; left:0; right:0; bottom:20px; z-index:1; text-align:center; padding:0 22px; }
+    .bk-hero-name { font-family:'Cormorant Garamond',Georgia,serif; font-size:36px; font-weight:700; color:#fffef9; line-height:1.04; margin:0; text-shadow:0 2px 14px rgba(50,35,10,.45); }
+    .bk-hero-tag { font-size:11px; font-weight:800; letter-spacing:2.4px; text-transform:uppercase; color:#f4e7c9; margin-top:8px; text-shadow:0 1px 8px rgba(50,35,10,.5); }
+    .bk-body { padding:2px 18px 0; margin-top:-2px; position:relative; z-index:2; }
+    .bk-card { background:rgba(255,253,248,.94); border:1px solid rgba(120,95,50,.12); border-radius:20px; padding:16px; margin-bottom:16px; box-shadow:0 6px 20px rgba(120,95,50,.07); }
+    .bk-eyebrow { font-size:10.5px; font-weight:800; letter-spacing:1.5px; text-transform:uppercase; color:#a9843f; margin-bottom:12px; }
+    .bk-field { margin-bottom:12px; }
+    .bk-field label { display:block; font-size:11.5px; font-weight:600; color:#8a7a5f; margin-bottom:5px; }
+    .bk-input, .bk-select { width:100%; box-sizing:border-box; border:1px solid rgba(120,95,50,.25); background:#fff; border-radius:12px; padding:12px; font-size:15px; color:#4a3f2f; font-family:inherit; -webkit-appearance:none; appearance:none; }
+    .bk-select { background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23a9843f' d='M6 8 0 0h12z'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 14px center; padding-right:32px; }
+    .bk-input:focus, .bk-select:focus { outline:none; border-color:#b1893f; box-shadow:0 0 0 3px rgba(177,137,63,.15); }
+    .bk-grid2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .bk-btn { width:100%; box-sizing:border-box; border:none; border-radius:14px; padding:14px; font-size:15px; font-weight:800; letter-spacing:.3px; color:#fff; background:linear-gradient(180deg,#c9a765,#b1893f); box-shadow:0 6px 16px rgba(150,110,40,.28); cursor:pointer; font-family:inherit; -webkit-tap-highlight-color:transparent; transition:transform .12s; }
+    .bk-btn:active { transform:scale(.98); }
+    .bk-avail { text-align:center; font-size:12px; color:#8a7a5f; margin:2px 0 14px; font-weight:700; }
+    .bk-room { background:rgba(255,253,248,.97); border:1.5px solid rgba(120,95,50,.12); border-radius:20px; overflow:hidden; margin-bottom:16px; box-shadow:0 6px 20px rgba(120,95,50,.09); transition:border-color .2s, box-shadow .2s, transform .15s; }
+    .bk-room.sel { border-color:#b1893f; box-shadow:0 10px 28px rgba(150,110,40,.26); }
+    .bk-room-photo { height:184px; background-size:cover; background-position:center; background-color:#e6ddce; position:relative; }
+    .bk-room-noimg { display:flex; align-items:center; justify-content:center; }
+    .bk-room-badge { position:absolute; top:12px; right:12px; background:rgba(61,51,36,.82); color:#f4e7c9; font-size:11px; font-weight:700; padding:5px 12px; border-radius:20px; }
+    .bk-room-body { padding:14px 16px 16px; }
+    .bk-room-type { font-family:'Cormorant Garamond',Georgia,serif; font-size:24px; font-weight:700; color:#3d3324; line-height:1.1; margin-bottom:2px; }
+    .bk-room-notas { font-size:12px; color:#8a7a5f; margin:4px 0 4px; }
+    .bk-room-foot { display:flex; align-items:flex-end; justify-content:space-between; gap:10px; border-top:1px solid rgba(120,95,50,.12); padding-top:12px; margin-top:10px; }
+    .bk-price { font-family:'Cormorant Garamond',serif; font-size:27px; font-weight:700; color:#b1893f; line-height:1; }
+    .bk-price small { font-size:11px; color:#8a7a5f; font-weight:600; font-family:'Inter',sans-serif; }
+    .bk-total { font-size:11.5px; color:#5f7d3a; font-weight:700; margin-top:4px; }
+    .bk-sel-banner { background:linear-gradient(135deg,#c9a765,#b1893f); color:#fff; border-radius:16px; padding:14px; text-align:center; margin-bottom:14px; box-shadow:0 6px 16px rgba(150,110,40,.22); }
+    .bk-note { font-size:10.5px; color:#8a7a5f; text-align:center; margin-top:9px; }
+    .bk-foot { text-align:center; font-size:11px; color:#a89878; margin-top:18px; letter-spacing:.3px; }
+    @media (max-width:380px){ .bk-hero { height:210px; } .bk-hero-name { font-size:30px; } .bk-body { padding-left:14px; padding-right:14px; } }
   </style>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3508,6 +3545,14 @@
         } else {
           showLoginScreen();
         }
+      } else if (guestBooking || guestGuia || guestValidar || guestRegId) {
+        // Enlace público pero sin poder resolver el scriptUrl (link incompleto/copiado a medias)
+        document.getElementById('setupScreen').classList.remove('active');
+        document.getElementById('loginScreen').classList.remove('active');
+        document.getElementById('appContainer').classList.add('hidden');
+        document.getElementById('guestScreen').classList.add('active');
+        var _gcw = document.getElementById('guestFormContainer');
+        if (_gcw) _gcw.innerHTML = '<div style="max-width:420px;margin:60px auto;text-align:center;padding:0 24px;font-family:Inter,sans-serif;color:#4a3f2f;"><div style="font-size:40px;">\ud83d\udd17</div><div style="font-family:Cormorant Garamond,serif;font-size:26px;font-weight:700;margin:8px 0;">Enlace incompleto</div><div style="font-size:13px;color:#8a7a5f;line-height:1.5;">Parece que el enlace se copi\u00f3 incompleto. Vuelve a abrir el enlace completo de reservaciones, o escr\u00edbenos por WhatsApp y con gusto te ayudamos.</div></div>';
       } else {
         showSetup();
       }
@@ -15700,6 +15745,213 @@
       } else {
         toast('Abre el menú del navegador y selecciona "Instalar app"');
       }
+    }
+
+    // ============================================================
+    // RESERVAS ONLINE · Rediseño estilo Welcome Book (aditivo)
+    // Redefine el render del flujo público de reservas manteniendo la
+    // misma lógica (showBookingMode carga datos → estas funciones pintan).
+    // Al declararse al final del script, sobreescriben las versiones previas.
+    // ============================================================
+    function _bkRoomPhoto(tipo) {
+      var g;
+      try { g = getGuestGuide(); } catch (e) { g = null; }
+      var rp = (g && g.roomPhotos) ? g.roomPhotos : {};
+      if (rp[tipo]) return rp[tipo];
+      var t = String(tipo || '').toLowerCase();
+      var keys = Object.keys(rp);
+      var i;
+      for (i = 0; i < keys.length; i++) {
+        var k = keys[i].toLowerCase();
+        if (k && rp[keys[i]] && (t.indexOf(k) !== -1 || k.indexOf(t) !== -1)) return rp[keys[i]];
+      }
+      // Heurística por palabra clave (por si el tipo en Config no coincide exacto)
+      function findBy(re) { for (var j = 0; j < keys.length; j++) { if (re.test(keys[j].toLowerCase()) && rp[keys[j]]) return rp[keys[j]]; } return ''; }
+      if (/queen/.test(t)) { var q = findBy(/queen/); if (q) return q; }
+      if (/matrimon|king/.test(t)) { var d = findBy(/matrimon/); if (d) return d; }
+      return '';
+    }
+
+    function renderBookingDatePicker() {
+      var scr = document.getElementById('guestScreen');
+      if (scr) scr.classList.add('bk-mode');
+      var g = {}; try { g = getGuestGuide(); } catch (e) {}
+      var hi = {}; try { hi = getHotelInfo(); } catch (e) {}
+      var hotelName = (hi && hi.nombre) ? hi.nombre : (typeof HOTEL_NAME !== 'undefined' ? HOTEL_NAME : 'Casa Regina');
+      var minDate = normDate(new Date());
+      var tmw = new Date(); tmw.setDate(tmw.getDate() + 1);
+      var minCheckout = normDate(tmw);
+      var heroStyle = (g && g.heroPhoto) ? ("background-image:url('" + _wbEsc(g.heroPhoto) + "')") : 'background:linear-gradient(135deg,#c9a765,#8a6d3a)';
+
+      var h = '<div class="bk-wrap">';
+      h += '<div class="bk-hero" style="' + heroStyle + '"><div class="bk-hero-in">';
+      h += '<h1 class="bk-hero-name">' + _wbEsc(hotelName) + '</h1>';
+      h += '<div class="bk-hero-tag">Reserva tu estancia</div>';
+      h += '</div></div>';
+
+      h += '<div class="bk-body">';
+      h += '<div class="bk-card">';
+      h += '<div class="bk-eyebrow">Elige tus fechas</div>';
+      h += '<div class="bk-grid2">';
+      h += '<div class="bk-field"><label>Entrada</label><input type="date" id="b_checkin" class="bk-input" min="' + minDate + '" value="' + minDate + '" onchange="updateBookingCheckout();searchAvailableRooms()"></div>';
+      h += '<div class="bk-field"><label>Salida</label><input type="date" id="b_checkout" class="bk-input" min="' + minCheckout + '" value="' + minCheckout + '" onchange="searchAvailableRooms()"></div>';
+      h += '</div>';
+      h += '<div class="bk-grid2">';
+      h += '<div class="bk-field"><label>Adultos</label><select id="b_adultos" class="bk-select"><option>1</option><option selected>2</option><option>3</option><option>4</option></select></div>';
+      h += '<div class="bk-field"><label>Niños</label><select id="b_ninos" class="bk-select"><option selected>0</option><option>1</option><option>2</option><option>3</option></select></div>';
+      h += '</div>';
+      h += '<button class="bk-btn" onclick="searchAvailableRooms()">Ver habitaciones disponibles</button>';
+      h += '</div>';
+
+      h += '<div id="bookingRoomsContainer"></div>';
+      h += '<div class="bk-foot">' + _wbEsc(hotelName) + ' · Hotel Boutique</div>';
+      h += '</div></div>';
+
+      document.getElementById('guestFormContainer').innerHTML = h;
+      searchAvailableRooms();
+    }
+
+    function searchAvailableRooms() {
+      var ciEl = document.getElementById('b_checkin');
+      var coEl = document.getElementById('b_checkout');
+      var container = document.getElementById('bookingRoomsContainer');
+      if (!ciEl || !coEl || !container) return;
+      var checkin = ciEl.value, checkout = coEl.value;
+      if (!checkin || !checkout || checkout <= checkin) {
+        container.innerHTML = '<div class="bk-card" style="text-align:center;color:#a05a4a;font-size:13px;">Selecciona fechas válidas (la salida debe ser posterior a la entrada).</div>';
+        return;
+      }
+      var nights = daysUntil(checkin, checkout);
+      var available = _bookingRooms.filter(function (room) {
+        var conflict = _bookingReservas.some(function (res) {
+          return res.habitacionNum === room.numero && res.fechaEntrada < checkout && res.fechaSalida > checkin;
+        });
+        return !conflict;
+      });
+
+      var h = '';
+      if (available.length === 0) {
+        h += '<div class="bk-card" style="text-align:center;">';
+        h += '<div style="font-size:40px;margin-bottom:6px;">🗓️</div>';
+        h += '<div style="font-family:\'Cormorant Garamond\',serif;font-size:22px;color:#3d3324;">Sin disponibilidad</div>';
+        h += '<div style="font-size:12.5px;color:#8a7a5f;margin-top:4px;">No hay habitaciones libres en esas fechas. Prueba con otras.</div>';
+        h += '</div>';
+      } else {
+        h += '<div class="bk-avail">' + available.length + ' habitación(es) disponible(s) · ' + nights + ' noche(s)</div>';
+        available.forEach(function (room) {
+          var total = room.tarifa * nights;
+          var photo = _bkRoomPhoto(room.tipo);
+          var isSel = _bookingSelected === room.numero;
+          h += '<div class="bk-room' + (isSel ? ' sel' : '') + '" id="bookRoom_' + room.numero + '">';
+          if (photo) {
+            h += '<div class="bk-room-photo" style="background-image:url(\'' + _wbEsc(photo) + '\')"><div class="bk-room-badge">Hab. ' + _wbEsc(room.numero) + '</div></div>';
+          } else {
+            h += '<div class="bk-room-photo bk-room-noimg"><span style="font-size:46px;opacity:.45;">🛏️</span><div class="bk-room-badge">Hab. ' + _wbEsc(room.numero) + '</div></div>';
+          }
+          h += '<div class="bk-room-body">';
+          h += '<div class="bk-room-type">' + _wbEsc(room.tipo) + '</div>';
+          if (room.notas) h += '<div class="bk-room-notas">' + _wbEsc(room.notas) + '</div>';
+          h += '<div class="bk-room-foot">';
+          h += '<div><div class="bk-price">$' + _fmt(room.tarifa) + ' <small>/ noche</small></div><div class="bk-total">Total ' + nights + ' noche(s): $' + _fmt(total) + '</div></div>';
+          h += '<button class="bk-btn" style="width:auto;padding:11px 22px;flex:0 0 auto;" onclick="selectBookingRoom(\'' + room.numero + '\')">Reservar</button>';
+          h += '</div>';
+          h += '</div></div>';
+        });
+      }
+      container.innerHTML = h;
+    }
+
+    function selectBookingRoom(roomNum) {
+      _bookingSelected = roomNum;
+      var rooms = document.querySelectorAll('.bk-room');
+      for (var i = 0; i < rooms.length; i++) rooms[i].classList.remove('sel');
+      var rel = document.getElementById('bookRoom_' + roomNum);
+      if (rel) rel.classList.add('sel');
+
+      var checkin = document.getElementById('b_checkin').value;
+      var checkout = document.getElementById('b_checkout').value;
+      var nights = daysUntil(checkin, checkout);
+      var room = _bookingRooms.find(function (r) { return r.numero === roomNum; });
+      var total = room.tarifa * nights;
+
+      var existing = document.getElementById('bookingGuestForm');
+      if (existing) existing.remove();
+
+      var h = '<div class="bk-card" id="bookingGuestForm">';
+      h += '<div class="bk-sel-banner">';
+      h += '<div style="font-size:11px;opacity:.9;letter-spacing:.5px;">SELECCIONASTE</div>';
+      h += '<div style="font-family:\'Cormorant Garamond\',serif;font-size:21px;font-weight:700;margin:2px 0;">' + _wbEsc(room.tipo) + ' · Hab. ' + _wbEsc(roomNum) + '</div>';
+      h += '<div style="font-size:12.5px;">' + formatDate(checkin) + ' → ' + formatDate(checkout) + ' · ' + nights + ' noche(s) · <strong>$' + _fmt(total) + '</strong></div>';
+      h += '</div>';
+      h += '<div class="bk-eyebrow">Tus datos</div>';
+      h += '<form onsubmit="submitBooking(event)">';
+      h += '<div class="bk-field"><label>Nombre completo *</label><input type="text" id="bk_nombre" class="bk-input" required></div>';
+      h += '<div class="bk-field"><label>Teléfono (WhatsApp) *</label><input type="tel" id="bk_telefono" class="bk-input" required></div>';
+      h += '<div class="bk-field"><label>Email</label><input type="email" id="bk_email" class="bk-input"></div>';
+      h += '<div class="bk-grid2">';
+      h += '<div class="bk-field"><label>Tipo de ID</label><select id="bk_tipoId" class="bk-select"><option value="INE">INE</option><option value="Pasaporte">Pasaporte</option><option value="Licencia">Licencia</option><option value="Otro">Otro</option></select></div>';
+      h += '<div class="bk-field"><label>Número de ID</label><input type="text" id="bk_numId" class="bk-input"></div>';
+      h += '</div>';
+      h += '<div class="bk-field"><label>Nacionalidad</label><input type="text" id="bk_nacionalidad" class="bk-input" placeholder="Ej: Mexicana"></div>';
+      h += '<div class="bk-field"><label>Observaciones / Peticiones especiales</label><textarea id="bk_observaciones" class="bk-input" rows="2" placeholder="Hora de llegada, alergias, etc." style="resize:vertical;"></textarea></div>';
+      h += '<button type="submit" class="bk-btn" id="bookingSubmitBtn">Solicitar reserva</button>';
+      h += '<div class="bk-note">Tu reserva quedará pendiente de confirmación por el hotel.</div>';
+      h += '</form></div>';
+
+      document.getElementById('bookingRoomsContainer').insertAdjacentHTML('beforeend', h);
+      var f = document.getElementById('bookingGuestForm');
+      if (f && f.scrollIntoView) f.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function showBookingConfirmation(nombre, telefono, room, roomNum, checkin, checkout, nights, total, resId) {
+      var hotelName = (typeof HOTEL_NAME !== 'undefined' ? HOTEL_NAME : 'Casa Regina');
+      var h = '<div class="bk-wrap"><div class="bk-body" style="padding-top:34px;">';
+      h += '<div style="text-align:center;margin-bottom:16px;">';
+      h += '<div style="font-size:56px;line-height:1;margin-bottom:8px;">🎉</div>';
+      h += '<h2 style="font-family:\'Cormorant Garamond\',serif;font-size:30px;font-weight:700;color:#3d3324;margin:0 0 4px;">¡Solicitud enviada!</h2>';
+      h += '<div style="font-size:13px;color:#8a7a5f;">Te confirmaremos por WhatsApp en breve.</div>';
+      h += '</div>';
+
+      h += '<div class="bk-card">';
+      h += '<div class="bk-eyebrow">Resumen de tu solicitud</div>';
+      h += '<div style="font-size:13.5px;line-height:1.8;color:#4a3f2f;">';
+      h += '👤 <strong>' + _wbEsc(nombre) + '</strong><br>';
+      h += '🛏️ Habitación <strong>' + _wbEsc(roomNum) + '</strong> · ' + _wbEsc(room.tipo) + '<br>';
+      h += '📅 ' + formatDate(checkin) + ' → ' + formatDate(checkout) + ' · ' + nights + ' noche(s)';
+      h += '</div>';
+      h += '<div style="font-family:\'Cormorant Garamond\',serif;font-size:26px;font-weight:700;color:#b1893f;margin-top:10px;">Total: $' + _fmt(total) + '</div>';
+      h += '<div style="font-size:11px;color:#a89878;margin-top:2px;">Ref: ' + _wbEsc(resId) + '</div>';
+      h += '</div>';
+
+      var waText = '🏨 *' + hotelName + '* — Solicitud de Reserva\n\n';
+      waText += '👤 ' + nombre + '\n';
+      waText += '🛏️ Habitación ' + roomNum + ' · ' + room.tipo + '\n';
+      waText += '📅 ' + formatDate(checkin) + ' → ' + formatDate(checkout) + ' (' + nights + ' noches)\n';
+      waText += '💰 Total: $' + _fmt(total) + '\n';
+      waText += '📋 Ref: ' + resId + '\n\n';
+      waText += '⏳ Reservada — pendiente de confirmación por el hotel.\n';
+      waText += '¡Gracias por elegir ' + hotelName + '! 🌟';
+      var cleanPhone = String(telefono).replace(/[^0-9]/g, '');
+      if (cleanPhone.length === 10) cleanPhone = '52' + cleanPhone;
+
+      h += '<a href="https://wa.me/' + cleanPhone + '?text=' + encodeURIComponent(waText) + '" target="_blank" rel="noopener" class="bk-btn" style="display:block;text-align:center;text-decoration:none;background:#25D366;box-shadow:0 6px 16px rgba(37,211,102,.28);margin-bottom:12px;">📲 Enviarme mi comprobante</a>';
+
+      var hotelWA = '';
+      try { hotelWA = getHotelWhatsApp() || ''; } catch (e) {}
+      if (hotelWA) {
+        var hotelPh = hotelWA.replace(/[^0-9]/g, '');
+        if (hotelPh.length === 10) hotelPh = '52' + hotelPh;
+        h += '<a href="https://wa.me/' + hotelPh + '?text=' + encodeURIComponent('Hola, acabo de hacer una solicitud de reserva (Ref: ' + resId + '). ') + '" target="_blank" rel="noopener" class="bk-btn" style="display:block;text-align:center;text-decoration:none;">💬 Contactar al hotel</a>';
+      }
+
+      h += '<div class="bk-foot">' + _wbEsc(hotelName) + ' · Hotel Boutique</div>';
+      h += '</div></div>';
+
+      var cont = document.getElementById('guestFormContainer');
+      cont.innerHTML = h;
+      cont.scrollTop = 0;
+      var gs = document.getElementById('guestScreen');
+      if (gs) { gs.scrollTop = 0; gs.classList.add('bk-mode'); }
     }
 
     // ============ INIT ============
