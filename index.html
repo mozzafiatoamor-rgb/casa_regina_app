@@ -1981,6 +1981,19 @@
     /* Frase bajo la portada (estilo del eslogan de la marca) */
     .bk-cta-title { font-family:'Cormorant Garamond',Georgia,serif; font-size:30px; font-weight:700; font-style:italic; color:#8a6d3a; text-align:center; margin:16px 4px 14px; line-height:1.12; letter-spacing:.3px; }
     @media (max-width:380px){ .bk-cta-title { font-size:26px; } }
+    /* FIX iPad/tablet: centrar horizontalmente (antes quedaba pegado a la izquierda) */
+    #guestScreen.bk-mode { align-items:center; }
+    /* Book — pantalla de despedida (post checkout) */
+    .wb-bye { max-width:440px; margin:0 auto; padding:30px 22px 40px; text-align:center; }
+    .wb-bye-hero { width:100%; border-radius:20px; overflow:hidden; margin-bottom:20px; box-shadow:0 10px 30px rgba(120,95,50,.15); }
+    .wb-bye-hero img { display:block; width:100%; height:auto; }
+    .wb-bye-title { font-family:'Cormorant Garamond',Georgia,serif; font-size:34px; font-weight:700; color:#3d3324; line-height:1.08; margin:6px 0 4px; }
+    .wb-bye-sub { font-size:14px; color:#6a5a3f; line-height:1.5; margin:0 4px 22px; }
+    .wb-bye-btn { display:block; text-decoration:none; text-align:center; box-sizing:border-box; width:100%; border-radius:14px; padding:14px; font-size:15px; font-weight:800; letter-spacing:.3px; margin-bottom:11px; cursor:pointer; border:none; font-family:'Inter',sans-serif; }
+    .wb-bye-btn.primary { color:#fff; background:linear-gradient(180deg,#c9a765,#b1893f); box-shadow:0 6px 16px rgba(150,110,40,.28); }
+    .wb-bye-btn.review { color:#fff; background:#e8a33d; box-shadow:0 6px 16px rgba(232,163,61,.28); }
+    .wb-bye-btn.wa { color:#fff; background:#25D366; box-shadow:0 6px 16px rgba(37,211,102,.24); }
+    .wb-bye-foot { font-size:11px; color:#a89878; margin-top:16px; }
   </style>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3525,6 +3538,11 @@
         }
       }
 
+      // Respaldo: si es un enlace de huésped y no se resolvió el scriptUrl, usar el grabado en la app
+      if ((guestRegId || guestBooking || guestValidar || guestGuia) && !S._publicMode && !(S.sheetId && S.apiKey) && typeof DEFAULT_SCRIPT_URL !== 'undefined' && DEFAULT_SCRIPT_URL) {
+        S.scriptUrl = DEFAULT_SCRIPT_URL; S._publicMode = true;
+      }
+
       if (guestRegId && (S._publicMode || (S.sheetId && S.apiKey))) {
         showGuestMode(guestRegId);
         return;
@@ -3773,7 +3791,7 @@
 
     function getGuestRegistrationLink(resId) {
       // Secure link: only scriptUrl (reads via Apps Script doGet, no API key exposed)
-      return window.location.origin + window.location.pathname + '?registro=' + resId + '&b=' + _b64u(S.scriptUrl);
+      return window.location.origin + window.location.pathname + '?registro=' + resId;
     }
 
     function copyGuestLink(resId) {
@@ -4003,6 +4021,7 @@
     var _wbRes = null;        // reserva cargada (modo por-huésped)
     var _wbBreakfast = [];    // códigos de desayuno del huésped
     var _wbAccess = '';       // código de acceso personal
+    var _wbEnded = false;     // la estancia ya terminó (checkout pasado / cancelada)
 
     function _wbBaseLang(g) { return (g.langs && g.langs[0]) || 'es'; }
     function _wbT(obj, g) {
@@ -4037,7 +4056,7 @@
       scr.classList.add('active');
       scr.innerHTML = '<div class="wb-loading">' + _wbLabel('loading') + '</div>';
 
-      _wbRes = null; _wbBreakfast = []; _wbAccess = '';
+      _wbRes = null; _wbBreakfast = []; _wbAccess = ''; _wbEnded = false;
       var pub = S._publicMode || (S.sheetId && S.apiKey);
       if (pub) {
         try {
@@ -4087,6 +4106,17 @@
           }
         } catch (e) { console.warn('WelcomeBook load error:', e.message); }
       }
+      // ¿La estancia ya terminó? (checkout pasado, o reserva completada/cancelada)
+      if (_wbRes) {
+        var _today = normDate(new Date());
+        var _st = String(_wbRes.estado || '').toLowerCase();
+        var _out = _wbRes.fechaSalida;
+        if ((_out && _out < _today) || _st === 'completada' || _st === 'cancelada' || _st === 'no show' || _st === 'no-show') {
+          _wbEnded = true;
+          _wbAccess = '';      // seguridad: ocultar el código de acceso tras el checkout
+          _wbBreakfast = [];   // ocultar QR de desayuno (ya no aplican)
+        }
+      }
       var g = getGuestGuide();
       _wbLang = (g.langs && g.langs[0]) || 'es';
       _wbView = null;
@@ -4111,10 +4141,47 @@
       return tiles;
     }
 
+    // Estancia terminada: pantalla de despedida (sin código de acceso ni datos personales)
+    var _WB_BYE = {
+      title:  { es:'¡Gracias por tu visita!', en:'Thank you for your visit!', fr:'Merci de votre visite !', it:'Grazie della visita!', de:'Danke für Ihren Besuch!' },
+      sub:    { es:'Esperamos que hayas disfrutado tu estancia con nosotros. Fue un placer recibirte y te esperamos muy pronto de vuelta.', en:'We hope you enjoyed your stay with us. It was a pleasure to host you and we hope to welcome you back soon.', fr:'Nous espérons que vous avez apprécié votre séjour. Ce fut un plaisir de vous accueillir et nous espérons vous revoir bientôt.', it:'Speriamo che il tuo soggiorno sia stato piacevole. È stato un piacere ospitarti e speriamo di rivederti presto.', de:'Wir hoffen, Ihr Aufenthalt hat Ihnen gefallen. Es war uns eine Freude und wir freuen uns auf Ihren nächsten Besuch.' },
+      bye:    { es:'Hasta pronto', en:'See you soon', fr:'À bientôt', it:'A presto', de:'Bis bald' },
+      rebook: { es:'Reservar de nuevo', en:'Book again', fr:'Réserver à nouveau', it:'Prenota di nuovo', de:'Erneut buchen' },
+      review: { es:'Déjanos tu reseña', en:'Leave us a review', fr:'Laissez-nous un avis', it:'Lascia una recensione', de:'Bewertung abgeben' },
+      contact:{ es:'Contáctanos', en:'Contact us', fr:'Contactez-nous', it:'Contattaci', de:'Kontakt' }
+    };
+    function _wbBye(k) { var o = _WB_BYE[k] || {}; return o[_wbLang] || o.es || ''; }
+    function _wbRenderFarewell(g, hi, scr) {
+      var name = (_wbRes && _wbRes.huesped) ? String(_wbRes.huesped).split(' ')[0] : '';
+      var img = (g.photos && g.photos.welcome) ? g.photos.welcome : (g.heroPhoto || '');
+      var review = '';
+      try { review = localStorage.getItem('reviewLink') || ''; } catch (e) {}
+      var waRaw = '';
+      try { waRaw = getHotelWhatsApp() || ''; } catch (e) {}
+      var h = '<div class="wb-phone"><div class="wb-bye">';
+      if (img) h += '<div class="wb-bye-hero"><img src="' + _wbEsc(img) + '" alt="' + _wbEsc(hi.nombre || '') + '" onerror="this.parentNode.style.display=\'none\'"></div>';
+      h += '<div class="wb-bye-title">' + _wbEsc(_wbBye('title')) + '</div>';
+      if (name) h += '<div style="font-family:\'Cormorant Garamond\',serif;font-size:19px;font-style:italic;color:#8a6d3a;margin-bottom:10px;">' + _wbEsc(_wbBye('bye')) + ', ' + _wbEsc(name) + '</div>';
+      h += '<div class="wb-bye-sub">' + _wbEsc(_wbBye('sub')) + '</div>';
+      // Reservar de nuevo
+      var rebookUrl = window.location.origin + window.location.pathname + '?reservar';
+      h += '<a class="wb-bye-btn primary" href="' + rebookUrl + '">🗓️ ' + _wbEsc(_wbBye('rebook')) + '</a>';
+      if (review) h += '<a class="wb-bye-btn review" href="' + _wbEsc(review) + '" target="_blank" rel="noopener">⭐ ' + _wbEsc(_wbBye('review')) + '</a>';
+      if (waRaw) {
+        var ph = String(waRaw).replace(/[^0-9]/g, ''); if (ph.length === 10) ph = '52' + ph;
+        h += '<a class="wb-bye-btn wa" href="https://wa.me/' + ph + '" target="_blank" rel="noopener">💬 ' + _wbEsc(_wbBye('contact')) + '</a>';
+      }
+      h += '<div class="wb-bye-foot">' + _wbEsc(hi.nombre || 'Casa Regina Hotel Boutique') + ' · Hotel Boutique</div>';
+      h += '</div></div>';
+      scr.innerHTML = h;
+      scr.scrollTop = 0;
+    }
+
     function renderWelcomeBook() {
       var g = getGuestGuide();
       var hi = getHotelInfo();
       var scr = document.getElementById('welcomeBookScreen');
+      if (_wbEnded) { _wbRenderFarewell(g, hi, scr); return; }
       var langs = (g.langs && g.langs.length) ? g.langs : ['es'];
 
       var flags = langs.map(function(l) {
@@ -4497,7 +4564,7 @@
     function getWelcomeBookLink(resId) {
       var base = window.location.origin + window.location.pathname;
       var url = S.scriptUrl || localStorage.getItem('scriptUrl') || '';
-      return base + '?guia' + (resId ? ('=' + encodeURIComponent(resId)) : '') + '&b=' + _b64u(url);
+      return base + '?guia' + (resId ? ('=' + encodeURIComponent(resId)) : '');
     }
     function copyWelcomeBookLink(resId) {
       var link = getWelcomeBookLink(resId);
@@ -5105,13 +5172,14 @@
       document.getElementById('guestFormContainer').scrollTop = 0;
     }
 
-    // Facebook/redes: codificar el scriptUrl en base64url para que el enlace no exponga
-    // 'script.google.com' (Meta bloquea esos dominios) ni caracteres que se truncan al compartir.
+    // Dirección del Apps Script GRABADA en la app: permite enlaces cortísimos (?reservar) que
+    // Facebook no puede cortar, y sirve de respaldo si el parámetro se pierde al compartir.
+    var DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzkziLsRv6FxTip3qqZ9TE_D6c72fgkxpTgkn7zOmzIw2XHpk6xSAvVMYUBmtHYhUvMnw/exec';
     function _b64u(str){ try { return btoa(unescape(encodeURIComponent(String(str)))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); } catch(e){ return encodeURIComponent(String(str)); } }
     function _unb64u(s){ try { s=String(s).replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4) s+='='; return decodeURIComponent(escape(atob(s))); } catch(e){ return ''; } }
     function getBookingLink() {
-      // Enlace SIN '&' (Facebook corta el URL en el primer &): todo en un solo parámetro reservar=<base64url>
-      return window.location.origin + window.location.pathname + '?reservar=' + _b64u(S.scriptUrl);
+      // Enlace ultra-corto: la dirección del script va grabada en la app. Nada que Facebook pueda cortar.
+      return window.location.origin + window.location.pathname + '?reservar';
     }
 
     function copyBookingLink() {
