@@ -3459,11 +3459,15 @@
       // Secure links: ?reservar&u=SCRIPT_URL (reads via Apps Script, no API key)
       if ((guestRegId || guestBooking || guestValidar || guestGuia) && !guestCfg) {
         var urlU = urlParams.get('u');
+        var urlB = urlParams.get('b');
         var urlS = urlParams.get('s');
         var urlK = urlParams.get('k');
         if (urlU) {
           S.scriptUrl = urlU;
           S._publicMode = true; // flag: read via script, no API key
+        } else if (urlB) {
+          var _dScript = _unb64u(urlB);
+          if (_dScript) { S.scriptUrl = _dScript; S._publicMode = true; }
         } else if (urlS && urlK) {
           // Legacy short links with API key (backward compat)
           S.sheetId = urlS;
@@ -3711,7 +3715,7 @@
 
     function getGuestRegistrationLink(resId) {
       // Secure link: only scriptUrl (reads via Apps Script doGet, no API key exposed)
-      return window.location.origin + window.location.pathname + '?registro=' + resId + '&u=' + encodeURIComponent(S.scriptUrl);
+      return window.location.origin + window.location.pathname + '?registro=' + resId + '&b=' + _b64u(S.scriptUrl);
     }
 
     function copyGuestLink(resId) {
@@ -4435,7 +4439,7 @@
     function getWelcomeBookLink(resId) {
       var base = window.location.origin + window.location.pathname;
       var url = S.scriptUrl || localStorage.getItem('scriptUrl') || '';
-      return base + '?guia' + (resId ? ('=' + encodeURIComponent(resId)) : '') + '&u=' + encodeURIComponent(url);
+      return base + '?guia' + (resId ? ('=' + encodeURIComponent(resId)) : '') + '&b=' + _b64u(url);
     }
     function copyWelcomeBookLink(resId) {
       var link = getWelcomeBookLink(resId);
@@ -5043,9 +5047,13 @@
       document.getElementById('guestFormContainer').scrollTop = 0;
     }
 
+    // Facebook/redes: codificar el scriptUrl en base64url para que el enlace no exponga
+    // 'script.google.com' (Meta bloquea esos dominios) ni caracteres que se truncan al compartir.
+    function _b64u(str){ try { return btoa(unescape(encodeURIComponent(String(str)))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); } catch(e){ return encodeURIComponent(String(str)); } }
+    function _unb64u(s){ try { s=String(s).replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4) s+='='; return decodeURIComponent(escape(atob(s))); } catch(e){ return ''; } }
     function getBookingLink() {
-      // Secure link: only scriptUrl (reads via Apps Script doGet, no API key exposed)
-      return window.location.origin + window.location.pathname + '?reservar&u=' + encodeURIComponent(S.scriptUrl);
+      // Enlace público limpio (sin exponer script.google.com): scriptUrl en base64url
+      return window.location.origin + window.location.pathname + '?reservar&b=' + _b64u(S.scriptUrl);
     }
 
     function copyBookingLink() {
