@@ -4094,7 +4094,7 @@
             // Tipo de habitación (para foto del cuarto)
             if (_wbRes) {
               for (var hk = 0; hk < habs.length; hk++) {
-                if (String(habs[hk][1]) === String(_wbRes.habitacionNum)) { _wbRes.tipo = String(habs[hk][2] || ''); break; }
+                if (String(habs[hk][1]) === String(_wbRes.habitacionNum)) { _wbRes.tipo = normalizeRoomType(String(habs[hk][2] || '')); break; }
               }
             }
             _wbBreakfast = des.filter(function(d) { return String(d[1]) === String(resId); }).map(function(d) {
@@ -4884,7 +4884,7 @@
         _bookingRooms = results[0].filter(function(r) {
           return r[0] && String(r[0]).trim() !== '';
         }).map(function(r) {
-          return { id: String(r[0]), numero: String(r[1]), tipo: String(r[2]), tarifa: parseFloat(r[3]) || 0, estado: String(r[4]), notas: r[5] ? String(r[5]) : '' };
+          return { id: String(r[0]), numero: String(r[1]), tipo: normalizeRoomType(String(r[2])), tarifa: parseFloat(r[3]) || 0, estado: String(r[4]), notas: r[5] ? String(r[5]) : '' };
         }).filter(function(r) { return r.estado !== 'Fuera de servicio' && r.estado !== 'Mantenimiento'; });
         _bookingReservas = results[1].filter(function(r) {
           return r[0] && String(r[11]) !== 'Cancelada' && String(r[11]) !== 'Completada' && String(r[11]) !== '__DELETED__';
@@ -5903,7 +5903,7 @@
         S.rooms = roomsData.map(r => ({
           id: r[0],
           numero: r[1],
-          tipo: r[2],
+          tipo: normalizeRoomType(r[2]),
           tarifa: parseFloat(r[3]) || 0,
           estado: r[4],
           notas: r[5] || ''
@@ -13476,6 +13476,7 @@
       html += '<div style="display:flex;flex-direction:column;gap:10px">' +
         '<button class="form-button" onclick="closeModal();goToCobros(\'' + res.id + '\')" style="background:var(--accent)">💰 Ir a Cobros — Pagar $' + deficit + '</button>' +
         '<button class="form-button secondary" onclick="closeModal();openPaymentModal(\'' + res.id + '\')">💳 Registrar Pago Rápido</button>' +
+        '<button class="form-button secondary" onclick="checkinCredito(\'' + res.id + '\')" style="border-color:#8a6d3a;color:#8a6d3a">🤝 Check-in a crédito (proveedor — paga después)</button>' +
         '</div>';
 
       document.getElementById('checkinBlockedContent').innerHTML = html;
@@ -15841,6 +15842,26 @@
     // misma lógica (showBookingMode carga datos → estas funciones pintan).
     // Al declararse al final del script, sobreescriben las versiones previas.
     // ============================================================
+
+    // Normaliza el nombre del tipo de habitación a un formato único y consistente
+    function normalizeRoomType(t) {
+      var s = String(t == null ? '' : t).trim();
+      if (!s) return s;
+      var l = s.toLowerCase();
+      if (/queen|sencill/.test(l)) return 'SENCILLA QUEEN';
+      if (/matrimon|doble|matri|king/.test(l)) return 'DOBLE MATRIMONIAL';
+      return s.toUpperCase();
+    }
+
+    // Check-in a crédito (proveedores que pagan después): omite el requisito de anticipo
+    function checkinCredito(resId) {
+      var res = S.reservas.find(function(r) { return r.id === resId; });
+      if (!res) { toast('Reserva no encontrada', true); return; }
+      if (!confirm('¿Hacer check-in a CRÉDITO (proveedor)?\nEl huésped pagará después. La reserva quedará con saldo pendiente registrado.')) return;
+      var room = S.rooms.find(function(r) { return r.numero === res.habitacionNum; });
+      closeModal();
+      showProcessChecklist('checkin', res, room);
+    }
 
     // Revertir un check-in hecho por error: vuelve la reserva a "Confirmada" y libera la habitación
     async function revertirCheckin(resId) {
