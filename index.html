@@ -1994,6 +1994,11 @@
     .wb-bye-btn.review { color:#fff; background:#e8a33d; box-shadow:0 6px 16px rgba(232,163,61,.28); }
     .wb-bye-btn.wa { color:#fff; background:#25D366; box-shadow:0 6px 16px rgba(37,211,102,.24); }
     .wb-bye-foot { font-size:11px; color:#a89878; margin-top:16px; }
+    /* Habitaciones en LIMPIEZA: color distinto (violeta) para que resalten */
+    .room-card.status-limpieza { border-left-color:#a06cd5; border-left-width:5px; background:rgba(160,108,213,0.14); }
+    .room-card.status-limpieza .status-badge { color:#a06cd5; }
+    .room-clean-done { margin-top:6px; width:100%; background:#2e9e6b; color:#fff; border:none; border-radius:8px; padding:9px; font-size:12px; font-weight:700; cursor:pointer; -webkit-tap-highlight-color:transparent; transition:transform .12s; }
+    .room-clean-done:active { transform:scale(.97); }
   </style>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -6586,6 +6591,7 @@
               </div>
             </div>
             <div class="room-type">${room.tipo} · $${room.tarifa}</div>
+            ${room.estado === 'Limpieza' && S.user && (S.user.rol === 'admin' || S.user.rol === 'recepcion') ? `<button class="room-clean-done" onclick="event.stopPropagation();marcarLimpiezaHecha('${room.id}')">✅ Limpieza hecha</button>` : ''}
             ${room.estado === 'Mantenimiento' && room.notas && room.notas.includes('[MANT]') ? `<div class="room-maint-note">🛠️ ${room.notas.match(/\[MANT\] ([^|]*)/)?.[1] || ''}</div>` : ''}
             ${currentRes ? `<div class="room-guest">👤 ${guestName}</div>` : ''}
             ${futureRes.length > 0 ? '<div class="room-timeline">' + timelineHtml + '</div>' : ''}
@@ -13101,7 +13107,7 @@
       var tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate()+1);
       var tomorrowStr = normDate(tomorrow);
       var avail = S.rooms.filter(function(r) {
-        if (r.estado !== 'Disponible') return false;
+        if (r.estado === 'Mantenimiento' || r.estado === 'Fuera de servicio' || r.estado === 'Ocupada') return false;
         var overlap = S.reservas.some(function(res) {
           return res.habitacionNum === r.numero && res.estado !== 'Cancelada' && res.estado !== 'Completada' && res.estado !== 'Check-out' && res.fechaEntrada < tomorrowStr && res.fechaSalida > today;
         });
@@ -15861,6 +15867,24 @@
       var room = S.rooms.find(function(r) { return r.numero === res.habitacionNum; });
       closeModal();
       showProcessChecklist('checkin', res, room);
+    }
+
+    // Marcar limpieza hecha con un clic: la habitación pasa a "Disponible"
+    async function marcarLimpiezaHecha(roomId) {
+      var room = S.rooms.find(function(r) { return r.id === roomId; });
+      if (!room) return;
+      await busy(async function() {
+        var n = now();
+        var logRow = [normDate(new Date()), n.split(' ')[1], (S.user && S.user.usuario) || '', 'Limpieza Hecha', 'Hab.' + room.numero + ' lista', 'info'];
+        await sheets.multi([
+          { type: 'updateById', sheet: '🏨 Habitaciones', id: room.id, values: [room.id, room.numero, room.tipo, room.tarifa, 'Disponible', room.notas || ''] },
+          { type: 'append', sheet: '📜 Bitácora', values: logRow }
+        ]);
+        var i = S.rooms.findIndex(function(r) { return r.id === roomId; });
+        if (i !== -1) S.rooms[i].estado = 'Disponible';
+        toast('Hab.' + room.numero + ' lista ✨');
+        render();
+      }, 'Marcando limpieza...');
     }
 
     // ===== Ajustes → Tarifas: tipo editable, agregar habitación, normalizar nombres en la hoja =====
