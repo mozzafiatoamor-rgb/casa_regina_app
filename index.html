@@ -4094,7 +4094,7 @@
             // Tipo de habitación (para foto del cuarto)
             if (_wbRes) {
               for (var hk = 0; hk < habs.length; hk++) {
-                if (String(habs[hk][1]) === String(_wbRes.habitacionNum)) { _wbRes.tipo = normalizeRoomType(String(habs[hk][2] || '')); break; }
+                if (String(habs[hk][1]) === String(_wbRes.habitacionNum)) { _wbRes.tipo = String(habs[hk][2] || ''); break; }
               }
             }
             _wbBreakfast = des.filter(function(d) { return String(d[1]) === String(resId); }).map(function(d) {
@@ -4884,7 +4884,7 @@
         _bookingRooms = results[0].filter(function(r) {
           return r[0] && String(r[0]).trim() !== '';
         }).map(function(r) {
-          return { id: String(r[0]), numero: String(r[1]), tipo: normalizeRoomType(String(r[2])), tarifa: parseFloat(r[3]) || 0, estado: String(r[4]), notas: r[5] ? String(r[5]) : '' };
+          return { id: String(r[0]), numero: String(r[1]), tipo: String(r[2]), tarifa: parseFloat(r[3]) || 0, estado: String(r[4]), notas: r[5] ? String(r[5]) : '' };
         }).filter(function(r) { return r.estado !== 'Fuera de servicio' && r.estado !== 'Mantenimiento'; });
         _bookingReservas = results[1].filter(function(r) {
           return r[0] && String(r[11]) !== 'Cancelada' && String(r[11]) !== 'Completada' && String(r[11]) !== '__DELETED__';
@@ -5903,7 +5903,7 @@
         S.rooms = roomsData.map(r => ({
           id: r[0],
           numero: r[1],
-          tipo: normalizeRoomType(r[2]),
+          tipo: r[2],
           tarifa: parseFloat(r[3]) || 0,
           estado: r[4],
           notas: r[5] || ''
@@ -15861,6 +15861,130 @@
       var room = S.rooms.find(function(r) { return r.numero === res.habitacionNum; });
       closeModal();
       showProcessChecklist('checkin', res, room);
+    }
+
+    // ===== Ajustes → Tarifas: tipo editable, agregar habitación, normalizar nombres en la hoja =====
+    function _bkRoomTypeOptions() {
+      var seen = {}, opts = ['DOBLE MATRIMONIAL', 'SENCILLA QUEEN'];
+      opts.forEach(function(o) { seen[o] = 1; });
+      (S.rooms || []).forEach(function(r) { var t = (r.tipo || '').trim(); if (t && !seen[t]) { seen[t] = 1; opts.push(t); } });
+      return opts;
+    }
+
+    function renderTarifasConfig() {
+      var h = '<div style="margin-bottom:16px">';
+      h += '<div class="section-title">Tarifas por Habitación</div>';
+      h += '<div style="font-size:12px;color:var(--text2);margin-bottom:12px">Edita el tipo y la tarifa base por noche. Los cambios se guardan en Google Sheets (la fuente de todo el sistema).</div>';
+      h += '</div>';
+
+      // datalist de tipos (estándar + los que ya existen)
+      var typeOpts = _bkRoomTypeOptions();
+      h += '<datalist id="roomTypeList">' + typeOpts.map(function(t) { return '<option value="' + escapeAttr(t) + '"></option>'; }).join('') + '</datalist>';
+
+      // Normalizar nombres a estándar
+      h += '<button class="form-button secondary" onclick="normalizeAllRoomTypes()" style="width:100%;margin-bottom:12px;font-size:12px;border-color:var(--accent);color:var(--accent)">✨ Normalizar nombres a estándar (DOBLE MATRIMONIAL / SENCILLA QUEEN)</button>';
+
+      // Agregar nueva habitación
+      h += '<div style="background:var(--surface2);border-radius:var(--radius);padding:14px;margin-bottom:16px;border:1px dashed var(--accent)">';
+      h += '<div style="font-weight:700;font-size:13px;margin-bottom:10px">➕ Agregar habitación / tipo</div>';
+      h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">';
+      h += '<div><label class="form-label" style="font-size:11px">Número</label><input id="newRoomNum" class="form-input" placeholder="Ej. 105" style="font-size:12px;padding:8px"></div>';
+      h += '<div><label class="form-label" style="font-size:11px">Tarifa / noche</label><input id="newRoomTarifa" type="number" min="0" step="50" class="form-input" placeholder="0" style="font-size:12px;padding:8px;font-family:Space Mono,monospace"></div>';
+      h += '</div>';
+      h += '<div style="margin-bottom:8px"><label class="form-label" style="font-size:11px">Tipo de habitación</label><input id="newRoomTipo" class="form-input" list="roomTypeList" placeholder="Ej. DOBLE MATRIMONIAL" style="font-size:12px;padding:8px"></div>';
+      h += '<button class="form-button" onclick="addNewRoom()" style="width:100%;font-size:12px;background:var(--accent);color:var(--bg)">Crear habitación</button>';
+      h += '</div>';
+
+      if (!S.rooms || S.rooms.length === 0) {
+        h += '<div style="text-align:center;padding:20px;color:var(--text2)">Sin habitaciones cargadas. Agrega una arriba.</div>';
+        document.getElementById('configContent').innerHTML = h;
+        return;
+      }
+
+      S.rooms.forEach(function(room) {
+        var statusColor = room.estado === 'Disponible' ? 'var(--green)' : room.estado === 'Ocupada' ? 'var(--blue)' : room.estado === 'Limpieza' ? 'var(--yellow)' : 'var(--text2)';
+        h += '<div style="background:var(--surface2);border-radius:var(--radius);padding:14px;margin-bottom:10px;border-left:4px solid ' + statusColor + '">';
+        h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">';
+        h += '<div style="font-size:20px;font-weight:800;font-family:Space Mono,monospace;color:var(--accent);width:40px">' + room.numero + '</div>';
+        h += '<div style="flex:1;font-size:12px;color:var(--text2)">' + room.estado + '</div>';
+        h += '</div>';
+        h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
+        h += '<div class="form-group" style="margin-bottom:0"><label class="form-label">Tipo</label>';
+        h += '<input class="form-input tarifa-tipo" list="roomTypeList" data-roomid="' + room.id + '" value="' + escapeAttr(room.tipo || '') + '" placeholder="Tipo de habitación"></div>';
+        h += '<div class="form-group" style="margin-bottom:0"><label class="form-label">Tarifa / Noche</label>';
+        h += '<input type="number" class="form-input tarifa-precio" data-roomid="' + room.id + '" value="' + room.tarifa + '" min="0" step="50" style="font-family:Space Mono,monospace"></div>';
+        h += '</div>';
+        h += '<div class="form-group" style="margin-bottom:0;margin-top:8px"><label class="form-label">Notas</label>';
+        h += '<input type="text" class="form-input tarifa-notas" data-roomid="' + room.id + '" value="' + escapeAttr(room.notas || '') + '" placeholder="Ej: Vista al mar, balcón..."></div>';
+        h += '</div>';
+      });
+
+      h += '<button class="form-button" onclick="saveTarifas()" style="width:100%;margin-top:16px;background:var(--accent);color:var(--bg)">💾 Guardar Cambios de Tarifas</button>';
+      document.getElementById('configContent').innerHTML = h;
+    }
+
+    async function addNewRoom() {
+      var numero = (document.getElementById('newRoomNum').value || '').trim();
+      var tipo = (document.getElementById('newRoomTipo').value || '').trim();
+      var tarifa = parseFloat(document.getElementById('newRoomTarifa').value) || 0;
+      if (!numero || !tipo) { toast('Pon número y tipo de habitación', true); return; }
+      if ((S.rooms || []).some(function(r) { return String(r.numero) === String(numero); })) { toast('Ya existe la Hab. ' + numero, true); return; }
+      var id = nextId('HAB', S.rooms || []);
+      await busy(async function() {
+        var row = [id, numero, tipo, tarifa, 'Disponible', ''];
+        var n = now();
+        var logRow = [normDate(new Date()), n.split(' ')[1], (S.user && S.user.usuario) || '', 'Nueva Habitación', 'Hab.' + numero + ' ' + tipo + ' $' + tarifa, 'info'];
+        await sheets.multi([{ type: 'append', sheet: '🏨 Habitaciones', values: row }, { type: 'append', sheet: '📜 Bitácora', values: logRow }]);
+        S.rooms.push({ id: id, numero: numero, tipo: tipo, tarifa: tarifa, estado: 'Disponible', notas: '' });
+        toast('Habitación ' + numero + ' creada ✅');
+        renderConfig();
+      }, 'Creando habitación...');
+    }
+
+    async function normalizeAllRoomTypes() {
+      if (!confirm('Se normalizarán los nombres de tipo de habitación a DOBLE MATRIMONIAL / SENCILLA QUEEN en la hoja y en las reglas de ocupación y desayunos. ¿Continuar?')) return;
+      var ops = [], changed = [];
+      (S.rooms || []).forEach(function(r) {
+        var nt = normalizeRoomType(r.tipo);
+        if (nt && nt !== r.tipo) {
+          ops.push({ type: 'updateById', sheet: '🏨 Habitaciones', id: r.id, values: [r.id, r.numero, nt, r.tarifa, r.estado, r.notas || ''] });
+          changed.push('Hab.' + r.numero);
+          r.tipo = nt;
+        }
+      });
+      var hi = getHotelInfo();
+      var hadOcup = Array.isArray(hi.occupancyRules) && hi.occupancyRules.length > 0;
+      if (hadOcup) {
+        var seen = {}, nr = [];
+        hi.occupancyRules.forEach(function(rule) {
+          var nt = normalizeRoomType(rule.tipo); if (!nt) return;
+          if (seen[nt] != null) { nr[seen[nt]].maxPersonas = Math.max(nr[seen[nt]].maxPersonas, rule.maxPersonas); }
+          else { seen[nt] = nr.length; nr.push({ tipo: nt, maxPersonas: rule.maxPersonas }); }
+        });
+        hi.occupancyRules = nr;
+      }
+      var promo = getBreakfastPromo();
+      var hadPromo = promo && Array.isArray(promo.rules) && promo.rules.length > 0;
+      if (hadPromo) {
+        var seen2 = {}, npr = [];
+        promo.rules.forEach(function(rule) {
+          var nt = normalizeRoomType(rule.tipo); if (!nt) return;
+          if (seen2[nt] != null) { npr[seen2[nt]].personas = Math.max(npr[seen2[nt]].personas, rule.personas); }
+          else { seen2[nt] = npr.length; npr.push({ tipo: nt, personas: rule.personas }); }
+        });
+        promo.rules = npr;
+      }
+      await busy(async function() {
+        if (ops.length) {
+          var n = now();
+          ops.push({ type: 'append', sheet: '📜 Bitácora', values: [normDate(new Date()), n.split(' ')[1], (S.user && S.user.usuario) || '', 'Normalizar tipos', (changed.join(', ') || 'reglas'), 'info'] });
+          await sheets.multi(ops);
+        }
+        if (hadOcup) saveHotelInfo(hi);
+        if (hadPromo) saveBreakfastPromo(promo);
+        toast('Nombres normalizados ✨');
+        renderConfig();
+      }, 'Normalizando nombres...');
     }
 
     // Revertir un check-in hecho por error: vuelve la reserva a "Confirmada" y libera la habitación
