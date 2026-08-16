@@ -6904,6 +6904,7 @@
                   <div>${t.asignadoA}</div>
                 </div>
                 ${progHtml}
+                ${t.estado !== 'Completada' && (S.user && (S.user.rol === 'admin' || S.user.rol === 'recepcion')) ? `<button onclick="event.stopPropagation();marcarLimpiezaHechaPorHab('${t.habitacionNum}')" style="margin-top:8px;width:100%;background:#2e9e6b;color:#fff;border:none;border-radius:7px;padding:8px;font-size:11px;font-weight:700;cursor:pointer">✅ Limpieza hecha</button>` : ''}
               </div>
             `;
           }).join('')
@@ -15869,22 +15870,151 @@
       showProcessChecklist('checkin', res, room);
     }
 
-    // Marcar limpieza hecha con un clic: la habitación pasa a "Disponible"
+    // Marcar limpieza hecha con un clic: completa las tareas de limpieza de la
+    // habitación (para que salga de la sección Limpieza) y la deja "Disponible".
     async function marcarLimpiezaHecha(roomId) {
       var room = S.rooms.find(function(r) { return r.id === roomId; });
       if (!room) return;
       await busy(async function() {
         var n = now();
-        var logRow = [normDate(new Date()), n.split(' ')[1], (S.user && S.user.usuario) || '', 'Limpieza Hecha', 'Hab.' + room.numero + ' lista', 'info'];
-        await sheets.multi([
-          { type: 'updateById', sheet: '🏨 Habitaciones', id: room.id, values: [room.id, room.numero, room.tipo, room.tarifa, 'Disponible', room.notas || ''] },
-          { type: 'append', sheet: '📜 Bitácora', values: logRow }
-        ]);
+        var ops = [];
+        // Completar TODAS las tareas de housekeeping abiertas de esta habitación
+        var openTasks = (S.housekeeping || []).filter(function(t) { return String(t.habitacionNum) === String(room.numero) && t.estado !== 'Completada'; });
+        openTasks.forEach(function(task) {
+          var taskRow = [task.id, task.fecha, task.habitacionNum, task.tarea, task.prioridad, 'Completada', task.asignadoA, task.notas, task.horaInicio || '', n, task.verificado || '', task.checklist || ''];
+          ops.push({ type: 'updateById', sheet: '🧹 Housekeeping', id: task.id, values: taskRow });
+        });
+        // Habitación a Disponible
+        ops.push({ type: 'updateById', sheet: '🏨 Habitaciones', id: room.id, values: [room.id, room.numero, room.tipo, room.tarifa, 'Disponible', room.notas || ''] });
+        ops.push({ type: 'append', sheet: '📜 Bitácora', values: [normDate(new Date()), n.split(' ')[1], (S.user && S.user.usuario) || '', 'Limpieza Hecha', 'Hab.' + room.numero + ' lista', 'info'] });
+        await sheets.multi(ops);
+        // Memoria
+        openTasks.forEach(function(task) { var ti = S.housekeeping.findIndex(function(t) { return t.id === task.id; }); if (ti !== -1) { S.housekeeping[ti].estado = 'Completada'; S.housekeeping[ti].horaFin = n; } });
         var i = S.rooms.findIndex(function(r) { return r.id === roomId; });
         if (i !== -1) S.rooms[i].estado = 'Disponible';
         toast('Hab.' + room.numero + ' lista ✨');
-        render();
+        // Refrescar la vista visible (walk-in abierto, o el tab actual)
+        var wk = document.getElementById('walkinWizardModal');
+        if (wk && wk.classList.contains('active') && typeof _walkin !== 'undefined' && _walkin && _walkin.step === 1) {
+          walkinStep1();
+        } else {
+          render();
+        }
       }, 'Marcando limpieza...');
+    }
+
+    // Atajo por número de habitación (usado desde la sección Limpieza)
+    function marcarLimpiezaHechaPorHab(numero) {
+      var room = S.rooms.find(function(r) { return String(r.numero) === String(numero); });
+      if (room) marcarLimpiezaHecha(room.id);
+      else toast('Habitación no encontrada', true);
+    }
+
+    // ¿Se puede mostrar el botón de limpieza hecha? (admin / recepción)
+    function _canCleanRooms() {
+      return !!(S.user && (S.user.rol === 'admin' || S.user.rol === 'recepcion'));
+    }
+
+    // Panel de disponibilidad del inicio: marcar limpieza en violeta + botón de limpieza hecha
+    function dashAvailSearch() {
+      var checkin = document.getElementById('dashAvailIn').value;
+      var checkout = document.getElementById('dashAvailOut').value;
+      if (!checkin || !checkout) return;
+      var nextDay = new Date(checkin + 'T12:00:00'); nextDay.setDate(nextDay.getDate() + 1);
+      var minOut = normDate(nextDay);
+      var outEl = document.getElementById('dashAvailOut');
+      outEl.min = minOut;
+      if (checkout <= checkin) { outEl.value = minOut; checkout = minOut; }
+      var nights = daysUntil(checkin, checkout);
+
+      var available = [], unavailable = [];
+      S.rooms.forEach(function(room) {
+        if (room.estado === 'Mantenimiento') { unavailable.push({ room: room, reason: '🛠️ Mantenimiento' }); return; }
+        var conflict = S.reservas.find(function(r) {
+          return r.habitacionNum === room.numero && r.estado !== 'Cancelada' && r.estado !== 'Check-out' && r.fechaEntrada < checkout && r.fechaSalida > checkin;
+        });
+        if (conflict) unavailable.push({ room: room, reason: '⛔ ' + conflict.huesped.split(' ')[0] });
+        else available.push(room);
+      });
+
+      document.getElementById('dashAvailCount').textContent = available.length + ' de ' + S.rooms.length + ' disponibles · ' + nights + ' noche(s)';
+
+      var h = '';
+      if (available.length === 0) {
+        h += '<div style="text-align:center;padding:16px;color:var(--text2);font-size:13px">Sin habitaciones disponibles en esas fechas</div>';
+      } else {
+        h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px">';
+        available.forEach(function(room) {
+          var total = room.tarifa * nights;
+          var enLimpieza = room.estado === 'Limpieza';
+          var cardBg = enLimpieza ? 'rgba(160,108,213,0.16)' : 'var(--surface3)';
+          var cardBorder = enLimpieza ? '#a06cd5' : 'transparent';
+          h += '<div onclick="openNewReservaModal(\'' + room.numero + '\',\'' + checkin + '\')" style="background:' + cardBg + ';border-radius:10px;padding:12px;cursor:pointer;border:2px solid ' + cardBorder + ';transition:all .15s">';
+          h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">';
+          h += '<div style="font-weight:800;font-size:16px;font-family:Space Mono,monospace;color:var(--accent)">' + room.numero + '</div>';
+          if (enLimpieza) h += '<div style="font-size:9px;padding:2px 6px;border-radius:6px;background:rgba(160,108,213,.25);color:#a06cd5;font-weight:700">🧹 Limpieza</div>';
+          else h += '<div style="font-size:9px;padding:2px 6px;border-radius:6px;background:rgba(139,170,106,.2);color:var(--green);font-weight:600">Disponible</div>';
+          h += '</div>';
+          h += '<div style="font-size:12px;color:var(--text2);margin-bottom:6px">' + room.tipo + '</div>';
+          h += '<div style="font-family:Space Mono,monospace;font-weight:700;font-size:15px">$' + room.tarifa + '<span style="font-size:10px;font-weight:400;color:var(--text2)">/noche</span></div>';
+          h += '<div style="font-family:Space Mono,monospace;font-size:11px;color:var(--green);margin-top:4px;font-weight:600">Total: $' + total + '</div>';
+          if (enLimpieza && _canCleanRooms()) {
+            h += '<button onclick="event.stopPropagation();marcarLimpiezaHecha(\'' + room.id + '\')" style="margin-top:8px;width:100%;background:#2e9e6b;color:#fff;border:none;border-radius:7px;padding:7px;font-size:11px;font-weight:700;cursor:pointer">✅ Limpieza hecha</button>';
+          }
+          h += '</div>';
+        });
+        h += '</div>';
+      }
+
+      if (unavailable.length > 0) {
+        h += '<div style="margin-top:8px;font-size:11px;color:var(--text2)">';
+        h += '<details><summary style="cursor:pointer;user-select:none">No disponibles (' + unavailable.length + ')</summary>';
+        h += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">';
+        unavailable.forEach(function(u) { h += '<span style="background:var(--surface3);padding:3px 8px;border-radius:6px;font-size:10px;opacity:.7">' + u.room.numero + ' ' + u.reason + '</span>'; });
+        h += '</div></details></div>';
+      }
+      document.getElementById('dashAvailResults').innerHTML = h;
+    }
+
+    // Walk-in paso 1: mostrar todas las libres, con las de limpieza en violeta + botón de limpieza hecha
+    function walkinStep1() {
+      _walkin.step = 1;
+      document.getElementById('walkinWizardTitle').textContent = '🚶 Walk-in — Paso 1 de 3';
+      var today = normDate(new Date());
+      var tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+      var tomorrowStr = normDate(tomorrow);
+      var avail = S.rooms.filter(function(r) {
+        if (r.estado === 'Mantenimiento' || r.estado === 'Fuera de servicio' || r.estado === 'Ocupada') return false;
+        var overlap = S.reservas.some(function(res) {
+          return res.habitacionNum === r.numero && res.estado !== 'Cancelada' && res.estado !== 'Completada' && res.estado !== 'Check-out' && res.fechaEntrada < tomorrowStr && res.fechaSalida > today;
+        });
+        return !overlap;
+      });
+
+      var h = '<div style="font-size:13px;color:var(--text2);margin-bottom:14px;">Selecciona la habitación para el huésped</div>';
+      if (avail.length === 0) {
+        h += '<div style="text-align:center;padding:30px;color:var(--text2);">😔 No hay habitaciones disponibles</div>';
+      } else {
+        h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">';
+        avail.forEach(function(r) {
+          var enLimpieza = r.estado === 'Limpieza';
+          var bg = enLimpieza ? 'rgba(160,108,213,0.16)' : 'var(--surface3)';
+          var bd = enLimpieza ? '#a06cd5' : 'var(--surface3)';
+          var tipoEsc = String(r.tipo || '').replace(/'/g, "\\'");
+          h += '<div onclick="walkinSelectRoom(\'' + r.numero + '\',\'' + tipoEsc + '\',' + r.tarifa + ')" style="background:' + bg + ';border:2px solid ' + bd + ';border-radius:var(--radius);padding:14px;cursor:pointer;text-align:center;transition:all .2s;">';
+          h += '<div style="font-size:22px;margin-bottom:4px;">🛏️</div>';
+          h += '<div style="font-weight:700;font-size:15px;">Hab. ' + r.numero + '</div>';
+          h += '<div style="font-size:12px;color:var(--text2);">' + r.tipo + '</div>';
+          if (enLimpieza) h += '<div style="font-size:10px;font-weight:700;color:#a06cd5;margin-top:3px">🧹 En limpieza</div>';
+          h += '<div style="font-size:14px;font-weight:700;color:var(--accent);margin-top:4px;font-family:Space Mono,monospace;">$' + r.tarifa + '/noche</div>';
+          if (enLimpieza && _canCleanRooms()) {
+            h += '<button onclick="event.stopPropagation();marcarLimpiezaHecha(\'' + r.id + '\')" style="margin-top:8px;width:100%;background:#2e9e6b;color:#fff;border:none;border-radius:7px;padding:7px;font-size:11px;font-weight:700;cursor:pointer">✅ Limpieza hecha</button>';
+          }
+          h += '</div>';
+        });
+        h += '</div>';
+      }
+      document.getElementById('walkinWizardContent').innerHTML = h;
     }
 
     // ===== Ajustes → Tarifas: tipo editable, agregar habitación, normalizar nombres en la hoja =====
