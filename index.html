@@ -4111,7 +4111,7 @@
         var _today = normDate(new Date());
         var _st = String(_wbRes.estado || '').toLowerCase();
         var _out = _wbRes.fechaSalida;
-        if ((_out && _out < _today) || _st === 'completada' || _st === 'cancelada' || _st === 'no show' || _st === 'no-show') {
+        if ((_out && _out < _today) || _st === 'completada' || _st === 'cancelada' || _st === 'check-out' || _st === 'checkout' || _st === 'salió' || _st === 'salio' || _st === 'no show' || _st === 'no-show') {
           _wbEnded = true;
           _wbAccess = '';      // seguridad: ocultar el código de acceso tras el checkout
           _wbBreakfast = [];   // ocultar QR de desayuno (ya no aplican)
@@ -8694,7 +8694,7 @@
           h += '</div></div>';
           // Codes list (collapsed by default)
           h += '<div style="display:none;border-top:1px solid var(--surface3);padding:8px 12px;">';
-          g.codes.sort(function(a, b) { return a.fecha.localeCompare(b.fecha); }).forEach(function(c) {
+          g.codes.sort(function(a, b) { var _rk = function(x){ return x.estado === 'Pendiente' ? 0 : x.estado === 'Consumido' ? 1 : 2; }; if (_rk(a) !== _rk(b)) return _rk(a) - _rk(b); return a.fecha.localeCompare(b.fecha); }).forEach(function(c) {
             var stColor = c.estado === 'Pendiente' ? 'var(--yellow)' : c.estado === 'Consumido' ? 'var(--green)' : 'var(--red)';
             var stIcon = c.estado === 'Pendiente' ? '🟡' : c.estado === 'Consumido' ? '✅' : '❌';
             h += '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--surface3);font-size:12px;">';
@@ -12102,6 +12102,7 @@
           buttons += '<div style="text-align:center;padding:10px;color:var(--green);font-weight:600">✅ Pagado completo</div>';
         }
         buttons += '<button class="form-button secondary" onclick="closeModal();executeCheckout(\'' + res.habitacionNum + '\')" style="background:var(--red)">Ejecutar Check-out</button>';
+        buttons += '<button class="form-button secondary" onclick="revertirCheckin(\'' + resId + '\')" style="border-color:var(--yellow);color:var(--yellow)">\u21a9\ufe0f Revertir Check-in (corregir)</button>';
       }
 
       if (buttons) {
@@ -12742,7 +12743,7 @@
       var checkout = document.getElementById('newResCheckOut').value;
       if (!checkin || !checkout || !tarifa) { infoEl.textContent = 'Llena tarifa y fechas para ver desglose'; return; }
       var days = daysUntil(checkin, checkout);
-      var subtotal = days * tarifa;
+      var subtotal = Math.max(days, 1) * tarifa;
       var iva = Math.round(subtotal * IVA_RATE * 100) / 100;
       var ish = Math.round(subtotal * ISH_RATE * 100) / 100;
       var total = subtotal + iva + ish;
@@ -12765,7 +12766,7 @@
       var checkout = document.getElementById('newResCheckOut').value;
       if (!checkin || !checkout || !tarifa) { toast('Llena tarifa y fechas primero', true); return; }
       var days = daysUntil(checkin, checkout);
-      var subtotal = days * tarifa;
+      var subtotal = Math.max(days, 1) * tarifa;
       var factura = document.getElementById('newResFactura') && document.getElementById('newResFactura').checked;
       var total = factura ? subtotal + Math.round(subtotal * IVA_RATE * 100) / 100 + Math.round(subtotal * ISH_RATE * 100) / 100 : subtotal;
       var monto = Math.ceil(total * (pct / 100));
@@ -12868,7 +12869,7 @@
 
       if (checkin && checkout) {
         const days = daysUntil(checkin, checkout);
-        const subtotal = days * tarifa;
+        const subtotal = Math.max(days, 1) * tarifa;
         var factura = document.getElementById('newResFactura') && document.getElementById('newResFactura').checked;
         if (factura) {
           var iva = Math.round(subtotal * IVA_RATE * 100) / 100;
@@ -12924,8 +12925,8 @@
         return;
       }
 
-      if (checkin >= checkout) {
-        toast('La fecha de salida debe ser posterior a la entrada', true);
+      if (checkin > checkout) {
+        toast('La fecha de salida no puede ser anterior a la entrada', true);
         return;
       }
 
@@ -12951,7 +12952,7 @@
       await busy(async () => {
         const id = nextId('R', S.reservas);
         const days = daysUntil(checkin, checkout);
-        const subtotal = days * tarifa;
+        const subtotal = Math.max(days, 1) * tarifa;
         var ivaAmount = 0;
         var ishAmount = 0;
         if (wantsFactura) {
@@ -15263,6 +15264,10 @@
 
     // ============ MODAL MANAGEMENT ============
     function openModal(modalId) {
+      if (S.currentModal && S.currentModal !== modalId) {
+        var _pm = document.getElementById(S.currentModal);
+        if (_pm) _pm.classList.remove('active');
+      }
       S.currentModal = modalId;
       document.getElementById('modalOverlay').classList.add('active');
       document.getElementById(modalId).classList.add('active');
@@ -15271,11 +15276,10 @@
     }
 
     function closeModal() {
-      if (S.currentModal) {
-        document.getElementById('modalOverlay').classList.remove('active');
-        document.getElementById(S.currentModal).classList.remove('active');
-        S.currentModal = null;
-      }
+      document.getElementById('modalOverlay').classList.remove('active');
+      var _openMs = document.querySelectorAll('.modal.active');
+      for (var _cm = 0; _cm < _openMs.length; _cm++) { _openMs[_cm].classList.remove('active'); }
+      S.currentModal = null;
     }
 
     // ============ TAB NAVIGATION ============
@@ -15837,6 +15841,29 @@
     // misma lógica (showBookingMode carga datos → estas funciones pintan).
     // Al declararse al final del script, sobreescriben las versiones previas.
     // ============================================================
+
+    // Revertir un check-in hecho por error: vuelve la reserva a "Confirmada" y libera la habitación
+    async function revertirCheckin(resId) {
+      if (!confirm('¿Revertir el check-in? La reserva volverá a "Confirmada" y la habitación quedará disponible.')) return;
+      var res = S.reservas.find(function(r) { return r.id === resId; });
+      if (!res) { toast('Reserva no encontrada', true); return; }
+      var room = S.rooms.find(function(r) { return r.numero === res.habitacionNum; });
+      await busy(async function() {
+        var resRow = [res.id, res.habitacionNum, res.huesped, res.telefono, res.email, res.fechaEntrada, res.fechaSalida, res.adultos, res.niños, res.tarifa, res.tarifaTotal, 'Confirmada', res.notas, res.creadoPor, res.fechaCreacion];
+        var n = now();
+        var logRow = [normDate(new Date()), n.split(' ')[1], (S.user && S.user.usuario) || '', 'Check-in Revertido', res.huesped + ' Hab. ' + res.habitacionNum, 'warning'];
+        var ops = [{ type: 'updateById', sheet: '📋 Reservas', id: res.id, values: resRow }];
+        if (room) ops.push({ type: 'updateById', sheet: '🏨 Habitaciones', id: room.id, values: [room.id, room.numero, room.tipo, room.tarifa, 'Disponible', room.notas] });
+        ops.push({ type: 'append', sheet: '📜 Bitácora', values: logRow });
+        await sheets.multi(ops);
+        var ri = S.reservas.findIndex(function(r) { return r.id === resId; });
+        if (ri !== -1) S.reservas[ri].estado = 'Confirmada';
+        if (room) { var rmi = S.rooms.findIndex(function(r) { return r.numero === res.habitacionNum; }); if (rmi !== -1) S.rooms[rmi].estado = 'Disponible'; }
+        toast('Check-in revertido ↩️');
+        closeModal();
+        render();
+      }, 'Revirtiendo check-in...');
+    }
     // Varias fotos por tipo (pool) → cada habitación muestra una distinta y consistente
     var _BK_ASSETS = 'https://raw.githubusercontent.com/mozzafiatoamor-rgb/casa_regina_app/main/assets/';
     var _BK_PHOTO_POOL = {
@@ -16022,7 +16049,9 @@
       h += '<div class="bk-note">Tu reserva quedará pendiente de confirmación por el hotel.</div>';
       h += '</form></div>';
 
-      document.getElementById('bookingRoomsContainer').insertAdjacentHTML('beforeend', h);
+      // Insertar el formulario JUSTO debajo de la habitación seleccionada (no al final de la lista)
+      if (rel) { rel.insertAdjacentHTML('afterend', h); }
+      else { document.getElementById('bookingRoomsContainer').insertAdjacentHTML('beforeend', h); }
       var f = document.getElementById('bookingGuestForm');
       if (f && f.scrollIntoView) f.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
