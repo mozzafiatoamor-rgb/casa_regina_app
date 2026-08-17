@@ -4569,7 +4569,7 @@
     function getWelcomeBookLink(resId) {
       var base = window.location.origin + window.location.pathname;
       var url = S.scriptUrl || localStorage.getItem('scriptUrl') || '';
-      return base + '?guia' + (resId ? ('=' + encodeURIComponent(resId)) : '');
+      return base + '?guia' + (resId ? ('=' + encodeURIComponent(resId)) : '') + '&b=' + _b64u(url);
     }
     function copyWelcomeBookLink(resId) {
       var link = getWelcomeBookLink(resId);
