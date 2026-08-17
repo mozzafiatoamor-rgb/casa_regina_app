@@ -8683,8 +8683,8 @@
         });
       }
 
-      // Codes grouped by guest
-      var activeRes = S.reservas.filter(function(r) { return r.estado === 'Check-in'; });
+      // Codes grouped by guest — TODAS las reservas con códigos (no solo check-in)
+      var activeRes = S.reservas.filter(function(r) { return r.estado !== 'Cancelada' && r.estado !== 'Check-out' && r.estado !== 'Completada'; });
       var guestsWithCodes = [];
       activeRes.forEach(function(r) {
         var codes = des.filter(function(d) { return d.reservaId === r.id; });
