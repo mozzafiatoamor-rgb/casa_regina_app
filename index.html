@@ -5864,6 +5864,15 @@
         const data = await res.json();
         if (!data.success) throw new Error(data.error || 'Error en operación múltiple');
         return data;
+      },
+
+      // Elimina una fila por id (columna A) usando la acción deleteById del backend
+      async deleteById(sheetName, id) {
+        const payload = { action: 'deleteById', sheet: sheetName, id: id };
+        const res = await fetch(S.scriptUrl, { method: 'POST', body: JSON.stringify(payload) });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || 'Error al eliminar');
+        return data;
       }
     };
 
@@ -8235,9 +8244,7 @@
       if (!cot) return;
       if (!confirm('¿Eliminar cotización ' + cot.numero + '? Esta acción no se puede deshacer.')) return;
       await busy(async function() {
-        await sheets.multi([
-          { type: 'delete', sheet: '📝 Cotizaciones', id: cotId }
-        ]);
+        await sheets.deleteById('📝 Cotizaciones', cotId);
         S.cotizaciones = S.cotizaciones.filter(function(c) { return c.id !== cotId; });
         renderCotizaciones();
         toast('Cotización eliminada');
