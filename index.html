@@ -8683,8 +8683,8 @@
         });
       }
 
-      // Codes grouped by guest — TODAS las reservas con códigos (no solo check-in)
-      var activeRes = S.reservas.filter(function(r) { return r.estado !== 'Cancelada' && r.estado !== 'Check-out' && r.estado !== 'Completada'; });
+      // Codes grouped by guest
+      var activeRes = S.reservas.filter(function(r) { return r.estado === 'Check-in'; });
       var guestsWithCodes = [];
       activeRes.forEach(function(r) {
         var codes = des.filter(function(d) { return d.reservaId === r.id; });
@@ -8708,7 +8708,7 @@
           h += '</div></div>';
           // Codes list (collapsed by default)
           h += '<div style="display:none;border-top:1px solid var(--surface3);padding:8px 12px;">';
-          g.codes.sort(function(a, b) { var _rk = function(x){ return x.estado === 'Pendiente' ? 0 : x.estado === 'Consumido' ? 1 : 2; }; if (_rk(a) !== _rk(b)) return _rk(a) - _rk(b); return a.fecha.localeCompare(b.fecha); }).forEach(function(c) {
+          g.codes.sort(function(a, b) { return a.fecha.localeCompare(b.fecha); }).forEach(function(c) {
             var stColor = c.estado === 'Pendiente' ? 'var(--yellow)' : c.estado === 'Consumido' ? 'var(--green)' : 'var(--red)';
             var stIcon = c.estado === 'Pendiente' ? '🟡' : c.estado === 'Consumido' ? '✅' : '❌';
             h += '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--surface3);font-size:12px;">';
@@ -15922,6 +15922,140 @@
       var tel = document.getElementById('wiTel'); if (tel) tel.value = client.telefono || '';
       var em = document.getElementById('wiEmail'); if (em) em.value = client.email || '';
       var dd = document.getElementById('walkinAcDropdown'); if (dd) { dd.classList.remove('open'); dd.innerHTML = ''; }
+    }
+
+    // Menú de Desayunos reorganizado: prioridad a "Códigos por huésped";
+    // "Últimos consumidos" guardado en un desplegable para que no estorbe.
+    function renderDesayunosTab() {
+      var promo = getBreakfastPromo();
+      var promoActive = isBreakfastPromoActive();
+      var des = S.desayunos || [];
+      var today = normDate(new Date());
+      var h = '';
+      h += '<div class="section-title" style="margin-bottom:14px;">🍳 Desayunos</div>';
+
+      if (promoActive) {
+        h += '<div style="background:linear-gradient(135deg,rgba(46,125,50,0.12),rgba(76,175,80,0.06));border:1px solid rgba(76,175,80,0.3);border-radius:var(--radius);padding:12px;margin-bottom:14px;">';
+        h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;"><span style="font-size:18px;">✅</span><span style="font-weight:700;color:#2e7d32;">Promoción activa</span></div>';
+        h += '<div style="font-size:12px;color:var(--text2);">' + (promo.partner || '') + '</div>';
+        if (promo.descripcion) h += '<div style="font-size:11px;color:var(--text1);margin-top:4px;">🍽️ ' + promo.descripcion + '</div>';
+        h += '</div>';
+      } else {
+        h += '<div style="background:var(--surface3);border-radius:var(--radius);padding:12px;margin-bottom:14px;text-align:center;">';
+        h += '<div style="font-size:13px;color:var(--text2);">⏸️ Promoción inactiva — Actívala en <a href="#" onclick="switchTab(\'config\');return false;" style="color:var(--accent);">Ajustes</a></div>';
+        h += '</div>';
+      }
+
+      var todayCodes = des.filter(function(d) { return d.fecha === today; });
+      var todayPendientes = todayCodes.filter(function(d) { return d.estado === 'Pendiente'; });
+      var todayConsumidos = todayCodes.filter(function(d) { return d.estado === 'Consumido'; });
+
+      h += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;">';
+      h += '<div class="report-box" style="text-align:center;padding:10px;"><div style="font-size:22px;font-weight:800;color:var(--yellow);">' + todayPendientes.length + '</div><div style="font-size:10px;color:var(--text2);">Pendientes hoy</div></div>';
+      h += '<div class="report-box" style="text-align:center;padding:10px;"><div style="font-size:22px;font-weight:800;color:var(--green);">' + todayConsumidos.length + '</div><div style="font-size:10px;color:var(--text2);">Consumidos hoy</div></div>';
+      h += '<div class="report-box" style="text-align:center;padding:10px;"><div style="font-size:22px;font-weight:800;color:var(--accent);">' + des.length + '</div><div style="font-size:10px;color:var(--text2);">Total códigos</div></div>';
+      h += '</div>';
+
+      if (promoActive && S.scriptUrl) {
+        var valLink = window.location.origin + window.location.pathname + '?validar&u=' + encodeURIComponent(S.scriptUrl);
+        h += '<div style="background:var(--surface3);padding:10px 12px;border-radius:var(--radius);margin-bottom:14px;">';
+        h += '<div style="font-size:11px;color:var(--text2);margin-bottom:6px;">Link de validación para restaurante:</div>';
+        h += '<div style="display:flex;gap:10px;align-items:center;">';
+        h += '<canvas id="valQrCanvas" width="80" height="80" style="border-radius:6px;background:#fff;padding:4px;width:80px;height:80px;flex-shrink:0;"></canvas>';
+        h += '<div style="flex:1;display:flex;flex-direction:column;gap:6px;">';
+        h += '<button class="form-button secondary" onclick="navigator.clipboard.writeText(\'' + valLink.replace(/'/g, "\\'") + '\');toast(\'Link copiado\')" style="font-size:11px;padding:6px 10px;">📋 Copiar link</button>';
+        h += '<button class="form-button secondary" onclick="window.open(\'' + valLink.replace(/'/g, "\\'") + '\',\'_blank\')" style="font-size:11px;padding:6px 10px;">🔗 Abrir</button>';
+        h += '<button class="form-button secondary" onclick="shareValidationQR()" style="font-size:11px;padding:6px 10px;">📤 Compartir QR</button>';
+        h += '</div></div></div>';
+      }
+
+      // ===== PRIORIDAD: Códigos por huésped (todas las reservas activas con códigos) =====
+      var activeRes = S.reservas.filter(function(r) { return r.estado !== 'Cancelada' && r.estado !== 'Check-out' && r.estado !== 'Completada'; });
+      var guestsWithCodes = [];
+      activeRes.forEach(function(r) {
+        var codes = des.filter(function(d) { return d.reservaId === r.id; });
+        if (codes.length > 0) guestsWithCodes.push({ res: r, codes: codes });
+      });
+
+      if (guestsWithCodes.length > 0) {
+        h += '<div class="section-title" style="font-size:13px;margin:4px 0 8px;">👤 Códigos por huésped</div>';
+        guestsWithCodes.forEach(function(g) {
+          var pend = g.codes.filter(function(d) { return d.estado === 'Pendiente'; }).length;
+          var used = g.codes.filter(function(d) { return d.estado === 'Consumido'; }).length;
+          h += '<div style="background:var(--surface2);border-radius:var(--radius);margin-bottom:8px;overflow:hidden;">';
+          h += '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;cursor:pointer;" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\'">';
+          h += '<div><div style="font-weight:700;font-size:13px;">' + g.res.huesped + '</div>';
+          h += '<div style="font-size:11px;color:var(--text2);">Hab. ' + g.res.habitacionNum + ' · ' + formatDate(g.res.fechaEntrada) + ' → ' + formatDate(g.res.fechaSalida) + '</div></div>';
+          h += '<div style="display:flex;gap:6px;align-items:center;">';
+          if (pend > 0) h += '<span style="background:var(--yellow);color:#000;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;">' + pend + ' pend.</span>';
+          if (used > 0) h += '<span style="background:var(--green);color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;">' + used + ' usados</span>';
+          h += '<span style="font-size:14px;color:var(--text2);">▾</span>';
+          h += '</div></div>';
+          h += '<div style="display:none;border-top:1px solid var(--surface3);padding:8px 12px;">';
+          g.codes.sort(function(a, b) { var _rk = function(x){ return x.estado === 'Pendiente' ? 0 : x.estado === 'Consumido' ? 1 : 2; }; if (_rk(a) !== _rk(b)) return _rk(a) - _rk(b); return a.fecha.localeCompare(b.fecha); }).forEach(function(c) {
+            var stIcon = c.estado === 'Pendiente' ? '🟡' : c.estado === 'Consumido' ? '✅' : '❌';
+            h += '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--surface3);font-size:12px;">';
+            h += '<div><span style="font-family:Space Mono,monospace;font-weight:600;color:var(--accent);">' + c.codigo + '</span>';
+            h += '<span style="color:var(--text2);margin-left:8px;">' + formatDate(c.fecha) + ' · ' + c.personas + ' pers.</span></div>';
+            h += '<div style="display:flex;align-items:center;gap:6px;">';
+            if (c.estado === 'Pendiente') h += '<button onclick="event.stopPropagation();shareBreakfastQRCard(\'' + c.codigo + '\')" style="background:#25D366;color:#fff;border:none;border-radius:6px;padding:3px 8px;font-size:10px;cursor:pointer;font-weight:600;">📱 QR</button>';
+            h += '<span style="font-size:10px;">' + stIcon + ' ' + c.estado + '</span>';
+            h += '</div></div>';
+          });
+          h += '<div style="display:flex;gap:6px;margin-top:8px;padding-bottom:4px;">';
+          h += '<button class="form-button secondary" onclick="openMessagingPanel(\'' + g.res.id + '\')" style="flex:1;font-size:11px;padding:6px;">📨 Enviar códigos</button>';
+          h += '<button class="form-button secondary" onclick="generateBreakfastVoucherPDF(\'' + g.res.id + '\',\'download\')" style="flex:1;font-size:11px;padding:6px;">🎟️ Voucher PDF</button>';
+          h += '</div>';
+          h += '</div></div>';
+        });
+      } else {
+        h += '<div style="text-align:center;padding:20px;color:var(--text2);font-size:12px;">Aún no hay códigos de desayuno. Genera desde una reserva o al hacer check-in.</div>';
+      }
+
+      // Pendientes de hoy (para el restaurante)
+      if (todayPendientes.length > 0) {
+        h += '<div class="section-title" style="font-size:13px;margin:16px 0 8px;">🎟️ Pendientes de hoy</div>';
+        todayPendientes.forEach(function(bf) {
+          h += '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:var(--surface2);border-radius:var(--radius);margin-bottom:6px;border-left:3px solid var(--yellow);">';
+          h += '<div><div style="font-family:Space Mono,monospace;font-weight:700;font-size:14px;color:var(--accent);">' + bf.codigo + '</div>';
+          h += '<div style="font-size:11px;color:var(--text2);">' + bf.huesped + ' · Hab. ' + bf.habitacion + ' · ' + bf.personas + ' pers.</div></div>';
+          h += '<span style="background:var(--yellow);color:#000;font-size:10px;font-weight:700;padding:3px 8px;border-radius:10px;">Pendiente</span>';
+          h += '</div>';
+        });
+      }
+
+      // Últimos consumidos — guardado en desplegable para que no estorbe
+      var recentConsumidos = des.filter(function(d) { return d.estado === 'Consumido'; }).sort(function(a, b) { return (b.horaValidacion || '').localeCompare(a.horaValidacion || ''); }).slice(0, 20);
+      if (recentConsumidos.length > 0) {
+        h += '<details style="margin-top:16px;background:var(--surface2);border-radius:var(--radius);padding:4px 12px;">';
+        h += '<summary style="cursor:pointer;font-size:13px;font-weight:700;padding:8px 0;color:var(--text2);">✅ Últimos consumidos (' + recentConsumidos.length + ')</summary>';
+        h += '<div style="padding-bottom:8px;">';
+        recentConsumidos.forEach(function(bf) {
+          h += '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-top:1px solid var(--surface3);font-size:12px;">';
+          h += '<div><span style="font-family:Space Mono,monospace;font-weight:600;">' + bf.codigo + '</span>';
+          h += '<span style="color:var(--text2);margin-left:6px;">' + bf.huesped + ' · ' + formatDate(bf.fecha) + '</span></div>';
+          h += '<span style="font-size:10px;color:var(--text2);">' + (bf.horaValidacion || '') + '</span>';
+          h += '</div>';
+        });
+        h += '</div></details>';
+      }
+
+      h += '<div style="margin-top:16px;display:flex;gap:8px;">';
+      h += '<button class="form-button secondary" onclick="switchTab(\'reports\');S.filterReports=\'desayunos\';renderReports();" style="flex:1;font-size:12px;">📊 Reporte completo</button>';
+      h += '<button class="form-button secondary" onclick="exportDesayunosPDF()" style="flex:1;font-size:12px;">📄 PDF facturación</button>';
+      h += '</div>';
+
+      document.getElementById('desayunosContent').innerHTML = h;
+
+      if (promoActive && S.scriptUrl) {
+        setTimeout(function() {
+          var qrEl = document.getElementById('valQrCanvas');
+          if (qrEl && typeof QRious !== 'undefined') {
+            var vl = window.location.origin + window.location.pathname + '?validar&u=' + encodeURIComponent(S.scriptUrl);
+            new QRious({ element: qrEl, value: vl, size: 200, level: 'M' });
+          }
+        }, 50);
+      }
     }
 
     // Núcleo compartido: escribe los códigos de desayuno en la hoja y en memoria. Devuelve cuántos.
