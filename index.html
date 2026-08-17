@@ -13389,6 +13389,8 @@
         toast('✅ Walk-in completado — ' + _walkin.nombre + ' en Hab. ' + _walkin.roomNum);
         render();
 
+        // Ofrecer la promo de desayuno (popup) y luego el panel de mensajería
+        try { await offerBreakfastOnCheckin(S.reservas.find(function(r){return r.id===resId;}), room); } catch (e) {}
         // Show messaging panel directly for the new reservation
         setTimeout(function() { openMessagingPanel(resId); }, 400);
       }, 'Procesando walk-in...');
@@ -14443,8 +14445,10 @@
       toast('📄 PDF formal generado');
     }
 
-    function showPostCheckinMessages(res, room) {
+    async function showPostCheckinMessages(res, room) {
       if (!res) return;
+      try { await offerBreakfastOnCheckin(res, room); } catch (e) {}
+      var alreadyHasBf = (S.desayunos || []).some(function(_d) { return _d.reservaId === res.id; });
       var hi = getHotelInfo();
       var promo = getBreakfastPromo();
       var promoActive = isBreakfastPromoActive();
@@ -14496,7 +14500,7 @@
       ];
 
       // Add breakfast promo message if active
-      if (promoActive && personas > 0) {
+      if (promoActive && personas > 0 && !alreadyHasBf) {
         msgCategories[3].messages.push({
           id: 'desayuno', name: 'Promoción de Desayuno', icon: '🍳', checked: true, isBreakfast: true,
           text: '🍳 *Desayuno incluido*\n\n¡Hola *' + res.huesped + '*!\n\nTu habitación incluye desayuno en *' + (promo.partner || 'Restaurante') + '*\n\n🍽️ ' + (promo.descripcion || 'Desayuno continental') + '\n👥 ' + personas + ' persona(s) por desayuno\n🌙 ' + nights + ' noche(s) = ' + nights + ' desayuno(s)\n\n¡Buen provecho! 😊'
@@ -14536,7 +14540,7 @@
       });
 
       // Breakfast activation prompt if applicable
-      if (promoActive && personas > 0) {
+      if (promoActive && personas > 0 && !alreadyHasBf) {
         h += '<div style="background:linear-gradient(135deg,rgba(139,170,106,.1),rgba(139,170,106,.05));border:1px solid var(--accent);border-radius:var(--radius);padding:12px;margin-bottom:14px;">';
         h += '<div style="display:flex;align-items:center;gap:10px;">';
         h += '<input type="checkbox" id="postmsg_activateBreakfast" checked style="accent-color:var(--accent);width:18px;height:18px;" />';
@@ -15913,37 +15917,69 @@
       var dd = document.getElementById('walkinAcDropdown'); if (dd) { dd.classList.remove('open'); dd.innerHTML = ''; }
     }
 
+    // Núcleo compartido: escribe los códigos de desayuno en la hoja y en memoria. Devuelve cuántos.
+    async function _appendBreakfastCodes(res, personas) {
+      var nights = daysUntil(res.fechaEntrada, res.fechaSalida);
+      var count = Math.max(nights, 1);
+      var ops = [], added = [], n = now();
+      for (var di = 0; di < count; di++) {
+        var d = new Date(res.fechaEntrada + 'T12:00:00'); d.setDate(d.getDate() + di + 1);
+        var ds = normDate(d);
+        var code = generateBreakfastCode();
+        ops.push({ type: 'append', sheet: '🍳 Desayunos', values: [code, res.id, res.huesped, res.habitacionNum, ds, personas, 'Pendiente', '', ''] });
+        added.push({ codigo: code, reservaId: res.id, huesped: res.huesped, habitacion: res.habitacionNum, fecha: ds, personas: personas, estado: 'Pendiente', validadoPor: '', horaValidacion: '' });
+      }
+      ops.push({ type: 'append', sheet: '📜 Bitácora', values: [normDate(new Date()), n.split(' ')[1], (S.user && S.user.usuario) || '', 'Desayunos Generados', 'Hab.' + res.habitacionNum + ' ' + added.length + ' código(s)', 'info'] });
+      await sheets.multi(ops);
+      S.desayunos = (S.desayunos || []).concat(added);
+      return added.length;
+    }
+
+    // Sugerencia de personas para el desayuno según tipo de habitación (con respaldo)
+    function _bfPersonasSugeridas(room) {
+      var p = 0;
+      try { p = getBreakfastPersonas(room ? room.tipo : '') || 0; } catch (e) {}
+      if (!p) { var hi = getHotelInfo(); p = (hi && hi.ocupacionBase) ? hi.ocupacionBase : 2; }
+      return p;
+    }
+
     // Generar códigos de desayuno de forma directa y confiable para una reserva
     // (funciona en cualquier estado, aunque la promo esté "inactiva", con conteo manual).
     async function generarDesayunosReserva(resId) {
       var res = S.reservas.find(function(r) { return r.id === resId; });
       if (!res) { toast('Reserva no encontrada', true); return; }
       var room = S.rooms.find(function(r) { return r.numero === res.habitacionNum; });
-      var sugerido = 0;
-      try { sugerido = getBreakfastPersonas(room ? room.tipo : '') || 0; } catch (e) {}
-      if (!sugerido) { var hi = getHotelInfo(); sugerido = (hi && hi.ocupacionBase) ? hi.ocupacionBase : 2; }
-      var ans = prompt('¿Cuántos desayunos por noche (personas)?', String(sugerido));
+      var ans = prompt('¿Cuántos desayunos por noche (personas)?', String(_bfPersonasSugeridas(room)));
       if (ans === null) return;
       var personas = parseInt(ans) || 0;
       if (personas <= 0) { toast('Cantidad inválida', true); return; }
-      var nights = daysUntil(res.fechaEntrada, res.fechaSalida);
-      var count = Math.max(nights, 1);
       await busy(async function() {
-        var ops = [], added = [], n = now();
-        for (var di = 0; di < count; di++) {
-          var d = new Date(res.fechaEntrada + 'T12:00:00'); d.setDate(d.getDate() + di + 1);
-          var ds = normDate(d);
-          var code = generateBreakfastCode();
-          ops.push({ type: 'append', sheet: '🍳 Desayunos', values: [code, res.id, res.huesped, res.habitacionNum, ds, personas, 'Pendiente', '', ''] });
-          added.push({ codigo: code, reservaId: res.id, huesped: res.huesped, habitacion: res.habitacionNum, fecha: ds, personas: personas, estado: 'Pendiente', validadoPor: '', horaValidacion: '' });
-        }
-        ops.push({ type: 'append', sheet: '📜 Bitácora', values: [normDate(new Date()), n.split(' ')[1], (S.user && S.user.usuario) || '', 'Desayunos Generados', 'Hab.' + res.habitacionNum + ' ' + added.length + ' código(s)', 'info'] });
-        await sheets.multi(ops);
-        S.desayunos = (S.desayunos || []).concat(added);
-        toast('🍳 ' + added.length + ' desayuno(s) generado(s)');
+        var c = await _appendBreakfastCodes(res, personas);
+        toast('🍳 ' + c + ' desayuno(s) generado(s)');
         closeModal();
         openReservaModal(resId);
       }, 'Generando desayunos...');
+    }
+
+    // Popup al hacer check-in: preguntar si se agrega la promo de desayuno vigente.
+    // No hace nada si ya tiene códigos o si no hay promo configurada.
+    async function offerBreakfastOnCheckin(res, room) {
+      try {
+        if (!res) return;
+        if ((S.desayunos || []).some(function(d) { return d.reservaId === res.id; })) return; // ya tiene
+        var promo = getBreakfastPromo();
+        if (!promo || !promo.partner) return; // sin promo configurada
+        var personas = _bfPersonasSugeridas(room);
+        var nights = daysUntil(res.fechaEntrada, res.fechaSalida);
+        var count = Math.max(nights, 1);
+        var vig = isBreakfastPromoActive() ? '' : '\n(La promo está marcada inactiva, pero puedes agregarla igual.)';
+        var msg = '¿Agregar la promoción de desayuno para ' + res.huesped + '?\n\n'
+          + (promo.partner || 'Desayuno') + ' · ' + personas + ' desayuno(s) por noche\n'
+          + 'Se generarán ' + count + ' código(s).' + vig;
+        if (!confirm(msg)) return;
+        var c = await _appendBreakfastCodes(res, personas);
+        toast('🍳 ' + c + ' desayuno(s) agregado(s)');
+      } catch (e) { console.warn('offerBreakfastOnCheckin:', e.message); }
     }
 
     // Marcar limpieza hecha con un clic: completa las tareas de limpieza de la
