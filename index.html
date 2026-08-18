@@ -16762,37 +16762,45 @@
       return digits;
     }
 
+    // Etiqueta amigable de fecha: Hoy / Mañana / "sáb 16 ago".
+    function _bfDateLabel(fecha) {
+      var today = normDate(new Date());
+      var tmr = normDate(new Date(Date.now() + 86400000));
+      if (fecha === today) return 'Hoy';
+      if (fecha === tmr) return 'Mañana';
+      try {
+        var d = new Date(fecha + 'T12:00:00');
+        var dias = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
+        var meses = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+        return dias[d.getDay()] + ' ' + d.getDate() + ' ' + meses[d.getMonth()];
+      } catch (e) { return fecha; }
+    }
+
     // Núcleo: arma y envía por WhatsApp al restaurante la lista de códigos dada.
-    // `codes` es un arreglo de objetos de S.desayunos. Agrupa por huésped.
-    function _sendCodesArrayToRestaurant(codes, subtitulo) {
+    // Formato bonito: agrupado por fecha, con lo necesario para recibir al huésped.
+    function _sendCodesArrayToRestaurant(codes) {
       if (!codes || codes.length === 0) { toast('No hay códigos para avisar', true); return; }
       var phone = _restaurantePhone();
       if (!phone) return;
       var promo = getBreakfastPromo();
       var hotelName = (typeof HOTEL_NAME !== 'undefined' ? HOTEL_NAME : 'Casa Regina');
 
-      // Agrupar por huésped/habitación
-      var groups = {};
-      codes.forEach(function(c) {
-        var key = (c.huesped || '') + '||' + (c.habitacion || '');
-        if (!groups[key]) groups[key] = { huesped: c.huesped || '', habitacion: c.habitacion || '', items: [] };
-        groups[key].items.push(c);
-      });
+      var byDate = {};
+      codes.forEach(function(c) { (byDate[c.fecha] = byDate[c.fecha] || []).push(c); });
+      var dates = Object.keys(byDate).sort();
+      var totalPers = codes.reduce(function(s, c) { return s + (parseInt(c.personas) || 0); }, 0);
 
-      var msg = '🍳 *AVISO DE DESAYUNOS — ' + hotelName + '*\n';
-      msg += '_' + (subtitulo || 'Para el restaurante: tener listos estos códigos') + '_\n';
-      msg += '━━━━━━━━━━━━━━━\n\n';
-      Object.keys(groups).forEach(function(k) {
-        var g = groups[k];
-        msg += '👤 *' + g.huesped + '*' + (g.habitacion ? ' — Hab. ' + g.habitacion : '') + '\n';
-        g.items.sort(function(a, b) { return String(a.fecha).localeCompare(String(b.fecha)); }).forEach(function(c) {
-          msg += '   • ' + formatDate(c.fecha) + ' — *' + c.codigo + '* (' + c.personas + ' pers.)\n';
+      var msg = '☀️ *' + hotelName + '*\n';
+      msg += 'Huéspedes que llegan a desayunar 🍽️\n';
+      dates.forEach(function(dt) {
+        msg += '\n📅 *' + _bfDateLabel(dt) + '*\n';
+        byDate[dt].sort(function(a, b) { return String(a.huesped).localeCompare(String(b.huesped)); }).forEach(function(c) {
+          msg += '• *' + (c.huesped || '') + '* — Hab. ' + (c.habitacion || '') + ' · ' + c.personas + ' pers · código *' + c.codigo + '*\n';
         });
-        msg += '\n';
       });
-      msg += '🕐 Horario: ' + (promo.horario || '8:00 AM a 4:00 PM') + '\n';
-      if (promo.pinRestaurante) msg += '🔒 Validar en la app con el PIN interno del restaurante.\n';
-      msg += '\nGracias por tenerlos listos para agilizar la recepción. 🌿';
+      msg += '\n🕐 Horario: ' + (promo.horario || '8:00 AM a 4:00 PM') + '\n';
+      msg += '👥 Total: ' + totalPers + ' persona' + (totalPers === 1 ? '' : 's') + '\n';
+      msg += '\n¡Gracias! 🌿';
 
       window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(msg), '_blank');
     }
@@ -16803,54 +16811,73 @@
       if (!res) { toast('Reserva no encontrada', true); return; }
       var codes = (S.desayunos || []).filter(function(d) { return d.reservaId === resId && d.estado === 'Pendiente'; });
       if (codes.length === 0) { toast('No hay códigos pendientes para avisar', true); return; }
-      _sendCodesArrayToRestaurant(codes, 'Huésped ' + res.huesped + ' — tener listos estos códigos');
+      _sendCodesArrayToRestaurant(codes);
     }
 
-    // Selector: elegir qué códigos mandar al restaurante (desde el menú de Desayunos).
+    // Selector: filtrar por fecha y elegir qué códigos mandar al restaurante.
     function openRestaurantCodesSelector() {
       var today = normDate(new Date());
+      var tmr = normDate(new Date(Date.now() + 86400000));
       var pend = (S.desayunos || []).filter(function(d) { return d.estado === 'Pendiente'; });
       if (pend.length === 0) { toast('No hay códigos pendientes', false); return; }
-      // ordenar por fecha; los de hoy primero
-      pend.sort(function(a, b) {
-        var ah = (a.fecha === today) ? 0 : 1, bh = (b.fecha === today) ? 0 : 1;
-        if (ah !== bh) return ah - bh;
-        return String(a.fecha).localeCompare(String(b.fecha));
-      });
+      pend.sort(function(a, b) { return String(a.fecha).localeCompare(String(b.fecha)); });
       window._restCodesPool = pend;
 
+      var dates = [];
+      pend.forEach(function(c) { if (dates.indexOf(c.fecha) === -1) dates.push(c.fecha); });
+      dates.sort();
+      var defFilter = (dates.indexOf(tmr) !== -1) ? tmr : '__all';
+
       var h = '';
-      h += '<div style="font-size:12px;color:var(--text2);margin-bottom:10px;">Elige los códigos que quieres enviar al restaurante. Por defecto van marcados los de <b>hoy</b>.</div>';
-      h += '<div style="display:flex;gap:6px;margin-bottom:10px;">';
-      h += '<button class="form-button secondary" onclick="_restCodesSelectAll(true)" style="flex:1;font-size:11px;padding:6px;">Todos</button>';
-      h += '<button class="form-button secondary" onclick="_restCodesSelectToday()" style="flex:1;font-size:11px;padding:6px;">Solo hoy</button>';
-      h += '<button class="form-button secondary" onclick="_restCodesSelectAll(false)" style="flex:1;font-size:11px;padding:6px;">Ninguno</button>';
+      h += '<div style="font-size:12px;color:var(--text2);margin-bottom:10px;">Avisa al restaurante con tiempo. Filtra por fecha (ej. <b>mañana</b>) y elige a quién incluir.</div>';
+      h += '<div style="margin-bottom:8px;"><select id="_restDateFilter" onchange="_restCodesFilterDate(this.value)" style="width:100%;padding:9px;border-radius:8px;border:1px solid var(--surface3);background:var(--surface2);color:var(--text);font-size:12px;">';
+      h += '<option value="__all"' + (defFilter === '__all' ? ' selected' : '') + '>Todas las fechas (' + pend.length + ')</option>';
+      dates.forEach(function(dt) {
+        var cnt = pend.filter(function(c) { return c.fecha === dt; }).length;
+        h += '<option value="' + dt + '"' + (dt === defFilter ? ' selected' : '') + '>' + _bfDateLabel(dt) + ' · ' + dt + ' (' + cnt + ')</option>';
+      });
+      h += '</select></div>';
+      h += '<div style="display:flex;gap:6px;margin-bottom:12px;">';
+      h += '<button class="form-button secondary" onclick="_restCodesQuick(true)" style="flex:1;font-size:11px;padding:6px;">Marcar visibles</button>';
+      h += '<button class="form-button secondary" onclick="_restCodesQuick(false)" style="flex:1;font-size:11px;padding:6px;">Ninguno</button>';
       h += '</div>';
-      pend.forEach(function(c, i) {
-        var isToday = (c.fecha === today);
-        h += '<label style="display:flex;align-items:center;gap:10px;padding:9px 10px;background:var(--surface2);border-radius:10px;margin-bottom:6px;cursor:pointer;' + (isToday ? 'border-left:3px solid var(--yellow);' : '') + '">';
-        h += '<input type="checkbox" class="_restCodeCb" data-idx="' + i + '" ' + (isToday ? 'checked' : '') + ' style="width:18px;height:18px;accent-color:#2e7d32;flex-shrink:0;">';
-        h += '<div style="flex:1;min-width:0;">';
-        h += '<div style="font-size:13px;font-weight:600;"><span style="font-family:Space Mono,monospace;color:var(--accent);">' + c.codigo + '</span>' + (isToday ? ' <span style="font-size:9px;background:var(--yellow);color:#000;padding:1px 6px;border-radius:8px;">HOY</span>' : '') + '</div>';
-        h += '<div style="font-size:11px;color:var(--text2);">' + (c.huesped || '') + ' · Hab. ' + (c.habitacion || '') + ' · ' + formatDate(c.fecha) + ' · ' + c.personas + ' pers.</div>';
-        h += '</div></label>';
+      dates.forEach(function(dt) {
+        h += '<div class="_restDateGroup" data-fecha="' + dt + '">';
+        h += '<div style="font-size:11px;font-weight:700;color:var(--accent);margin:8px 0 4px;">📅 ' + _bfDateLabel(dt) + ' · ' + dt + '</div>';
+        pend.forEach(function(c, i) {
+          if (c.fecha !== dt) return;
+          h += '<label style="display:flex;align-items:center;gap:10px;padding:9px 10px;background:var(--surface2);border-radius:10px;margin-bottom:6px;cursor:pointer;">';
+          h += '<input type="checkbox" class="_restCodeCb" data-idx="' + i + '" data-fecha="' + c.fecha + '" style="width:18px;height:18px;accent-color:#2e7d32;flex-shrink:0;">';
+          h += '<div style="flex:1;min-width:0;">';
+          h += '<div style="font-size:13px;font-weight:600;">' + (c.huesped || '') + ' <span style="font-weight:400;color:var(--text2);font-size:11px;">· Hab. ' + (c.habitacion || '') + '</span></div>';
+          h += '<div style="font-size:11px;color:var(--text2);"><span style="font-family:Space Mono,monospace;color:var(--accent);">' + c.codigo + '</span> · ' + c.personas + ' pers.</div>';
+          h += '</div></label>';
+        });
+        h += '</div>';
       });
 
       document.getElementById('taskDetailContent').innerHTML = h;
-      document.getElementById('taskDetailModal').querySelector('.modal-title').textContent = '🍽️ Avisar códigos al restaurante';
-      document.getElementById('taskDetailActions').innerHTML = '<button class="form-button" onclick="sendSelectedCodesToRestaurant()" style="width:100%;background:#2e7d32;color:#fff;">📲 Enviar seleccionados</button>';
+      document.getElementById('taskDetailModal').querySelector('.modal-title').textContent = '🍽️ Avisar al restaurante';
+      document.getElementById('taskDetailActions').innerHTML = '<button class="form-button" onclick="sendSelectedCodesToRestaurant()" style="width:100%;background:#2e7d32;color:#fff;">📲 Enviar aviso</button>';
       openModal('taskDetailModal');
+      _restCodesFilterDate(defFilter);   // aplica filtro y marca por defecto
     }
 
-    function _restCodesSelectAll(val) {
-      document.querySelectorAll('._restCodeCb').forEach(function(cb) { cb.checked = !!val; });
-    }
-    function _restCodesSelectToday() {
-      var today = normDate(new Date());
-      var pool = window._restCodesPool || [];
+    // Filtra la vista por fecha y marca automáticamente los visibles (deja los ocultos sin marcar).
+    function _restCodesFilterDate(val) {
+      document.querySelectorAll('._restDateGroup').forEach(function(g) {
+        g.style.display = (val === '__all' || g.getAttribute('data-fecha') === val) ? '' : 'none';
+      });
       document.querySelectorAll('._restCodeCb').forEach(function(cb) {
-        var idx = parseInt(cb.getAttribute('data-idx'), 10);
-        cb.checked = pool[idx] && pool[idx].fecha === today;
+        cb.checked = (val === '__all' || cb.getAttribute('data-fecha') === val);
+      });
+      var sel = document.getElementById('_restDateFilter'); if (sel && sel.value !== val) sel.value = val;
+    }
+    // Marca/desmarca solo los códigos visibles (según el filtro de fecha actual).
+    function _restCodesQuick(val) {
+      document.querySelectorAll('._restDateGroup').forEach(function(g) {
+        if (g.style.display === 'none') return;
+        g.querySelectorAll('._restCodeCb').forEach(function(cb) { cb.checked = !!val; });
       });
     }
     function sendSelectedCodesToRestaurant() {
@@ -16861,7 +16888,7 @@
       });
       if (chosen.length === 0) { toast('Selecciona al menos un código', true); return; }
       closeModal();
-      _sendCodesArrayToRestaurant(chosen, 'Códigos seleccionados — tener listos');
+      _sendCodesArrayToRestaurant(chosen);
     }
 
     // Cambiar el estado de un código de desayuno desde la app y persistirlo en la hoja
