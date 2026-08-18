@@ -4052,6 +4052,21 @@
       return '<img class="wb-photo' + (cls ? ' ' + cls : '') + '" src="' + _wbEsc(url) + '" alt="" loading="lazy" onerror="this.style.display=\'none\'">';
     }
 
+    // Resuelve la foto de una habitación aunque el nombre esté normalizado/distinto
+    // (exacto → sin distinguir mayúsculas/parcial → pool del repo por palabra clave)
+    function _wbResolveRoomPhoto(g, tipo, roomNum) {
+      var rp = (g && g.roomPhotos) ? g.roomPhotos : {};
+      if (rp[tipo]) return rp[tipo];
+      var t = String(tipo || '').toLowerCase();
+      var keys = Object.keys(rp), i;
+      for (i = 0; i < keys.length; i++) {
+        var k = keys[i].toLowerCase();
+        if (k && rp[keys[i]] && (t === k || t.indexOf(k) !== -1 || k.indexOf(t) !== -1)) return rp[keys[i]];
+      }
+      try { if (typeof _bkRoomPhoto === 'function') { var p = _bkRoomPhoto(tipo, roomNum); if (p) return p; } } catch (e) {}
+      return '';
+    }
+
     async function showWelcomeBook(resId) {
       document.getElementById('setupScreen').classList.remove('active');
       document.getElementById('loginScreen').classList.remove('active');
@@ -4395,8 +4410,8 @@
           order.sort(function(a, b) { if (a.tipo === _wbRes.tipo) return -1; if (b.tipo === _wbRes.tipo) return 1; return 0; });
         }
         var cards = order.map(function(r) {
-          var photo = (g.roomPhotos && g.roomPhotos[r.tipo]) || '';
-          var mine = _wbRes && _wbRes.tipo === r.tipo;
+          var mine = _wbRes && String(_wbRes.tipo || '').toLowerCase() === String(r.tipo || '').toLowerCase();
+          var photo = _wbResolveRoomPhoto(g, r.tipo, mine ? (_wbRes && _wbRes.habitacionNum) : '');
           var h = '';
           if (photo) h += _wbPhoto(photo, 'wb-sec-photo');
           h += '<div class="wb-place-name">' + (mine ? '⭐ ' : '') + _wbEsc(r.tipo) + (mine ? ' · ' + _wbEsc(_wbLabel('yourRoom')) : '') + '</div>';
@@ -4410,7 +4425,8 @@
         var h = '';
         // Datos reales del cliente
         if (_wbRes) {
-          if (g.roomPhotos && _wbRes.tipo && g.roomPhotos[_wbRes.tipo]) h += _wbPhoto(g.roomPhotos[_wbRes.tipo], 'wb-sec-photo');
+          var _mrp = _wbResolveRoomPhoto(g, _wbRes.tipo, _wbRes.habitacionNum);
+          if (_mrp) h += _wbPhoto(_mrp, 'wb-sec-photo');
           var ci = '<div class="wb-kv"><span>' + _wbEsc(_wbLabel('guestLbl')) + '</span><b>' + _wbEsc(_wbRes.huesped) + '</b></div>';
           ci += '<div class="wb-kv"><span>' + _wbEsc(_wbLabel('room')) + '</span><b>' + _wbEsc(_wbRes.habitacionNum) + '</b></div>';
           if (_wbRes.fechaEntrada) ci += '<div class="wb-kv"><span>' + _wbEsc(_wbLabel('arrivalDate')) + '</span><b>' + _wbEsc(_wbRes.fechaEntrada) + (hi.checkin_hora ? ' · ' + _wbEsc(formatHoraDisplay(hi.checkin_hora)) : '') + '</b></div>';
