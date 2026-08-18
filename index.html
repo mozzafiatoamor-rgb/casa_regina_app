@@ -5296,8 +5296,11 @@
             'Validar Código</button>' +
         '</div>' +
         '<div id="validarResult" style="margin-top:20px;"></div>' +
+        '<div id="validarRoster" style="margin-top:24px;"></div>' +
         '<div id="validarHistory" style="margin-top:30px;"></div>';
 
+      // Lista de llegadas (roster) para el restaurante
+      try { _renderValidarRoster(); } catch (e) {}
       // Auto-fill from QR code link (?validar&code=DES-XXXX)
       var urlCode = new URLSearchParams(window.location.search).get('code');
       if (urlCode) {
@@ -16762,6 +16765,150 @@
       return digits;
     }
 
+    // ============ ROSTER DE RESTAURANTE (?validar&fecha=...) ============
+    // Lista de códigos esperados por fecha, con botón "Consumido" por huésped.
+    // El restaurante abre el link que le mandamos y va marcando conforme llegan.
+    var _rosterAll = [], _rosterDate = '', _rosterPin = '', _rosterLoaded = false;
+
+    async function _renderValidarRoster() {
+      var el = document.getElementById('validarRoster');
+      if (!el) return;
+      el.innerHTML = '<div style="text-align:center;color:#888;font-size:13px;padding:10px;">Cargando lista de desayunos…</div>';
+      var _rd = S._publicMode
+        ? function(sh, rg) { return publicRead(S.scriptUrl, sh, rg); }
+        : function(sh, rg) { return sheets.read(sh, rg); };
+      // PIN configurado (si existe)
+      try {
+        var cfg = await _rd('⚙️ Config', 'A2:B50');
+        for (var ci = 0; ci < cfg.length; ci++) {
+          if (cfg[ci][0] === 'validarPin' && cfg[ci][1]) { _rosterPin = String(cfg[ci][1]); }
+          if (cfg[ci][0] === 'breakfastPromo' && cfg[ci][1] && !_rosterPin) {
+            try { _rosterPin = String((JSON.parse(cfg[ci][1]) || {}).pinRestaurante || ''); } catch (e) {}
+          }
+        }
+      } catch (e) {}
+      var data = [];
+      try { data = await _rd('🍳 Desayunos', 'A2:I5000'); } catch (e) {
+        el.innerHTML = '<div style="text-align:center;color:#c33;font-size:13px;padding:10px;">No se pudo cargar la lista. Reintenta.</div>';
+        return;
+      }
+      _rosterAll = data.map(function(d) {
+        return { codigo: String(d[0] || ''), huesped: String(d[2] || ''), habitacion: String(d[3] || ''),
+                 fecha: String(d[4] || '').substring(0, 10), personas: d[5] || '', estado: String(d[6] || 'Pendiente') };
+      }).filter(function(c) { return c.codigo; });
+      _rosterLoaded = true;
+
+      var today = normDate(new Date());
+      var urlFecha = new URLSearchParams(window.location.search).get('fecha');
+      var dates = [];
+      _rosterAll.forEach(function(c) { if (dates.indexOf(c.fecha) === -1 && c.fecha) dates.push(c.fecha); });
+      dates.sort();
+      // fecha activa: la del link, o hoy, o la primera con pendientes
+      var pendingDates = dates.filter(function(dt) { return _rosterAll.some(function(c) { return c.fecha === dt && c.estado === 'Pendiente'; }); });
+      _rosterDate = (urlFecha && dates.indexOf(urlFecha) !== -1) ? urlFecha
+                   : (pendingDates.indexOf(today) !== -1 ? today : (pendingDates[0] || dates[0] || today));
+      _rosterRenderList();
+    }
+
+    function _rosterRenderList() {
+      var el = document.getElementById('validarRoster');
+      if (!el) return;
+      var today = normDate(new Date());
+      var dates = [];
+      _rosterAll.forEach(function(c) { if (dates.indexOf(c.fecha) === -1 && c.fecha) dates.push(c.fecha); });
+      dates.sort();
+
+      var h = '';
+      h += '<div style="border-top:1px solid #e5ddcf;padding-top:16px;">';
+      h += '<div style="font-weight:800;font-size:16px;color:#3d3324;margin-bottom:4px;">📋 Llegadas de desayuno</div>';
+      h += '<div style="font-size:12px;color:#8a7a5f;margin-bottom:10px;">Toca “Llegó / Consumido” cuando el huésped se presente.</div>';
+      // Selector de fecha (chips)
+      if (dates.length > 1) {
+        h += '<div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin-bottom:10px;">';
+        dates.forEach(function(dt) {
+          var active = dt === _rosterDate;
+          var pend = _rosterAll.filter(function(c) { return c.fecha === dt && c.estado === 'Pendiente'; }).length;
+          h += '<button onclick="_rosterSetDate(\'' + dt + '\')" style="flex:0 0 auto;padding:6px 12px;border-radius:20px;border:1px solid ' + (active ? '#2e7d32' : '#d8cdb8') + ';background:' + (active ? '#2e7d32' : '#fff') + ';color:' + (active ? '#fff' : '#5a4d38') + ';font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">' + _bfDateLabel(dt) + (pend ? ' · ' + pend : '') + '</button>';
+        });
+        h += '</div>';
+      } else {
+        h += '<div style="font-size:13px;font-weight:700;color:#2e7d32;margin-bottom:8px;">📅 ' + _bfDateLabel(_rosterDate) + '</div>';
+      }
+
+      var list = _rosterAll.filter(function(c) { return c.fecha === _rosterDate; });
+      list.sort(function(a, b) {
+        var rk = function(x) { return x.estado === 'Pendiente' ? 0 : x.estado === 'Consumido' ? 1 : 2; };
+        if (rk(a) !== rk(b)) return rk(a) - rk(b);
+        return String(a.huesped).localeCompare(String(b.huesped));
+      });
+      if (!list.length) {
+        h += '<div style="text-align:center;color:#999;font-size:13px;padding:16px;">No hay desayunos para esta fecha.</div>';
+      }
+      list.forEach(function(c) {
+        var done = /consum|used/i.test(c.estado);
+        var cancel = /cancel/i.test(c.estado);
+        h += '<div style="display:flex;align-items:center;gap:10px;padding:12px;border-radius:12px;margin-bottom:8px;background:' + (done ? '#eef5ec' : cancel ? '#f6eeee' : '#fff') + ';border:1px solid ' + (done ? '#bcdcae' : '#e5ddcf') + ';' + (done || cancel ? 'opacity:.75;' : '') + '">';
+        h += '<div style="flex:1;min-width:0;">';
+        h += '<div style="font-size:15px;font-weight:700;color:#3d3324;">' + (c.huesped || '') + '</div>';
+        h += '<div style="font-size:12px;color:#8a7a5f;">Hab. ' + (c.habitacion || '') + ' · ' + c.personas + ' pers · <span style="font-family:monospace;">' + c.codigo + '</span></div>';
+        h += '</div>';
+        if (done) {
+          h += '<div style="color:#2e7d32;font-weight:700;font-size:13px;white-space:nowrap;">✅ Llegó</div>';
+        } else if (cancel) {
+          h += '<div style="color:#b04a4a;font-weight:700;font-size:12px;white-space:nowrap;">Cancelado</div>';
+        } else {
+          h += '<button id="rbtn_' + c.codigo + '" onclick="_rosterConsume(\'' + c.codigo + '\')" style="flex:0 0 auto;padding:10px 14px;border:none;border-radius:10px;background:#2e7d32;color:#fff;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;">✅ Llegó</button>';
+        }
+        h += '</div>';
+      });
+
+      // Resumen
+      var pend = list.filter(function(c) { return c.estado === 'Pendiente'; }).length;
+      var done = list.filter(function(c) { return /consum|used/i.test(c.estado); }).length;
+      h += '<div style="display:flex;gap:8px;margin-top:6px;">';
+      h += '<div style="flex:1;text-align:center;background:#fff8e1;border-radius:8px;padding:8px;"><div style="font-size:18px;font-weight:800;color:#b7860b;">' + pend + '</div><div style="font-size:10px;color:#8a7a5f;">Por llegar</div></div>';
+      h += '<div style="flex:1;text-align:center;background:#eef5ec;border-radius:8px;padding:8px;"><div style="font-size:18px;font-weight:800;color:#2e7d32;">' + done + '</div><div style="font-size:10px;color:#8a7a5f;">Registrados</div></div>';
+      h += '</div>';
+      h += '</div>';
+      el.innerHTML = h;
+    }
+
+    function _rosterSetDate(dt) { _rosterDate = dt; _rosterRenderList(); }
+
+    async function _rosterConsume(code) {
+      // Gate de PIN si está configurado
+      if (_rosterPin && !_isRestaurantPinAuthed()) {
+        var entered = window.prompt('PIN del restaurante (4 dígitos) para registrar consumos:');
+        if (entered === null) return;
+        if (String(entered).trim() !== String(_rosterPin).trim()) { alert('PIN incorrecto'); return; }
+        _setRestaurantPinAuthed();
+      }
+      var btn = document.getElementById('rbtn_' + code);
+      if (btn) { btn.disabled = true; btn.textContent = '…'; }
+      try {
+        var _rd = S._publicMode
+          ? function(sh, rg) { return publicRead(S.scriptUrl, sh, rg); }
+          : function(sh, rg) { return sheets.read(sh, rg); };
+        var data = await _rd('🍳 Desayunos', 'A2:I5000');
+        var found = null;
+        for (var i = 0; i < data.length; i++) { if (String(data[i][0]).toUpperCase() === String(code).toUpperCase()) { found = data[i]; break; } }
+        if (!found) throw new Error('no encontrado');
+        var nowStr = (typeof now === 'function') ? now() : new Date().toISOString();
+        var body = { action: 'multi', operations: [{
+          type: 'updateById', sheet: '🍳 Desayunos', id: String(found[0]),
+          values: [String(found[0]), String(found[1]), String(found[2]), String(found[3]), String(found[4]).substring(0, 10), parseInt(found[5]) || 1, 'Consumido', 'Restaurante', nowStr]
+        }] };
+        var res = await fetch(S.scriptUrl, { method: 'POST', body: JSON.stringify(body) });
+        if (!res.ok) throw new Error('servidor');
+        // actualizar en memoria y re-render
+        for (var j = 0; j < _rosterAll.length; j++) { if (String(_rosterAll[j].codigo).toUpperCase() === String(code).toUpperCase()) { _rosterAll[j].estado = 'Consumido'; break; } }
+        _rosterRenderList();
+      } catch (e) {
+        if (btn) { btn.disabled = false; btn.textContent = '✅ Llegó'; }
+        alert('No se pudo registrar. Revisa la conexión y reintenta.');
+      }
+    }
+
     // Etiqueta amigable de fecha: Hoy / Mañana / "sáb 16 ago".
     function _bfDateLabel(fecha) {
       var today = normDate(new Date());
@@ -16800,6 +16947,14 @@
       });
       msg += '\n🕐 Horario: ' + (promo.horario || '8:00 AM a 4:00 PM') + '\n';
       msg += '👥 Total: ' + totalPers + ' persona' + (totalPers === 1 ? '' : 's') + '\n';
+      // Link para registrar las llegadas (marca "consumido" conforme lleguen)
+      try {
+        if (S.scriptUrl) {
+          var base = window.location.origin + window.location.pathname;
+          var rosterLink = base + '?validar&u=' + encodeURIComponent(S.scriptUrl) + '&fecha=' + dates[0];
+          msg += '\n📲 Registra las llegadas aquí (marca “Llegó” cuando se presenten):\n' + rosterLink + '\n';
+        }
+      } catch (e) {}
       msg += '\n¡Gracias! 🌿';
 
       window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(msg), '_blank');
