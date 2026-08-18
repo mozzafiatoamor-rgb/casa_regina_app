@@ -2632,7 +2632,7 @@
             <option value="Cargo extra">Cargo extra</option>
           </select>
         </div>
-        <div style="display:flex;align-items:center;gap:10px;margin:10px 0 14px;padding:12px;background:var(--surface2);border-radius:var(--radius);">
+        <div id="payFacturaRow" style="display:flex;align-items:center;gap:10px;margin:10px 0 14px;padding:12px;background:var(--surface2);border-radius:var(--radius);">
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;flex:1;">
             <input type="checkbox" id="payFactura" onchange="togglePayIVA()" style="accent-color:var(--accent);width:18px;height:18px;" />
             <div><div style="font-size:13px;font-weight:600;">¿Requiere factura?</div><div style="font-size:11px;color:var(--text2);">Agrega IVA 16% + ISH 3% al monto</div></div>
@@ -2860,6 +2860,7 @@
       startDate: '',
       endDate: '',
       partner: 'Restaurante Cafeteria Mozzafiato',
+      telRestaurante: '',
       descripcion: 'Combo continental Croissant, mantequilla, mermelada de la casa, fruta fresca de temporada con granola y yogurt griego, jugo de naranja 275 ml, café americano sencillo o té sencillo.',
       horario: '8:00 AM a 4:00 PM',
       restricciones: 'Válido únicamente para huéspedes registrados del hotel.\nNo aplica para acompañantes externos.\nPresentar código QR al momento de ordenar.\nSujeto a disponibilidad.\nNo transferible ni acumulable.',
@@ -7608,8 +7609,9 @@
       });
 
       var subtotal = grandSubtotalHab + grandSubtotalPE;
-      var iva = conIVA ? Math.round(subtotal * IVA_RATE * 100) / 100 : 0;
-      var ish = conIVA ? Math.round(subtotal * ISH_RATE * 100) / 100 : 0;
+      var _tbC = _taxBreak(subtotal, conIVA);
+      var iva = _tbC.iva;
+      var ish = _tbC.ish;
       var total = subtotal + iva + ish;
       var anticipo_pct = getAnticipoPct();
       var anticipoMonto = anticipo_pct > 0 ? Math.ceil(total * getAnticipoFraction()) : 0;
@@ -8218,8 +8220,9 @@
       });
       var subtotal = grandSubtotalHab + grandSubtotalPE;
       var conIVA = cot.opciones.conIVA || false;
-      var iva = conIVA ? Math.round(subtotal * IVA_RATE * 100) / 100 : 0;
-      var ish = conIVA ? Math.round(subtotal * ISH_RATE * 100) / 100 : 0;
+      var _tbC2 = _taxBreak(subtotal, conIVA);
+      var iva = _tbC2.iva;
+      var ish = _tbC2.ish;
       var total = subtotal + iva + ish;
       var anticipo_pct = getAnticipoPct();
       _cotizacionData = {
@@ -10541,6 +10544,11 @@
       h += '<input type="text" id="bfHorario" class="login-input" value="' + (promo.horario || '8:00 AM a 4:00 PM') + '" placeholder="Ej: 8:00 AM a 4:00 PM" oninput="updateBreakfastField(\'horario\',this.value)" style="padding:8px;font-size:12px">';
       h += '<div style="font-size:10px;color:var(--text2);margin-top:2px">Se muestra en los mensajes de desayuno al huésped</div></div>';
 
+      // Teléfono del restaurante (para avisar los códigos)
+      h += '<div style="margin-bottom:12px"><label class="form-label" style="font-size:11px">\uD83C\uDF7D\uFE0F WhatsApp del restaurante</label>';
+      h += '<input type="text" id="bfTelRestaurante" class="login-input" value="' + (promo.telRestaurante || '') + '" placeholder="Ej: 9981234567" oninput="updateBreakfastField(\'telRestaurante\',this.value)" style="padding:8px;font-size:12px">';
+      h += '<div style="font-size:10px;color:var(--text2);margin-top:2px">Se usa con el bot\u00f3n \u201cAvisar al restaurante\u201d para enviarles los c\u00f3digos y agilizar la recepci\u00f3n</div></div>';
+
       // Restricciones
       h += '<div style="margin-bottom:12px"><label class="form-label" style="font-size:11px">Restricciones y condiciones</label>';
       h += '<textarea id="bfRestricciones" class="login-input" rows="4" placeholder="Ej: Válido únicamente para huéspedes registrados.\nNo transferible ni acumulable." oninput="updateBreakfastField(\'restricciones\',this.value)" style="padding:8px;font-size:12px;resize:vertical;width:100%;box-sizing:border-box;font-family:inherit">' + (promo.restricciones || '') + '</textarea>';
@@ -11955,6 +11963,7 @@
 
       const content = `
         <div style="margin-bottom: 20px;">
+          ${_resStepTracker(res, balance)}
           <div style="background: var(--surface3); padding: 12px; border-radius: var(--radius); margin-bottom: 12px;">
             <div style="font-size: 12px; color: var(--text2); margin-bottom: 4px;">HUÉSPED</div>
             <div style="font-weight: 700; margin-bottom: 8px;">${res.huesped}</div>
@@ -12013,7 +12022,8 @@
         msgSection += '<div style="font-size:12px;color:var(--text2);margin-bottom:8px;">ENVIAR MENSAJE</div>';
         msgSection += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">';
         var templates = getMsgTemplates();
-        var tplKeys = Object.keys(templates);
+        var _MSG_KEEP = ['confirmacion','recordatorio','despedida'];
+        var tplKeys = Object.keys(templates).filter(function(k){ return _MSG_KEEP.indexOf(k) !== -1; });
         tplKeys.forEach(function(key) {
           var tpl = templates[key];
           msgSection += '<button onclick="closeModal();previewTemplate(\'' + key + '\',\'' + resId + '\')" style="background:var(--surface2);border:1px solid var(--surface3);border-radius:8px;padding:8px 6px;font-size:11px;cursor:pointer;color:var(--text);text-align:center;">' + tpl.icon + ' ' + tpl.nombre.split(' ')[0] + '</button>';
@@ -12096,6 +12106,7 @@
         bfSection += '<button onclick="shareBreakfastCodes(\'' + resId + '\')" style="flex:1;background:#25D366;color:white;border:none;border-radius:8px;padding:8px;font-size:12px;cursor:pointer;font-weight:600">📲 Enviar códigos</button>';
         bfSection += '<button onclick="cancelBreakfastCodes(\'' + resId + '\')" style="background:var(--surface2);border:1px solid var(--surface3);border-radius:8px;padding:8px 12px;font-size:11px;cursor:pointer;color:var(--red)">Cancelar</button>';
         bfSection += '</div>';
+        bfSection += '<button onclick="sendCodesToRestaurant(\'' + resId + '\')" style="width:100%;margin-top:6px;background:var(--surface2);border:1px solid #2e7d32;border-radius:8px;padding:8px;font-size:11px;cursor:pointer;color:#2e7d32;font-weight:600">\uD83C\uDF7D\uFE0F Avisar c\u00f3digos al restaurante</button>';
         bfSection += '<div style="display:flex;gap:6px;margin-top:6px">';
         bfSection += '<button onclick="generateBreakfastVoucherPDF(\'' + resId + '\',\'share\')" style="flex:1;background:#2e7d32;color:white;border:none;border-radius:8px;padding:8px;font-size:11px;cursor:pointer;font-weight:600">🎫 Voucher PDF WhatsApp</button>';
         bfSection += '<button onclick="generateBreakfastVoucherPDF(\'' + resId + '\',\'download\')" style="flex:1;background:var(--surface2);border:1px solid #2e7d32;border-radius:8px;padding:8px;font-size:11px;cursor:pointer;color:#2e7d32;font-weight:600">📄 Descargar Voucher</button>';
@@ -12126,16 +12137,17 @@
         buttons += '<button class="form-button" onclick="confirmarReserva(\'' + resId + '\')" style="background:var(--green);color:white;">✅ Confirmar Reserva</button>';
       }
       if (res.estado === 'Confirmada' || res.estado === 'Reservada') {
+        buttons += '<button class="form-button" onclick="checkinReservaDirect(\'' + resId + '\')" style="background:var(--blue);color:#fff;">\uD83D\uDD11 Hacer Check-in</button>';
         buttons += '<button class="form-button secondary" onclick="cancelReserva(\'' + resId + '\')">Cancelar Reserva</button>';
         if (balance > 0) {
-          buttons += '<button class="form-button" onclick="closeModal();goToCobros(\'' + resId + '\')">💰 Ir a Cobros ($' + balance + ' pendiente)</button>';
+          buttons += '<button class="form-button" onclick="closeModal();openPaymentModal(\'' + resId + '\')">💰 Cobrar ($' + balance + ' pendiente)</button>';
         } else {
           buttons += '<div style="text-align:center;padding:10px;color:var(--green);font-weight:600">✅ Pagado completo</div>';
         }
       } else if (res.estado === 'Check-in') {
         buttons += '<button class="form-button" onclick="closeModal();openExtraChargeModal(\'' + resId + '\')" style="background:var(--yellow);color:var(--bg)">➕ Agregar Cargo Extra</button>';
         if (balance > 0) {
-          buttons += '<button class="form-button" onclick="closeModal();goToCobros(\'' + resId + '\')">💰 Ir a Cobros ($' + balance + ' pendiente)</button>';
+          buttons += '<button class="form-button" onclick="closeModal();openPaymentModal(\'' + resId + '\')">💰 Cobrar ($' + balance + ' pendiente)</button>';
         } else {
           buttons += '<div style="text-align:center;padding:10px;color:var(--green);font-weight:600">✅ Pagado completo</div>';
         }
@@ -12612,6 +12624,18 @@
       document.getElementById('payNotas').value = '';
       document.getElementById('payFactura').checked = false;
       document.getElementById('payIVAInfo').style.display = 'none';
+      var _pfRow = document.getElementById('payFacturaRow'); if (_pfRow) _pfRow.style.display = 'none';
+      var _fd = _resFacturaData(res);
+      if (_fd) {
+        var _dsg = '<div style="background:var(--surface2);border-radius:var(--radius);padding:12px;margin-bottom:14px;border:1px solid var(--accent);">'
+          + '<div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:8px;">\ud83e\uddfe FACTURA (folio ' + (_fd.folio || '') + ') — ya incluida en el total</div>'
+          + '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;"><span style="color:var(--text2)">Subtotal</span><span style="font-family:Space Mono">$' + _fmt(_fd.subtotal||0) + '</span></div>'
+          + '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;"><span style="color:var(--text2)">ISH (3%)</span><span style="font-family:Space Mono">$' + _fmt(_fd.ish||0) + '</span></div>'
+          + '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;"><span style="color:var(--text2)">IVA (16%)</span><span style="font-family:Space Mono">$' + _fmt(_fd.iva||0) + '</span></div>'
+          + '<div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;border-top:1px solid var(--surface3);padding-top:6px;margin-top:4px;"><span>Total</span><span style="font-family:Space Mono;color:var(--accent)">$' + _fmt(res.tarifaTotal) + '</span></div>'
+          + '</div>';
+        document.getElementById('paymentResInfo').insertAdjacentHTML('beforeend', _dsg);
+      }
       openModal('paymentModal');
     }
 
@@ -12682,17 +12706,11 @@
       event.preventDefault();
       var resId = document.getElementById('payResId').value;
       var montoBase = parseFloat(document.getElementById('payMonto').value);
-      var requiereFactura = document.getElementById('payFactura').checked;
-      var ivaAmount = requiereFactura ? Math.round(montoBase * IVA_RATE * 100) / 100 : 0;
-      var ishAmount = requiereFactura ? Math.round(montoBase * ISH_RATE * 100) / 100 : 0;
-      var monto = montoBase + ivaAmount + ishAmount;
+      var monto = montoBase; // el total de la reserva ya incluye impuestos si aplica (no re-agregar)
       var metodo = document.getElementById('payMetodo').value;
       var concepto = document.getElementById('payConcepto').value;
       var notas = document.getElementById('payNotas').value;
-      if (requiereFactura) {
-        var _payFolio = nextFacturaFolio();
-        notas = (notas ? notas + ' | ' : '') + 'FACTURA ' + _payFolio + ' — Subtotal: $' + _fmt(montoBase) + ' + IVA: $' + _fmt(ivaAmount) + ' + ISH: $' + _fmt(ishAmount);
-      }
+      // (la factura y su desglose ya quedan en la reserva; el pago solo registra el monto)
 
       if (!montoBase || montoBase <= 0 || !metodo) {
         toast('Completa monto y método de pago', true);
@@ -12701,8 +12719,7 @@
 
       var res = S.reservas.find(r => r.id === resId);
       var existingPaid = S.cobros.filter(function(c){return c.reservaId===resId}).reduce(function(s,c){return s+c.monto},0);
-      var tarifaConIVA = requiereFactura ? res.tarifaTotal * (1 + IVA_RATE + ISH_RATE) : res.tarifaTotal;
-      var currentBalance = tarifaConIVA - existingPaid;
+      var currentBalance = res.tarifaTotal - existingPaid;
       if (currentBalance <= 0) {
         toast('Esta reserva ya está pagada', false);
         closeModal();
@@ -12782,9 +12799,10 @@
       if (!checkin || !checkout || !tarifa) { infoEl.textContent = 'Llena tarifa y fechas para ver desglose'; return; }
       var days = daysUntil(checkin, checkout);
       var subtotal = Math.max(days, 1) * tarifa;
-      var iva = Math.round(subtotal * IVA_RATE * 100) / 100;
-      var ish = Math.round(subtotal * ISH_RATE * 100) / 100;
-      var total = subtotal + iva + ish;
+      var _tbI = _taxBreak(subtotal, true);
+      var iva = _tbI.iva;
+      var ish = _tbI.ish;
+      var total = _tbI.total;
       infoEl.innerHTML = '🧾 Subtotal: <strong>$' + _fmt(subtotal) + '</strong><br>IVA (16%): <strong>$' + _fmt(iva) + '</strong> · ISH (3%): <strong>$' + _fmt(ish) + '</strong><br>Total: <strong>$' + _fmt(total) + '</strong>';
     }
 
@@ -12806,12 +12824,14 @@
       var days = daysUntil(checkin, checkout);
       var subtotal = Math.max(days, 1) * tarifa;
       var factura = document.getElementById('newResFactura') && document.getElementById('newResFactura').checked;
-      var total = factura ? subtotal + Math.round(subtotal * IVA_RATE * 100) / 100 + Math.round(subtotal * ISH_RATE * 100) / 100 : subtotal;
+      var total = _taxBreak(subtotal, factura).total;
       var monto = Math.ceil(total * (pct / 100));
       document.getElementById('newResPayMonto').value = monto;
     }
 
     function openNewReservaModal(preRoom, preDate) {
+      window._walkinIntent = false;
+      try { var _nrmT = document.getElementById('newReservaModal').querySelector('.modal-title'); if (_nrmT) _nrmT.textContent = 'Nueva Reserva'; } catch(e) {}
       var checkin = preDate || normDate(new Date());
       var checkout = normDate(new Date(new Date(checkin + 'T12:00:00').getTime() + 86400000));
       document.getElementById('newResCheckIn').value = checkin;
@@ -12991,12 +13011,9 @@
         const id = nextId('R', S.reservas);
         const days = daysUntil(checkin, checkout);
         const subtotal = Math.max(days, 1) * tarifa;
-        var ivaAmount = 0;
-        var ishAmount = 0;
-        if (wantsFactura) {
-          ivaAmount = Math.round(subtotal * IVA_RATE * 100) / 100;
-          ishAmount = Math.round(subtotal * ISH_RATE * 100) / 100;
-        }
+        var _tbR = _taxBreak(subtotal, wantsFactura);
+        var ivaAmount = _tbR.iva;
+        var ishAmount = _tbR.ish;
         const total = subtotal + ivaAmount + ishAmount;
         const n = now();
         const fecha = normDate(new Date());
@@ -13060,14 +13077,18 @@
         closeModal();
         render();
 
-        // Show confirmation prompt after save
-        setTimeout(function() {
-          showPostReservaConfirm(id, huesped, roomNum);
-        }, 400);
+        // Walk-in unificado: si la intención es walk-in y la entrada es hoy, check-in inmediato
+        var _isToday = (checkin === normDate(new Date()));
+        var _wi = !!window._walkinIntent; window._walkinIntent = false;
+        if (_wi && _isToday) {
+          setTimeout(function() { checkinReservaDirect(id); }, 400);
+        } else {
+          setTimeout(function() { showPostReservaConfirm(id, huesped, roomNum, _isToday); }, 400);
+        }
       }, 'Guardando reserva...');
     }
 
-    function showPostReservaConfirm(resId, huesped, roomNum) {
+    function showPostReservaConfirm(resId, huesped, roomNum, isToday) {
       var res = S.reservas.find(function(r){return r.id===resId});
       var _aPct = getAnticipoPct();
       var anticipoMin = Math.ceil(res.tarifaTotal * getAnticipoFraction());
@@ -13115,6 +13136,11 @@
       h += '<button onclick="closeReceipt();previewTemplate(\'instrucciones\',\'' + resId + '\')" style="background:#2980b9;border:none;color:#fff">📍 Instrucciones de Llegada</button>';
       h += '</div>';
 
+      if (isToday) {
+        h += '<div class="receipt-btns" style="margin-top:12px">';
+        h += '<button onclick="closeReceipt();checkinReservaDirect(\'' + resId + '\')" style="background:#2980b9;border:none;color:#fff;font-weight:700">\uD83D\uDD11 Hacer Check-in ahora (walk-in)</button>';
+        h += '</div>';
+      }
       h += '<div class="receipt-btns" style="margin-top:12px">';
       h += '<button onclick="closeReceipt()" style="background:#eee;border:1px solid #ddd;color:#666">Cerrar</button>';
       h += '</div>';
@@ -16074,6 +16100,23 @@
       }
     }
 
+    // Impuestos: primero ISH 3% sobre el subtotal, luego IVA 16% sobre (subtotal + ISH)
+    function _taxBreak(subtotal, aplica) {
+      subtotal = parseFloat(subtotal) || 0;
+      if (!aplica) return { ish: 0, iva: 0, total: subtotal };
+      var ish = Math.round(subtotal * ISH_RATE * 100) / 100;
+      var iva = Math.round((subtotal + ish) * IVA_RATE * 100) / 100;
+      return { ish: ish, iva: iva, total: Math.round((subtotal + ish + iva) * 100) / 100 };
+    }
+    // Lee los datos de factura guardados en las notas de la reserva (si tiene)
+    function _resFacturaData(res) {
+      try {
+        var m = String(res && res.notas || '').match(/\[IVA:(\{.*?\})\]/);
+        if (m) { var d = JSON.parse(m[1]); if (d && d.factura) return d; }
+      } catch (e) {}
+      return null;
+    }
+
     // Núcleo compartido: escribe los códigos de desayuno en la hoja y en memoria. Devuelve cuántos.
     async function _appendBreakfastCodes(res, personas) {
       var nights = daysUntil(res.fechaEntrada, res.fechaSalida);
@@ -16673,6 +16716,183 @@
       cont.scrollTop = 0;
       var gs = document.getElementById('guestScreen');
       if (gs) { gs.scrollTop = 0; gs.classList.add('bk-mode'); }
+    }
+
+    // ============ AVISO DE CÓDIGOS AL RESTAURANTE (#4) ============
+    // Envía al restaurante (no al huésped) la lista de códigos de desayuno de una
+    // reserva, para que los tengan listos y agilicen la recepción del huésped.
+    function _restaurantePhone() {
+      var promo = getBreakfastPromo();
+      var tel = (promo && promo.telRestaurante) ? String(promo.telRestaurante).trim() : '';
+      if (!tel) {
+        var entered = window.prompt('Número de WhatsApp del restaurante (' + ((promo && promo.partner) || 'restaurante') + ')\nEj. 9981234567', '');
+        if (entered === null) return null;
+        entered = String(entered).trim();
+        if (!entered) { toast('No se guardó ningún número', true); return null; }
+        try { updateBreakfastField('telRestaurante', entered); } catch (e) {}
+        tel = entered;
+      }
+      var digits = tel.replace(/[^0-9]/g, '');
+      if (digits.length === 10) digits = '52' + digits;
+      return digits;
+    }
+
+    function sendCodesToRestaurant(resId) {
+      var res = S.reservas.find(function(r) { return r.id === resId; });
+      if (!res) { toast('Reserva no encontrada', true); return; }
+      var codes = (S.desayunos || []).filter(function(d) { return d.reservaId === resId && d.estado === 'Pendiente'; });
+      if (codes.length === 0) { toast('No hay códigos pendientes para avisar', true); return; }
+      var phone = _restaurantePhone();
+      if (!phone) return;
+      var promo = getBreakfastPromo();
+      var hotelName = (typeof HOTEL_NAME !== 'undefined' ? HOTEL_NAME : 'Casa Regina');
+
+      var msg = '🍳 *AVISO DE DESAYUNOS — ' + hotelName + '*\n';
+      msg += '_Para el restaurante: tener listos estos códigos_\n';
+      msg += '━━━━━━━━━━━━━━━\n\n';
+      msg += '👤 Huésped: *' + res.huesped + '*\n';
+      msg += '🛏️ Habitación: ' + res.habitacionNum + '\n';
+      msg += '📅 Estancia: ' + formatDate(res.fechaEntrada) + ' → ' + formatDate(res.fechaSalida) + '\n\n';
+      msg += '🎟️ *Códigos válidos:*\n';
+      codes.forEach(function(c) {
+        msg += '• ' + formatDate(c.fecha) + ' — *' + c.codigo + '* (' + c.personas + ' pers.)\n';
+      });
+      msg += '\n🕐 Horario: ' + (promo.horario || '8:00 AM a 4:00 PM') + '\n';
+      if (promo.pinRestaurante) {
+        msg += '🔒 Validar en la app con el PIN interno del restaurante.\n';
+      }
+      msg += '\nGracias por tenerlos listos para agilizar la recepción. 🌿';
+
+      window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(msg), '_blank');
+    }
+
+    // ============ MENSAJERÍA POST CHECK-IN — SIMPLIFICADA (#3) ============
+    // El Welcome Book cubre bienvenida, wifi, horarios, reglamento y ubicación,
+    // así que aquí solo se deja lo que el book NO resuelve: enviar el book en sí,
+    // y gestionar los desayunos (huésped + restaurante).
+    async function showPostCheckinMessages(res, room) {
+      if (!res) return;
+      try { await offerBreakfastOnCheckin(res, room); } catch (e) {}
+
+      var alreadyHasBf = (S.desayunos || []).some(function(_d) { return _d.reservaId === res.id; });
+      var promoActive = false; try { promoActive = isBreakfastPromoActive(); } catch (e) {}
+      var promo = getBreakfastPromo();
+      var personas = room ? getBreakfastPersonas(room.tipo) : 0;
+      var nights = daysUntil(res.fechaEntrada, res.fechaSalida);
+
+      // Los flujos existentes leen estos globales; mantenerlos definidos.
+      window._postCheckinMsgs = {};
+      window._postCheckinRes = res;
+      window._postCheckinRoom = room;
+
+      var h = '';
+      h += '<div style="background:var(--surface3);padding:12px;border-radius:var(--radius);margin-bottom:14px;">';
+      h += '<div style="font-weight:700;font-size:15px;">✅ Check-in completado</div>';
+      h += '<div style="font-size:12px;color:var(--text2);margin-top:2px;">' + res.huesped + ' · Hab. ' + res.habitacionNum + '</div>';
+      h += '</div>';
+
+      // HERO: enviar la Guía del Huésped (reemplaza los mensajes informativos)
+      h += '<div style="background:linear-gradient(135deg,rgba(139,170,106,.12),rgba(139,170,106,.05));border:1px solid var(--accent);border-radius:var(--radius);padding:14px;margin-bottom:12px;">';
+      h += '<div style="font-size:14px;font-weight:800;color:var(--accent);margin-bottom:4px;">📖 Guía del Huésped (Welcome Book)</div>';
+      h += '<div style="font-size:11px;color:var(--text2);line-height:1.4;margin-bottom:10px;">Enviarla reemplaza los mensajes de bienvenida, WiFi, horarios, reglamento y ubicación — todo está dentro de la guía, personalizada para ' + res.huesped + '.</div>';
+      h += '<button class="form-button" onclick="closeModal();shareWelcomeBookWhatsApp(\'' + res.id + '\')" style="width:100%;background:#25D366;color:#fff;">📲 Enviar Guía por WhatsApp</button>';
+      h += '</div>';
+
+      // DESAYUNOS
+      if (alreadyHasBf) {
+        h += '<div style="background:var(--surface3);border-radius:var(--radius);padding:14px;margin-bottom:12px;">';
+        h += '<div style="font-size:13px;font-weight:700;color:#2e7d32;margin-bottom:8px;">🍳 Desayunos de esta estancia</div>';
+        h += '<div style="display:flex;flex-direction:column;gap:8px;">';
+        h += '<button class="form-button" onclick="closeModal();shareBreakfastCodes(\'' + res.id + '\')" style="background:#2e7d32;color:#fff;">📲 Enviar códigos al huésped</button>';
+        h += '<button class="form-button secondary" onclick="sendCodesToRestaurant(\'' + res.id + '\')" style="border-color:#2e7d32;color:#2e7d32;">🍽️ Avisar códigos al restaurante</button>';
+        h += '</div></div>';
+      } else if (promoActive && personas > 0 && nights > 0) {
+        h += '<div style="background:linear-gradient(135deg,rgba(46,125,50,.10),rgba(76,175,80,.04));border:1px dashed #2e7d32;border-radius:var(--radius);padding:14px;margin-bottom:12px;">';
+        h += '<div style="font-size:13px;font-weight:700;color:#2e7d32;margin-bottom:4px;">🍳 Desayunos incluidos</div>';
+        h += '<div style="font-size:11px;color:var(--text2);margin-bottom:10px;">' + nights + ' código(s) · ' + personas + ' persona(s) · ' + (promo.partner || 'Restaurante') + '</div>';
+        h += '<button class="form-button" onclick="activateBreakfastForRes(\'' + res.id + '\',\'' + (room ? String(room.tipo).replace(/'/g, "\\'") : '') + '\')" style="width:100%;background:#2e7d32;color:#fff;">🍳 Activar y generar códigos</button>';
+        h += '</div>';
+      }
+
+      // Cierre
+      h += '<button class="form-button secondary" onclick="closeModal()" style="width:100%;margin-top:4px;">Listo</button>';
+
+      document.getElementById('postCheckinMsgContent').innerHTML = h;
+      openModal('postCheckinMsgModal');
+    }
+
+    // ============ FLUJO UNIFICADO (#1) ============
+    // Rastreador de pasos: Reservada → Check-in → Cobro → Guía
+    function _resStepTracker(res, balance) {
+      if (!res || res.estado === 'Cancelada') return '';
+      var estado = res.estado || '';
+      // step index: 0 Reservada/Confirmada, 1 Check-in, 2 Cobro, 3 Guía
+      var current = 0;
+      var isCheckin = (estado === 'Check-in');
+      var isOut = (estado === 'Check-out' || estado === 'Completada');
+      var paid = (typeof balance === 'number') ? (balance <= 0.01) : false;
+      if (isOut) current = 3;
+      else if (isCheckin && paid) current = 3;      // listo para enviar guía
+      else if (isCheckin) current = 2;              // en cobro
+      else current = 1;                             // por hacer check-in
+      var steps = [
+        { n: '1', label: 'Reserva', icon: '📋' },
+        { n: '2', label: 'Check-in', icon: '🔑' },
+        { n: '3', label: 'Cobro', icon: '💰' },
+        { n: '4', label: 'Guía', icon: '📖' }
+      ];
+      var h = '<div style="display:flex;align-items:center;justify-content:space-between;background:var(--surface3);border-radius:var(--radius);padding:12px 8px;margin-bottom:12px;">';
+      steps.forEach(function(s, i) {
+        var done = i < current;
+        var active = i === current;
+        var color = done ? 'var(--green)' : (active ? 'var(--accent)' : 'var(--surface2)');
+        var txtCol = (done || active) ? '#fff' : 'var(--text2)';
+        var labCol = active ? 'var(--accent)' : (done ? 'var(--green)' : 'var(--text2)');
+        h += '<div style="display:flex;flex-direction:column;align-items:center;flex:1;min-width:0;">';
+        h += '<div style="width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;background:' + color + ';color:' + txtCol + ';' + (active ? 'box-shadow:0 0 0 3px rgba(139,170,106,.25);' : '') + '">' + (done ? '✓' : s.icon) + '</div>';
+        h += '<div style="font-size:9px;margin-top:4px;font-weight:' + (active ? '700' : '500') + ';color:' + labCol + ';text-align:center;">' + s.label + '</div>';
+        h += '</div>';
+        if (i < steps.length - 1) {
+          var lineCol = i < current ? 'var(--green)' : 'var(--surface2)';
+          h += '<div style="height:2px;flex:0 0 14px;background:' + lineCol + ';margin:0 1px;margin-bottom:14px;"></div>';
+        }
+      });
+      h += '</div>';
+      return h;
+    }
+
+    // Check-in directo desde la ficha, sin el modal separado ni volver a buscar al huésped.
+    // Reusa exactamente la misma validación de anticipo y el checklist de check-in.
+    function checkinReservaDirect(resId) {
+      var res = S.reservas.find(function(r) { return r.id === resId; });
+      if (!res) { toast('Reserva no encontrada', true); return; }
+      if (res.estado === 'Check-in') { toast('Esta reserva ya tiene check-in', false); return; }
+      var room = S.rooms.find(function(r) { return r.numero === res.habitacionNum; });
+      closeModal();
+      var aPct = 0; try { aPct = getAnticipoPct(); } catch (e) {}
+      var payments = (S.cobros || []).filter(function(c) { return c.reservaId === res.id; });
+      var totalPaid = payments.reduce(function(s, c) { return s + c.monto; }, 0);
+      if (aPct > 0) {
+        var minRequired = Math.ceil(res.tarifaTotal * getAnticipoFraction());
+        if (totalPaid < minRequired) { showCheckinBlocked(res, totalPaid, minRequired); return; }
+      }
+      showProcessChecklist('checkin', res, room);
+    }
+
+    // Walk-in unificado: usa EL MISMO formulario de "Nueva Reserva" con la fecha de hoy.
+    // Marca la intención para que, al guardar, se haga el check-in de inmediato.
+    function openWalkinWizard() {
+      var today = normDate(new Date());
+      openNewReservaModal(null, today);
+      window._walkinIntent = true;   // se fija DESPUÉS: openNewReservaModal lo pone en false
+      try {
+        var m = document.getElementById('newReservaModal');
+        var t = m && m.querySelector('.modal-title');
+        if (t) t.textContent = '🚶 Walk-in (check-in inmediato)';
+        // pre-activa el cobro: en walk-in casi siempre se paga al llegar
+        var payToggle = document.getElementById('newResPayToggle');
+        if (payToggle && !payToggle.checked) { payToggle.checked = true; toggleNewResPayment(); }
+      } catch (e) {}
     }
 
     // ============ INIT ============
