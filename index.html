@@ -4118,7 +4118,10 @@
                 if (String(habs[hk][1]) === String(_wbRes.habitacionNum)) { _wbRes.tipo = String(habs[hk][2] || ''); break; }
               }
             }
-            _wbBreakfast = des.filter(function(d) { return String(d[1]) === String(resId); }).map(function(d) {
+            _wbBreakfast = des.filter(function(d) {
+              var est = String(d[6] || 'Pendiente');
+              return String(d[1]) === String(resId) && est !== 'Cancelado' && est !== 'Expirado';
+            }).map(function(d) {
               return { codigo: String(d[0] || ''), fecha: String(d[4] || ''), personas: d[5] || '', estado: String(d[6] || 'Pendiente') };
             });
             for (var j = 0; j < acc.length; j++) {
@@ -16052,9 +16055,12 @@
             h += '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--surface3);font-size:12px;">';
             h += '<div><span style="font-family:Space Mono,monospace;font-weight:600;color:var(--accent);">' + c.codigo + '</span>';
             h += '<span style="color:var(--text2);margin-left:8px;">' + formatDate(c.fecha) + ' · ' + c.personas + ' pers.</span></div>';
-            h += '<div style="display:flex;align-items:center;gap:6px;">';
+            h += '<div style="display:flex;align-items:center;gap:6px;" onclick="event.stopPropagation();">';
             if (c.estado === 'Pendiente') h += '<button onclick="event.stopPropagation();shareBreakfastQRCard(\'' + c.codigo + '\')" style="background:#25D366;color:#fff;border:none;border-radius:6px;padding:3px 8px;font-size:10px;cursor:pointer;font-weight:600;">📱 QR</button>';
-            h += '<span style="font-size:10px;">' + stIcon + ' ' + c.estado + '</span>';
+            h += '<span style="font-size:11px;">' + stIcon + '</span>';
+            h += '<select onchange="setBreakfastCodeEstado(\'' + c.codigo + '\', this.value)" onclick="event.stopPropagation();" style="font-size:11px;padding:3px 4px;border-radius:6px;border:1px solid var(--surface3);background:var(--surface2);color:var(--text);cursor:pointer;">';
+            ['Pendiente','Consumido','Cancelado'].forEach(function(op){ h += '<option value="' + op + '"' + (c.estado === op ? ' selected' : '') + '>' + op + '</option>'; });
+            h += '</select>';
             h += '</div></div>';
           });
           h += '<div style="display:flex;gap:6px;margin-top:8px;padding-bottom:4px;">';
@@ -16856,6 +16862,35 @@
       if (chosen.length === 0) { toast('Selecciona al menos un código', true); return; }
       closeModal();
       _sendCodesArrayToRestaurant(chosen, 'Códigos seleccionados — tener listos');
+    }
+
+    // Cambiar el estado de un código de desayuno desde la app y persistirlo en la hoja
+    // (así se refleja en todos lados, incluido el Welcome Book que lee de la hoja).
+    async function setBreakfastCodeEstado(codigo, nuevoEstado) {
+      var idx = (S.desayunos || []).findIndex(function(d) { return String(d.codigo) === String(codigo); });
+      if (idx === -1) { toast('Código no encontrado', true); return; }
+      var c = S.desayunos[idx];
+      if (c.estado === nuevoEstado) return;
+      var prev = c.estado;
+      var validadoPor = '', hora = '';
+      if (nuevoEstado === 'Consumido') {
+        validadoPor = (S.user && S.user.usuario) || 'Recepción';
+        hora = now();
+      }
+      var row = [String(c.codigo), String(c.reservaId || ''), String(c.huesped || ''), String(c.habitacion || ''), String(c.fecha || '').substring(0, 10), parseInt(c.personas) || 1, nuevoEstado, validadoPor, hora];
+      var _f = normDate(new Date()), _n = now(), _hr = _n.split(' ')[1];
+      await busy(async function() {
+        await sheets.multi([
+          { type: 'updateById', sheet: '🍳 Desayunos', id: String(c.codigo), values: row },
+          { type: 'append', sheet: '📜 Bitácora', values: [_f, _hr, (S.user && S.user.usuario) || '', 'Desayuno ' + nuevoEstado, String(c.codigo) + ' — ' + (c.huesped || '') + ' (' + prev + ' → ' + nuevoEstado + ')', 'info'] }
+        ]);
+        S.desayunos[idx].estado = nuevoEstado;
+        S.desayunos[idx].validadoPor = validadoPor;
+        S.desayunos[idx].horaValidacion = hora;
+        toast('Código ' + codigo + ' → ' + nuevoEstado);
+        if (S.currentTab === 'desayunos' && typeof renderDesayunosTab === 'function') renderDesayunosTab();
+        else render();
+      }, 'Actualizando código...');
     }
 
     // ============ MENSAJERÍA POST CHECK-IN — SIMPLIFICADA (#3) ============
