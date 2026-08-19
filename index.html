@@ -17294,6 +17294,25 @@
       } catch (e) {}
     }
 
+    // Asegura que un cambio pendiente de la promo de desayuno llegue a la hoja
+    // aunque el usuario cierre la app o cambie de pestaña antes de que corra el
+    // guardado automático (evita que el book se quede con la descripción vieja).
+    function _bfFlushSync() {
+      try {
+        if (typeof _bfSyncTimer === 'undefined' || !_bfSyncTimer) return; // no hay edición pendiente
+        clearTimeout(_bfSyncTimer); _bfSyncTimer = null;
+        if (S._publicMode) return;
+        var p = (typeof getBreakfastPromo === 'function') ? getBreakfastPromo() : null;
+        if (p && p.partner && p.precioPorPersona > 0 && typeof syncConfigToSheet === 'function') {
+          syncConfigToSheet('breakfastPromo', p);
+        }
+      } catch (e) {}
+    }
+    try {
+      document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') _bfFlushSync(); });
+      window.addEventListener('pagehide', _bfFlushSync);
+    } catch (e) {}
+
     // ============ INIT ============
     window.addEventListener('load', function() {
       registerPWA();
