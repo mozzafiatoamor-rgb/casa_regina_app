@@ -3887,6 +3887,28 @@
       actividades: []
     };
 
+    // Rellena traducciones faltantes (en/fr/it/de) con las de fábrica SOLO cuando
+    // la sección sigue con el texto por defecto en español (no personalizada).
+    // Así las secciones estándar se ven en inglés aunque el hotel no las haya traducido.
+    function _wbHealLangs(g) {
+      try {
+        var D = DEFAULT_GUEST_GUIDE;
+        var fields = ['welcome', 'checkin', 'checkout', 'reglas', 'transporte', 'servicios', 'informacion', 'accesoInstr', 'pagosNotas', 'ubicacionNotas', 'wifiNotas', 'contactoNotas'];
+        var langs = ['en', 'fr', 'it', 'de'];
+        fields.forEach(function(f) {
+          if (!g[f] || typeof g[f] !== 'object' || !D[f]) return;
+          var esVal = String(g[f].es || '').trim();
+          var defEs = String(D[f].es || '').trim();
+          if (esVal && esVal === defEs) {
+            langs.forEach(function(l) {
+              if ((!g[f][l] || !String(g[f][l]).trim()) && D[f][l]) g[f][l] = D[f][l];
+            });
+          }
+        });
+      } catch (e) {}
+      return g;
+    }
+
     function getGuestGuide() {
       try {
         var saved = localStorage.getItem('guestGuide');
@@ -3901,7 +3923,7 @@
             if (!g.roomPhotos || typeof g.roomPhotos !== 'object') g.roomPhotos = {};
             if (!Array.isArray(g.pagos)) g.pagos = [];
             if (!Array.isArray(g.langs) || !g.langs.length) g.langs = DEFAULT_GUEST_GUIDE.langs.slice();
-            return g;
+            return _wbHealLangs(g);
           }
         }
       } catch (e) { console.warn('getGuestGuide parse error:', e.message); }
@@ -3910,7 +3932,7 @@
           var fromSheet = _parseConfigVal(_sheetConfigCache['guestGuide']);
           if (typeof fromSheet === 'object' && fromSheet !== null) {
             localStorage.setItem('guestGuide', JSON.stringify(fromSheet));
-            return Object.assign({}, DEFAULT_GUEST_GUIDE, fromSheet);
+            return _wbHealLangs(Object.assign({}, DEFAULT_GUEST_GUIDE, fromSheet));
           }
         } catch (e2) {}
       }
@@ -4354,7 +4376,9 @@
         return hw0 + _wbText(g.welcome, g);
       }
       if (key === 'reglas') {
-        var regl = _wbReglamentoText();
+        // En español usa el reglamento del template; en otros idiomas prefiere las reglas
+        // traducidas de la guía (con fallback al template si están vacías).
+        var regl = (_wbLang === 'es') ? _wbReglamentoText() : (_wbT(g.reglas, g) || _wbReglamentoText());
         // Políticas de ocupación: SIEMPRE desde la config real de Ocupación
         var occ = _wbOccupancyPolicies();
         // Términos y condiciones: la lista del usuario, excluyendo las de ocupación para no duplicar
@@ -4568,14 +4592,26 @@
       var menores = hi.menoresEdadLimite || 11;
       var rules = (hi.occupancyRules && hi.occupancyRules.length) ? hi.occupancyRules
                   : (typeof DEFAULT_HOTEL_INFO !== 'undefined' ? DEFAULT_HOTEL_INFO.occupancyRules : []);
-      var cap = (rules || []).map(function(r) { return r.tipo + ': máximo ' + r.maxPersonas + ' personas'; }).join('. ');
-      var pe = '$' + extra + '.00 MXN + impuestos';
-      var out = [
-        { title: 'Ocupación base', body: 'La tarifa base publicada ampara la estadía de un máximo de ' + base + ' persona(s) por habitación.' },
-        { title: 'Cargo por persona adicional', body: 'Toda persona extra que pernocte o haga uso de la habitación superando la ocupación base de ' + base + ' persona(s) estará sujeta a un cargo adicional obligatorio de ' + pe + ' por persona, por noche. El pago de esta tarifa no garantiza automáticamente la instalación de una cama supletoria, la cual estará sujeta a disponibilidad y al espacio físico asignado en la habitación.' },
-        { title: 'Política de menores', body: 'Niños menores de ' + menores + ' años pueden hospedarse sin costo adicional compartiendo las camas existentes con sus padres o tutores (máximo 1 menor gratis por habitación). A partir de los ' + (menores + 1) + ' años, todo huésped será considerado como adulto para efectos de la tarifa y aplicará el cargo por persona extra de ' + pe + ' por noche.' }
-      ];
-      if (cap) out.push({ title: 'Capacidad máxima por habitación', body: 'Por disposiciones legales y normativas de seguridad e incendios: ' + cap + '. El hotel se reserva el derecho de rechazar el ingreso o requerir una habitación adicional si se supera la capacidad máxima.' });
+      var en = (_wbLang && _wbLang !== 'es'); // inglés (u otro idioma) → textos en inglés
+      var pe = en ? ('$' + extra + '.00 MXN + taxes') : ('$' + extra + '.00 MXN + impuestos');
+      var out;
+      if (en) {
+        var capEn = (rules || []).map(function(r) { return r.tipo + ': maximum ' + r.maxPersonas + ' guests'; }).join('. ');
+        out = [
+          { title: 'Base occupancy', body: 'The published base rate covers a maximum of ' + base + ' guest(s) per room.' },
+          { title: 'Additional guest charge', body: 'Any additional guest who stays overnight or uses the room beyond the base occupancy of ' + base + ' guest(s) is subject to a mandatory extra charge of ' + pe + ' per person, per night. Paying this fee does not automatically guarantee an extra bed, which is subject to availability and the physical space of the room.' },
+          { title: 'Children policy', body: 'Children under ' + menores + ' years old may stay at no extra cost sharing the existing beds with their parents or guardians (maximum 1 free child per room). From ' + (menores + 1) + ' years old, every guest is considered an adult for rate purposes and the extra-person charge of ' + pe + ' per night applies.' }
+        ];
+        if (capEn) out.push({ title: 'Maximum room capacity', body: 'Due to legal, safety and fire regulations: ' + capEn + '. The hotel reserves the right to deny entry or require an additional room if the maximum capacity is exceeded.' });
+      } else {
+        var cap = (rules || []).map(function(r) { return r.tipo + ': máximo ' + r.maxPersonas + ' personas'; }).join('. ');
+        out = [
+          { title: 'Ocupación base', body: 'La tarifa base publicada ampara la estadía de un máximo de ' + base + ' persona(s) por habitación.' },
+          { title: 'Cargo por persona adicional', body: 'Toda persona extra que pernocte o haga uso de la habitación superando la ocupación base de ' + base + ' persona(s) estará sujeta a un cargo adicional obligatorio de ' + pe + ' por persona, por noche. El pago de esta tarifa no garantiza automáticamente la instalación de una cama supletoria, la cual estará sujeta a disponibilidad y al espacio físico asignado en la habitación.' },
+          { title: 'Política de menores', body: 'Niños menores de ' + menores + ' años pueden hospedarse sin costo adicional compartiendo las camas existentes con sus padres o tutores (máximo 1 menor gratis por habitación). A partir de los ' + (menores + 1) + ' años, todo huésped será considerado como adulto para efectos de la tarifa y aplicará el cargo por persona extra de ' + pe + ' por noche.' }
+        ];
+        if (cap) out.push({ title: 'Capacidad máxima por habitación', body: 'Por disposiciones legales y normativas de seguridad e incendios: ' + cap + '. El hotel se reserva el derecho de rechazar el ingreso o requerir una habitación adicional si se supera la capacidad máxima.' });
+      }
       return out;
     }
     function wbToggleAcc(id) {
@@ -4681,6 +4717,51 @@
     ];
     var WB_LIST_CATS = [ ['restaurantes','🍽️ Restaurantes'], ['bares','🍸 Bares y Clubs'], ['compras','🛍️ Compras'], ['actividades','🎯 Actividades'] ];
 
+    // ===== Exportar / importar la guía para traducción =====
+    function wbExportGuide() {
+      var g = getGuestGuide();
+      var json = JSON.stringify(g, null, 2);
+      var h = '<div style="font-size:12px;color:var(--text2);margin-bottom:8px;">Copia TODO este texto y pégaselo a Claude pidiendo la traducción al inglés (u otro idioma). Es el contenido de tu guía.</div>';
+      h += '<textarea id="wbExportArea" readonly style="width:100%;box-sizing:border-box;height:240px;font-family:monospace;font-size:11px;padding:8px;border-radius:8px;border:1px solid var(--surface3);background:var(--surface2);color:var(--text);">' + _wbEsc(json) + '</textarea>';
+      document.getElementById('taskDetailContent').innerHTML = h;
+      document.getElementById('taskDetailModal').querySelector('.modal-title').textContent = '📤 Exportar guía';
+      document.getElementById('taskDetailActions').innerHTML = '<button class="form-button" onclick="wbExportCopy()" style="width:100%;">📋 Copiar todo</button>';
+      openModal('taskDetailModal');
+    }
+    function wbExportCopy() {
+      var t = document.getElementById('wbExportArea');
+      if (!t) return;
+      t.select();
+      try { document.execCommand('copy'); } catch (e) {}
+      if (navigator.clipboard) { try { navigator.clipboard.writeText(t.value); } catch (e) {} }
+      toast('Copiado — pégaselo a Claude');
+    }
+    function wbImportGuide() {
+      var h = '<div style="font-size:12px;color:var(--text2);margin-bottom:8px;">Pega aquí la guía <b>traducida</b> (el texto que te devolvió Claude) y presiona Importar. Se guarda y se sincroniza sola.</div>';
+      h += '<textarea id="wbImportArea" placeholder="Pega aquí el JSON traducido…" style="width:100%;box-sizing:border-box;height:240px;font-family:monospace;font-size:11px;padding:8px;border-radius:8px;border:1px solid var(--surface3);background:var(--surface2);color:var(--text);"></textarea>';
+      document.getElementById('taskDetailContent').innerHTML = h;
+      document.getElementById('taskDetailModal').querySelector('.modal-title').textContent = '📥 Importar traducción';
+      document.getElementById('taskDetailActions').innerHTML = '<button class="form-button" onclick="wbImportGuideApply()" style="width:100%;background:var(--accent);color:var(--bg);">✅ Importar y guardar</button>';
+      openModal('taskDetailModal');
+    }
+    async function wbImportGuideApply() {
+      var el = document.getElementById('wbImportArea');
+      var raw = (el ? el.value : '').trim();
+      if (!raw) { toast('Pega el contenido primero', true); return; }
+      var obj;
+      try { obj = JSON.parse(raw); } catch (e) { toast('El texto no es un JSON válido. Copia completo lo que te dio Claude.', true); return; }
+      if (typeof obj !== 'object' || !obj || Array.isArray(obj)) { toast('Contenido inválido', true); return; }
+      var merged = Object.assign({}, DEFAULT_GUEST_GUIDE, getGuestGuide(), obj);
+      ['restaurantes', 'bares', 'compras', 'actividades'].forEach(function(k) { if (!Array.isArray(merged[k])) merged[k] = []; });
+      if (!Array.isArray(merged.langs) || !merged.langs.length) merged.langs = DEFAULT_GUEST_GUIDE.langs.slice();
+      await busy(async function() {
+        saveGuestGuide(merged);
+        toast('Guía importada y sincronizada ✅');
+        closeModal();
+        try { renderGuiaConfig(); } catch (e) {}
+      }, 'Guardando guía traducida…');
+    }
+
     function renderGuiaConfig() {
       var g = getGuestGuide();
       var h = '';
@@ -4693,6 +4774,15 @@
       h += '<button class="form-button secondary" onclick="copyWelcomeBookLink()" style="flex:1;min-width:120px;padding:10px;font-size:12px;">🔗 Copiar enlace general</button>';
       h += '<button class="form-button secondary" onclick="showWelcomeBookQR()" style="flex:1;min-width:120px;padding:10px;font-size:12px;">📱 QR general</button>';
       h += '</div>';
+
+      // Exportar / importar para traducción
+      h += '<div style="background:rgba(139,170,106,.08);border:1px solid var(--accent);border-radius:var(--radius);padding:10px 12px;margin-bottom:14px;">';
+      h += '<div style="font-size:12px;font-weight:700;margin-bottom:2px;">🌐 Traducir la guía</div>';
+      h += '<div style="font-size:11px;color:var(--text2);margin-bottom:8px;">Exporta tu contenido, pásaselo a Claude para traducir, y luego importa el resultado. No reescribes nada.</div>';
+      h += '<div style="display:flex;gap:8px;flex-wrap:wrap;">';
+      h += '<button class="form-button secondary" onclick="wbExportGuide()" style="flex:1;min-width:120px;padding:9px;font-size:12px;">📤 Exportar guía</button>';
+      h += '<button class="form-button secondary" onclick="wbImportGuide()" style="flex:1;min-width:120px;padding:9px;font-size:12px;">📥 Importar traducción</button>';
+      h += '</div></div>';
 
       // Idiomas activos
       h += '<div style="background:var(--surface3);padding:10px 12px;border-radius:var(--radius);margin-bottom:14px;">';
