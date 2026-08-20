@@ -17489,7 +17489,8 @@
       var today = normDate(new Date());
       var salida = normDate(new Date(Date.now() + 86400000));
       var h = '';
-      h += '<div style="font-size:12px;color:var(--text2);margin-bottom:10px;">Reserva varias habitaciones para un mismo titular, con un total combinado y cobro único.</div>';
+      h += '<div style="font-size:12px;color:var(--text2);margin-bottom:8px;">Reserva varias habitaciones para un mismo titular, con un total combinado y cobro único.</div>';
+      h += '<button onclick="openGroupExistingModal()" style="width:100%;background:var(--surface2);border:1px solid var(--surface3);border-radius:8px;padding:8px;font-size:12px;cursor:pointer;color:var(--accent);font-weight:600;margin-bottom:12px;">🔗 ¿Ya tienes reservas creadas? Agrúpalas aquí</button>';
       h += '<label class="form-label" style="font-size:12px;">Titular</label>';
       h += '<input id="grp_nombre" class="login-input" placeholder="Nombre del titular" style="margin-bottom:8px;">';
       h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">';
@@ -17502,12 +17503,10 @@
       h += '</div>';
       h += '<div style="font-size:12px;font-weight:700;margin-bottom:6px;">Habitaciones</div>';
       h += '<div id="groupRoomsList"></div>';
-      // Factura (impuestos combinados: ISH 3% y luego IVA 16% sobre subtotal+ISH)
-      h += '<div style="display:flex;align-items:center;gap:10px;margin:12px 0 6px;padding:10px;background:var(--surface2);border-radius:var(--radius);">';
-      h += '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;flex:1;"><input type="checkbox" id="grp_factura" onchange="_groupToggleFactura()" style="width:18px;height:18px;accent-color:var(--accent);"><div><div style="font-size:13px;font-weight:600;">🧾 ¿Requiere factura?</div><div style="font-size:11px;color:var(--text2);">Agrega ISH 3% y luego IVA 16% sobre (subtotal+ISH)</div></div></label>';
-      h += '</div>';
+      // Factura por habitación: marca 🧾 en cada habitación que la requiera (ISH 3% + IVA 16% compuesto)
+      h += '<div style="font-size:11px;color:var(--text2);margin:10px 0 4px;">🧾 Marca la casilla de factura en cada habitación que la requiera.</div>';
       h += '<div id="grp_facturaFields" style="display:none;margin-bottom:6px;">';
-      h += '<input id="grp_rfc" class="login-input" placeholder="RFC" style="text-transform:uppercase;margin-bottom:6px;">';
+      h += '<input id="grp_rfc" class="login-input" placeholder="RFC (para las que llevan factura)" style="text-transform:uppercase;margin-bottom:6px;">';
       h += '<input id="grp_razon" class="login-input" placeholder="Razón social">';
       h += '</div>';
       h += '<div id="groupTotalBox" style="text-align:right;font-weight:700;margin-top:8px;font-size:13px;"></div>';
@@ -17530,7 +17529,10 @@
         h += '<div style="display:flex;align-items:center;gap:8px;padding:8px;border-radius:8px;margin-bottom:6px;background:var(--surface2);' + (avail ? '' : 'opacity:.5;') + '">';
         h += '<input type="checkbox" ' + (sel ? 'checked' : '') + ' ' + (avail ? '' : 'disabled') + ' onchange="_groupToggleRoom(\'' + rm.numero + '\',this.checked)" style="width:18px;height:18px;flex-shrink:0;">';
         h += '<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:600;">Hab. ' + rm.numero + ' · ' + _wbEsc(rm.tipo) + '</div><div style="font-size:11px;color:var(--text2);">$' + _fmt(rm.tarifa) + '/noche' + (avail ? '' : ' · ocupada estas fechas') + '</div></div>';
-        if (sel) h += '<input type="text" value="' + _wbEsc(sel.guest || '') + '" placeholder="Huésped" onchange="_groupSetGuest(\'' + rm.numero + '\',this.value)" style="width:96px;font-size:11px;padding:5px;border-radius:6px;border:1px solid var(--surface3);background:var(--surface3);color:var(--text);">';
+        if (sel) {
+          h += '<input type="text" value="' + _wbEsc(sel.guest || '') + '" placeholder="Huésped" onchange="_groupSetGuest(\'' + rm.numero + '\',this.value)" style="width:82px;font-size:11px;padding:5px;border-radius:6px;border:1px solid var(--surface3);background:var(--surface3);color:var(--text);">';
+          h += '<label style="display:flex;align-items:center;gap:3px;font-size:11px;color:' + (sel.factura ? 'var(--accent)' : 'var(--text2)') + ';cursor:pointer;white-space:nowrap;flex-shrink:0;"><input type="checkbox" ' + (sel.factura ? 'checked' : '') + ' onchange="_groupSetFactura(\'' + rm.numero + '\',this.checked)" style="width:15px;height:15px;accent-color:var(--accent);">🧾</label>';
+        }
         h += '</div>';
       });
       el.innerHTML = h || '<div style="font-size:12px;color:var(--text2);">No hay habitaciones.</div>';
@@ -17538,33 +17540,35 @@
     }
     function _groupToggleRoom(num, on) {
       var rm = (S.rooms || []).find(function (r) { return r.numero === num; });
-      if (on) window._groupSel[num] = { tarifa: parseFloat(rm.tarifa) || 0, guest: '' };
+      if (on) window._groupSel[num] = { tarifa: parseFloat(rm.tarifa) || 0, guest: '', factura: false };
       else delete window._groupSel[num];
       _groupRefreshRooms();
     }
     function _groupSetGuest(num, val) { if (window._groupSel[num]) window._groupSel[num].guest = val; }
-    function _groupToggleFactura() {
-      var on = document.getElementById('grp_factura').checked;
-      var ff = document.getElementById('grp_facturaFields'); if (ff) ff.style.display = on ? '' : 'none';
-      _groupUpdateTotal();
-    }
+    function _groupSetFactura(num, on) { if (window._groupSel[num]) window._groupSel[num].factura = !!on; _groupRefreshRooms(); }
+    function _groupAnyFactura() { return Object.keys(window._groupSel || {}).some(function (k) { return window._groupSel[k].factura; }); }
     function _groupUpdateTotal() {
       var checkin = document.getElementById('grp_checkin').value;
       var checkout = document.getElementById('grp_checkout').value;
       var nights = Math.max(daysUntil(checkin, checkout), 1);
-      var facturaEl = document.getElementById('grp_factura');
-      var factura = facturaEl ? facturaEl.checked : false;
-      var subtotal = 0; Object.keys(window._groupSel).forEach(function (k) { subtotal += window._groupSel[k].tarifa * nights; });
-      var n = Object.keys(window._groupSel).length;
+      var sel = window._groupSel || {};
+      var keys = Object.keys(sel);
       var box = document.getElementById('groupTotalBox');
-      if (!n) { box.innerHTML = ''; return; }
-      var tb = _taxBreak(subtotal, factura);
-      if (factura) {
-        box.innerHTML = n + ' hab. · ' + nights + ' noche(s)<br>' +
-          '<span style="font-size:11px;color:var(--text2);font-weight:400;">Subtotal $' + _fmt(subtotal) + ' · ISH $' + _fmt(tb.ish) + ' · IVA $' + _fmt(tb.iva) + '</span><br>' +
-          'Total: <span style="color:var(--accent);">$' + _fmt(tb.total) + '</span>';
+      var anyFact = _groupAnyFactura();
+      var ff = document.getElementById('grp_facturaFields'); if (ff) ff.style.display = anyFact ? '' : 'none';
+      if (!keys.length) { box.innerHTML = ''; return; }
+      var subSum = 0, ishSum = 0, ivaSum = 0, total = 0;
+      keys.forEach(function (k) {
+        var s = sel[k].tarifa * nights;
+        var tb = _taxBreak(s, sel[k].factura);
+        subSum += s; ishSum += tb.ish; ivaSum += tb.iva; total += tb.total;
+      });
+      if (anyFact) {
+        box.innerHTML = keys.length + ' hab. · ' + nights + ' noche(s)<br>' +
+          '<span style="font-size:11px;color:var(--text2);font-weight:400;">Subtotal $' + _fmt(subSum) + ' · ISH $' + _fmt(ishSum) + ' · IVA $' + _fmt(ivaSum) + '</span><br>' +
+          'Total: <span style="color:var(--accent);">$' + _fmt(total) + '</span>';
       } else {
-        box.innerHTML = n + ' hab. · ' + nights + ' noche(s) · Total: <span style="color:var(--accent);">$' + _fmt(subtotal) + '</span>';
+        box.innerHTML = keys.length + ' hab. · ' + nights + ' noche(s) · Total: <span style="color:var(--accent);">$' + _fmt(total) + '</span>';
       }
     }
     async function saveGroupReserva() {
@@ -17580,12 +17584,11 @@
       if (checkin >= checkout) { toast('La salida debe ser después de la entrada', true); return; }
       var nights = Math.max(daysUntil(checkin, checkout), 1);
       var groupId = 'G-' + Date.now();
-      var facturaEl = document.getElementById('grp_factura');
-      var wantsFactura = facturaEl ? facturaEl.checked : false;
-      var rfc = wantsFactura ? ((document.getElementById('grp_rfc').value || '').trim().toUpperCase()) : '';
-      var razonSocial = wantsFactura ? ((document.getElementById('grp_razon').value || '').trim()) : '';
+      var anyFactura = _groupAnyFactura();
+      var rfc = anyFactura ? ((document.getElementById('grp_rfc').value || '').trim().toUpperCase()) : '';
+      var razonSocial = anyFactura ? ((document.getElementById('grp_razon').value || '').trim()) : '';
       var _grpFolio = '', _hotelNombre = '';
-      if (wantsFactura) {
+      if (anyFactura) {
         try { _grpFolio = nextFacturaFolio(); } catch (e) {}
         try { _hotelNombre = getHotelInfo().nombre; } catch (e) {}
       }
@@ -17598,12 +17601,13 @@
           var rm = (S.rooms || []).find(function (r) { return r.numero === num; });
           var tarifa = parseFloat(rm.tarifa) || 0;
           var subtotal = tarifa * nights;
-          var _tb = _taxBreak(subtotal, wantsFactura);
-          var total = _tb.total; // incluye impuestos combinados si aplica
+          var roomFactura = !!sel[num].factura;
+          var _tb = _taxBreak(subtotal, roomFactura);
+          var total = _tb.total; // incluye impuestos combinados si esta habitación lleva factura
           var guestName = (sel[num].guest || '').trim() || nombre;
           var resId = nextId('R', S.reservas.concat(newRes));
           var notas = '[GRUPO:' + groupId + ']';
-          if (wantsFactura) {
+          if (roomFactura) {
             var ivaData = JSON.stringify({ factura: true, folio: _grpFolio, hotel: _hotelNombre, rfc: rfc, razonSocial: razonSocial, subtotal: subtotal, iva: _tb.iva, ish: _tb.ish });
             notas += '[IVA:' + ivaData + ']';
           }
@@ -17714,6 +17718,56 @@
       h += '<button onclick="closeModal();openGroupSummary(\'' + gid + '\')" style="width:100%;background:var(--accent);color:var(--bg);border:none;border-radius:8px;padding:8px;font-size:12px;font-weight:700;cursor:pointer;">Ver / cobrar grupo</button>';
       h += '</div>';
       return h;
+    }
+
+    // ---- Agrupar reservas YA EXISTENTES para cobrarlas juntas ----
+    function _reservaRow(r) {
+      return [r.id, r.habitacionNum, r.huesped, r.telefono || '', r.email || '', r.fechaEntrada, r.fechaSalida, (r.adultos != null ? r.adultos : 1), (r.niños != null ? r.niños : (r.ninos != null ? r.ninos : 0)), r.tarifa, r.tarifaTotal, r.estado, r.notas || '', r.creadoPor || '', r.fechaCreacion || ''];
+    }
+    function openGroupExistingModal() {
+      var active = (S.reservas || []).filter(function (r) { return r.estado !== 'Cancelada' && r.estado !== 'Check-out' && r.estado !== 'Completada'; });
+      active.sort(function (a, b) { var c = String(a.huesped).localeCompare(String(b.huesped)); return c !== 0 ? c : String(a.habitacionNum).localeCompare(String(b.habitacionNum)); });
+      window._groupExistPool = active;
+      var h = '<div style="font-size:12px;color:var(--text2);margin-bottom:10px;">Selecciona reservas ya creadas (reservadas o en check-in) para agruparlas y cobrarlas juntas.</div>';
+      if (!active.length) h += '<div style="text-align:center;color:var(--text2);padding:16px;">No hay reservas activas.</div>';
+      active.forEach(function (r, i) {
+        var gid = _resGroupId(r);
+        var b = _resBalance(r.id, r.tarifaTotal);
+        h += '<label style="display:flex;align-items:center;gap:10px;padding:9px 10px;background:var(--surface2);border-radius:10px;margin-bottom:6px;cursor:pointer;">';
+        h += '<input type="checkbox" class="_grpExistCb" data-idx="' + i + '" style="width:18px;height:18px;accent-color:var(--accent);flex-shrink:0;">';
+        h += '<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:600;">' + _wbEsc(r.huesped) + ' · Hab. ' + r.habitacionNum + '</div>';
+        h += '<div style="font-size:11px;color:var(--text2);">' + r.estado + ' · ' + formatDate(r.fechaEntrada) + ' → ' + formatDate(r.fechaSalida) + ' · Saldo $' + _fmt(b.balance) + (gid ? ' · <span style="color:var(--accent);">ya en grupo</span>' : '') + '</div></div>';
+        h += '</label>';
+      });
+      document.getElementById('taskDetailContent').innerHTML = h;
+      document.getElementById('taskDetailModal').querySelector('.modal-title').textContent = '🔗 Agrupar reservas';
+      document.getElementById('taskDetailActions').innerHTML = '<button class="form-button" onclick="groupExistingReservas()" style="width:100%;">Agrupar seleccionadas</button>';
+      openModal('taskDetailModal');
+    }
+    async function groupExistingReservas() {
+      var pool = window._groupExistPool || [];
+      var chosen = [];
+      document.querySelectorAll('._grpExistCb').forEach(function (cb) { if (cb.checked) { var i = parseInt(cb.getAttribute('data-idx'), 10); if (pool[i]) chosen.push(pool[i]); } });
+      if (chosen.length < 2) { toast('Selecciona al menos 2 reservas', true); return; }
+      var existingGids = chosen.map(_resGroupId).filter(Boolean);
+      var groupId = (existingGids.length && existingGids.every(function (g) { return g === existingGids[0]; })) ? existingGids[0] : ('G-' + Date.now());
+      var n = now(), fecha = normDate(new Date()), hora = n.split(' ')[1];
+      await busy(async function () {
+        var ops = [];
+        chosen.forEach(function (r) {
+          var notas = String(r.notas || '').replace(/\[GRUPO:[^\]]*\]/g, '');
+          notas = '[GRUPO:' + groupId + ']' + notas;
+          ops.push({ type: 'updateById', sheet: '📋 Reservas', id: r.id, values: _reservaRow(Object.assign({}, r, { notas: notas })) });
+          var i = S.reservas.findIndex(function (x) { return x.id === r.id; });
+          if (i !== -1) S.reservas[i].notas = notas;
+        });
+        ops.push({ type: 'append', sheet: '📜 Bitácora', values: [fecha, hora, (S.user && S.user.usuario) || '', 'Agrupar reservas', chosen.length + ' reservas (' + groupId + ')', 'info'] });
+        await sheets.multi(ops);
+        toast('✅ ' + chosen.length + ' reservas agrupadas');
+        closeModal();
+        render();
+        setTimeout(function () { openGroupSummary(groupId); }, 250);
+      }, 'Agrupando reservas…');
     }
 
     // ============ INIT ============
