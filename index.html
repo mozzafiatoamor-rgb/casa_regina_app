@@ -12824,6 +12824,9 @@
           + '<div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;border-top:1px solid var(--surface3);padding-top:6px;margin-top:4px;"><span>Total</span><span style="font-family:Space Mono;color:var(--accent)">$' + _fmt(res.tarifaTotal) + '</span></div>'
           + '</div>';
         document.getElementById('paymentResInfo').insertAdjacentHTML('beforeend', _dsg);
+      } else {
+        var _addF = '<button onclick="addFacturaFromPayment(\'' + resId + '\')" style="width:100%;margin-bottom:12px;background:var(--surface2);border:1px dashed var(--accent);border-radius:var(--radius);padding:10px;font-size:12px;color:var(--accent);font-weight:600;cursor:pointer;">\ud83e\uddfe \u00bfEl cliente pedir\u00e1 factura? Agregar impuestos</button>';
+        document.getElementById('paymentResInfo').insertAdjacentHTML('beforeend', _addF);
       }
       openModal('paymentModal');
     }
@@ -18038,6 +18041,16 @@
       document.getElementById('taskDetailActions').innerHTML = acts;
       openModal('taskDetailModal');
     }
+    // Abrir el editor de factura desde el modal de pago y volver al pago al terminar.
+    function addFacturaFromPayment(resId) {
+      window._facturaReturnTo = 'payment:' + resId;
+      openAddFacturaModal(resId);
+    }
+    function _facturaReopen(resId) {
+      var ret = window._facturaReturnTo; window._facturaReturnTo = '';
+      if (ret === 'payment:' + resId && typeof openPaymentModal === 'function') { openPaymentModal(resId); }
+      else { openReservaModal(resId); }
+    }
     async function applyAddFactura(resId) {
       var rfc = (document.getElementById('af_rfc').value || '').trim().toUpperCase();
       var razon = (document.getElementById('af_razon').value || '').trim();
@@ -18049,7 +18062,7 @@
         var idx = S.reservas.findIndex(function (x) { return x.id === resId; });
         if (idx !== -1) { S.reservas[idx].notas = u.notas; S.reservas[idx].tarifaTotal = u.total; }
         await sheets.multi([{ type: 'updateById', sheet: '📋 Reservas', id: resId, values: _reservaRow(S.reservas[idx]) }]);
-        toast('Factura aplicada ✅'); closeModal(); openReservaModal(resId);
+        toast('Factura aplicada ✅'); closeModal(); _facturaReopen(resId);
       }, 'Aplicando factura…');
     }
     async function removeFacturaFromRes(resId) {
@@ -18060,7 +18073,7 @@
         var idx = S.reservas.findIndex(function (x) { return x.id === resId; });
         if (idx !== -1) { S.reservas[idx].notas = u.notas; S.reservas[idx].tarifaTotal = u.total; }
         await sheets.multi([{ type: 'updateById', sheet: '📋 Reservas', id: resId, values: _reservaRow(S.reservas[idx]) }]);
-        toast('Factura quitada'); closeModal(); openReservaModal(resId);
+        toast('Factura quitada'); closeModal(); _facturaReopen(resId);
       }, 'Quitando factura…');
     }
     // Factura a nivel grupo (por habitación)
