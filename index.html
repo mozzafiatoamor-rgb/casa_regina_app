@@ -9239,7 +9239,26 @@
       }
 
       var html='';
+      // Tarjetas de grupo (reservas ligadas por [GRUPO:])
+      try {
+        var _grpSeen={}, _grpIds=[];
+        filtered.forEach(function(r){ var g=(typeof _resGroupId==='function')?_resGroupId(r):''; if(g && !_grpSeen[g]){ _grpSeen[g]=true; _grpIds.push(g); } });
+        _grpIds.forEach(function(gid){
+          var gt=_groupTotals(gid); if(!gt.count) return;
+          var rs=gt.reservas; var title=rs[0]?rs[0].huesped:'Grupo';
+          var rooms=rs.map(function(x){return x.habitacionNum;}).join(', ');
+          var gbal=gt.balance; var gsc=gbal<=0?'paid':(gt.paid>0?'partial':'unpaid');
+          html+='<div class="cobro-card '+gsc+'" style="border-left:4px solid var(--accent);">';
+          html+='<div class="cobro-head"><div><div class="cobro-guest">\uD83D\uDC65 Grupo \u00b7 '+title+'</div><div style="font-size:11px;color:var(--text2)">'+gt.count+' habitaciones \u00b7 '+rooms+'</div></div><div class="cobro-room">GRP</div></div>';
+          html+='<div class="cobro-amounts"><div class="cobro-amt"><div class="cobro-amt-val">$'+_fmt(gt.total)+'</div><div class="cobro-amt-lbl">Total grupo</div></div><div class="cobro-amt"><div class="cobro-amt-val" style="color:var(--green)">$'+_fmt(gt.paid)+'</div><div class="cobro-amt-lbl">Pagado</div></div><div class="cobro-amt"><div class="cobro-amt-val" style="color:'+(gbal>0?'var(--red)':'var(--green)')+'">$'+_fmt(gbal)+'</div><div class="cobro-amt-lbl">Saldo</div></div></div>';
+          html+='<div class="cobro-actions">';
+          if(gbal>0) html+='<button class="cobro-btn primary" onclick="openGroupSummary(\''+gid+'\')">\uD83D\uDC65 Cobrar grupo $'+_fmt(gbal)+'</button>';
+          else html+='<button class="cobro-btn" onclick="openGroupSummary(\''+gid+'\')">\uD83D\uDC65 Ver grupo</button>';
+          html+='</div></div>';
+        });
+      } catch(e) {}
       filtered.forEach(function(r){
+        if (typeof _resGroupId==='function' && _resGroupId(r)) return;
         var payments=S.cobros.filter(function(c){return c.reservaId===r.id});
         var totalPaid=payments.reduce(function(s,c){return s+c.monto},0);
         var balance=r.tarifaTotal-totalPaid;
@@ -12251,6 +12270,7 @@
       // Reservation confirmation receipt — available for all active states
       if (res.estado !== 'Cancelada') {
         buttons += '<button class="form-button" onclick="closeModal();showReservaConfirmation(\'' + resId + '\')" style="background:var(--blue)">📄 Confirmación de Reserva</button>';
+        buttons += '<button class="form-button secondary" onclick="closeModal();openAddFacturaModal(\'' + resId + '\')">🧾 Factura / impuestos</button>';
         var _room = S.rooms.find(function(r){return r.numero===res.habitacionNum});
         buttons += '<button class="form-button" onclick="closeModal();showPostCheckinMessages(S.reservas.find(function(r){return r.id===\'' + resId + '\'}), S.rooms.find(function(r){return r.numero===\'' + res.habitacionNum + '\'}))" style="background:#25D366;color:#fff;">📨 Enviar Mensajes al Huésped</button>';
       }
@@ -17657,6 +17677,7 @@
       var acts = '';
       if (t.balance > 0.01) acts += '<button class="form-button" onclick="openGroupPayment(\'' + groupId + '\')" style="width:100%;background:var(--accent);color:var(--bg);">💰 Cobrar grupo ($' + _fmt(t.balance) + ')</button>';
       else acts += '<div style="text-align:center;color:var(--green);font-weight:700;">✅ Grupo pagado completo</div>';
+      acts += '<button class="form-button secondary" onclick="openGroupFacturaModal(\'' + groupId + '\')" style="width:100%;">🧾 Factura del grupo</button>';
       document.getElementById('taskDetailActions').innerHTML = acts;
       openModal('taskDetailModal');
     }
@@ -17768,6 +17789,115 @@
         render();
         setTimeout(function () { openGroupSummary(groupId); }, 250);
       }, 'Agrupando reservas…');
+    }
+
+    // ============ AGREGAR/EDITAR FACTURA A RESERVAS YA CREADAS ============
+    function _resSubtotal(res) {
+      var iva = (typeof parseIVAData === 'function') ? parseIVAData(res.notas) : null;
+      if (iva && iva.subtotal) return parseFloat(iva.subtotal) || 0;
+      var nights = Math.max(daysUntil(res.fechaEntrada, res.fechaSalida), 1);
+      var byRate = (parseFloat(res.tarifa) || 0) * nights;
+      return byRate || (parseFloat(res.tarifaTotal) || 0);
+    }
+    // Devuelve {notas,total} con o sin factura, sin escribir a la hoja.
+    function _resSetFactura(res, want, rfc, razon, folio) {
+      var subtotal = _resSubtotal(res);
+      var notas = String(res.notas || '').replace(/\[IVA:\{[^}]*\}\]/, '');
+      var total;
+      if (want) {
+        var tb = _taxBreak(subtotal, true);
+        total = tb.total;
+        var hotelN = ''; try { hotelN = getHotelInfo().nombre; } catch (e) {}
+        notas += '[IVA:' + JSON.stringify({ factura: true, folio: folio || '', hotel: hotelN, rfc: rfc || '', razonSocial: razon || '', subtotal: subtotal, iva: tb.iva, ish: tb.ish }) + ']';
+      } else {
+        total = subtotal;
+      }
+      return { notas: notas, total: total };
+    }
+    function openAddFacturaModal(resId) {
+      var res = S.reservas.find(function (r) { return r.id === resId; }); if (!res) return;
+      var iva = (typeof parseIVAData === 'function') ? parseIVAData(res.notas) : null; var has = !!iva;
+      var h = '<div style="font-size:12px;color:var(--text2);margin-bottom:10px;">Impuestos combinados: ISH 3% y luego IVA 16% sobre (subtotal+ISH).</div>';
+      h += '<div style="font-size:12px;margin-bottom:8px;">Subtotal: <b>$' + _fmt(_resSubtotal(res)) + '</b></div>';
+      h += '<input id="af_rfc" class="login-input" placeholder="RFC" value="' + _wbEsc(has ? (iva.rfc || '') : '') + '" style="text-transform:uppercase;margin-bottom:8px;">';
+      h += '<input id="af_razon" class="login-input" placeholder="Razón social" value="' + _wbEsc(has ? (iva.razonSocial || '') : '') + '">';
+      document.getElementById('taskDetailContent').innerHTML = h;
+      document.getElementById('taskDetailModal').querySelector('.modal-title').textContent = has ? '🧾 Editar factura' : '🧾 Agregar factura';
+      var acts = '<button class="form-button" onclick="applyAddFactura(\'' + resId + '\')" style="width:100%;">' + (has ? 'Actualizar factura' : 'Agregar factura') + '</button>';
+      if (has) acts += '<button class="form-button secondary" onclick="removeFacturaFromRes(\'' + resId + '\')" style="width:100%;color:var(--red);border-color:var(--red);">Quitar factura</button>';
+      document.getElementById('taskDetailActions').innerHTML = acts;
+      openModal('taskDetailModal');
+    }
+    async function applyAddFactura(resId) {
+      var rfc = (document.getElementById('af_rfc').value || '').trim().toUpperCase();
+      var razon = (document.getElementById('af_razon').value || '').trim();
+      var res = S.reservas.find(function (r) { return r.id === resId; }); if (!res) return;
+      var existing = (typeof parseIVAData === 'function') ? parseIVAData(res.notas) : null;
+      var folio = (existing && existing.folio) ? existing.folio : (function () { try { return nextFacturaFolio(); } catch (e) { return ''; } })();
+      await busy(async function () {
+        var u = _resSetFactura(res, true, rfc, razon, folio);
+        var idx = S.reservas.findIndex(function (x) { return x.id === resId; });
+        if (idx !== -1) { S.reservas[idx].notas = u.notas; S.reservas[idx].tarifaTotal = u.total; }
+        await sheets.multi([{ type: 'updateById', sheet: '📋 Reservas', id: resId, values: _reservaRow(S.reservas[idx]) }]);
+        toast('Factura aplicada ✅'); closeModal(); openReservaModal(resId);
+      }, 'Aplicando factura…');
+    }
+    async function removeFacturaFromRes(resId) {
+      var res = S.reservas.find(function (r) { return r.id === resId; }); if (!res) return;
+      if (!confirm('¿Quitar la factura y sus impuestos de esta reserva?')) return;
+      await busy(async function () {
+        var u = _resSetFactura(res, false);
+        var idx = S.reservas.findIndex(function (x) { return x.id === resId; });
+        if (idx !== -1) { S.reservas[idx].notas = u.notas; S.reservas[idx].tarifaTotal = u.total; }
+        await sheets.multi([{ type: 'updateById', sheet: '📋 Reservas', id: resId, values: _reservaRow(S.reservas[idx]) }]);
+        toast('Factura quitada'); closeModal(); openReservaModal(resId);
+      }, 'Quitando factura…');
+    }
+    // Factura a nivel grupo (por habitación)
+    function openGroupFacturaModal(groupId) {
+      var t = _groupTotals(groupId);
+      if (!t.count) { toast('Grupo no encontrado', true); return; }
+      window._grpFacturaPool = t.reservas;
+      var anyIva = null;
+      t.reservas.forEach(function (r) { var v = parseIVAData(r.notas); if (v && !anyIva) anyIva = v; });
+      var h = '<div style="font-size:12px;color:var(--text2);margin-bottom:10px;">Marca las habitaciones que llevan factura (ISH 3% + IVA 16% compuesto).</div>';
+      t.reservas.forEach(function (r, i) {
+        var has = !!parseIVAData(r.notas);
+        h += '<label style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--surface2);border-radius:8px;margin-bottom:6px;cursor:pointer;">';
+        h += '<input type="checkbox" class="_grpFactCb" data-idx="' + i + '" ' + (has ? 'checked' : '') + ' style="width:18px;height:18px;accent-color:var(--accent);">';
+        h += '<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:600;">Hab. ' + r.habitacionNum + ' · ' + _wbEsc(r.huesped) + '</div><div style="font-size:11px;color:var(--text2);">Subtotal $' + _fmt(_resSubtotal(r)) + (has ? ' · ya con factura' : '') + '</div></div></label>';
+      });
+      h += '<input id="gf_rfc" class="login-input" placeholder="RFC" value="' + _wbEsc(anyIva ? (anyIva.rfc || '') : '') + '" style="text-transform:uppercase;margin:8px 0;">';
+      h += '<input id="gf_razon" class="login-input" placeholder="Razón social" value="' + _wbEsc(anyIva ? (anyIva.razonSocial || '') : '') + '">';
+      document.getElementById('taskDetailContent').innerHTML = h;
+      document.getElementById('taskDetailModal').querySelector('.modal-title').textContent = '🧾 Factura del grupo';
+      document.getElementById('taskDetailActions').innerHTML = '<button class="form-button" onclick="applyGroupFactura(\'' + groupId + '\')" style="width:100%;">Aplicar</button>';
+      openModal('taskDetailModal');
+    }
+    async function applyGroupFactura(groupId) {
+      var pool = window._grpFacturaPool || [];
+      var wanted = {};
+      document.querySelectorAll('._grpFactCb').forEach(function (cb) { var i = parseInt(cb.getAttribute('data-idx'), 10); if (pool[i]) wanted[pool[i].id] = cb.checked; });
+      var rfc = (document.getElementById('gf_rfc').value || '').trim().toUpperCase();
+      var razon = (document.getElementById('gf_razon').value || '').trim();
+      var folio = ''; pool.forEach(function (r) { var v = parseIVAData(r.notas); if (v && v.folio && !folio) folio = v.folio; });
+      if (!folio && Object.keys(wanted).some(function (k) { return wanted[k]; })) { try { folio = nextFacturaFolio(); } catch (e) {} }
+      await busy(async function () {
+        var ops = [];
+        pool.forEach(function (r) {
+          var want = !!wanted[r.id];
+          var has = !!parseIVAData(r.notas);
+          if (!want && !has) return; // nada que hacer
+          var u = _resSetFactura(r, want, rfc, razon, folio);
+          var idx = S.reservas.findIndex(function (x) { return x.id === r.id; });
+          if (idx !== -1) { S.reservas[idx].notas = u.notas; S.reservas[idx].tarifaTotal = u.total; }
+          ops.push({ type: 'updateById', sheet: '📋 Reservas', id: r.id, values: _reservaRow(S.reservas[idx]) });
+        });
+        if (!ops.length) { toast('Sin cambios'); closeModal(); return; }
+        await sheets.multi(ops);
+        toast('Factura del grupo actualizada ✅'); closeModal(); render();
+        setTimeout(function () { openGroupSummary(groupId); }, 200);
+      }, 'Aplicando factura al grupo…');
     }
 
     // ============ INIT ============
