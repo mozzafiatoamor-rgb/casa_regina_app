@@ -12824,6 +12824,8 @@
           + '<div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;border-top:1px solid var(--surface3);padding-top:6px;margin-top:4px;"><span>Total</span><span style="font-family:Space Mono;color:var(--accent)">$' + _fmt(res.tarifaTotal) + '</span></div>'
           + '</div>';
         document.getElementById('paymentResInfo').insertAdjacentHTML('beforeend', _dsg);
+        var _rmF = '<button onclick="removeFacturaFromPayment(\'' + resId + '\')" style="width:100%;margin-bottom:12px;background:none;border:none;color:var(--red);font-size:11px;cursor:pointer;text-decoration:underline;">Quitar factura (el cliente ya no la quiere)</button>';
+        document.getElementById('paymentResInfo').insertAdjacentHTML('beforeend', _rmF);
       } else {
         var _addF = '<button onclick="addFacturaFromPayment(\'' + resId + '\')" style="width:100%;margin-bottom:12px;background:var(--surface2);border:1px dashed var(--accent);border-radius:var(--radius);padding:10px;font-size:12px;color:var(--accent);font-weight:600;cursor:pointer;">\ud83e\uddfe \u00bfEl cliente pedir\u00e1 factura? Agregar impuestos</button>';
         document.getElementById('paymentResInfo').insertAdjacentHTML('beforeend', _addF);
@@ -18045,6 +18047,11 @@
     function addFacturaFromPayment(resId) {
       window._facturaReturnTo = 'payment:' + resId;
       openAddFacturaModal(resId);
+    }
+    // Quitar la factura desde el modal de pago (el cliente ya no la quiere) y volver al pago.
+    function removeFacturaFromPayment(resId) {
+      window._facturaReturnTo = 'payment:' + resId;
+      removeFacturaFromRes(resId);
     }
     function _facturaReopen(resId) {
       var ret = window._facturaReturnTo; window._facturaReturnTo = '';
