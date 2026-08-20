@@ -4050,6 +4050,7 @@
     var _wbView = null;
     var _wbRes = null;        // reserva cargada (modo por-huésped)
     var _wbBreakfast = [];    // códigos de desayuno del huésped
+    var _wbGuestRegId = '';   // si el libro es de un huésped específico (&g=REGID)
     var _wbAccess = '';       // código de acceso personal
     var _wbEnded = false;     // la estancia ya terminó (checkout pasado / cancelada)
 
@@ -4111,9 +4112,10 @@
           var reads = [ _rd('⚙️ Config', 'A2:B50').catch(function() { return []; }) ];
           if (resId) {
             reads.push(_rd('📋 Reservas', 'A2:P5000').catch(function() { return []; }));
-            reads.push(_rd('🍳 Desayunos', 'A2:I5000').catch(function() { return []; }));
+            reads.push(_rd('🍳 Desayunos', 'A2:J5000').catch(function() { return []; }));
             reads.push(_rd('🔑 Accesos', 'A2:C5000').catch(function() { return []; }));
             reads.push(_rd('🏨 Habitaciones', 'A2:F30').catch(function() { return []; }));
+            reads.push(_rd('📝 Registro', 'A2:M5000').catch(function() { return []; }));
           }
           var out = await Promise.all(reads);
           var cfgRows = out[0];
@@ -4126,7 +4128,7 @@
             });
           }
           if (resId) {
-            var reservas = out[1] || [], des = out[2] || [], acc = out[3] || [], habs = out[4] || [];
+            var reservas = out[1] || [], des = out[2] || [], acc = out[3] || [], habs = out[4] || [], regs = out[5] || [];
             for (var i = 0; i < reservas.length; i++) {
               if (String(reservas[i][0]) === String(resId)) {
                 var f = reservas[i];
@@ -4134,6 +4136,18 @@
                            fechaEntrada: String(f[5] || '').substring(0, 10), fechaSalida: String(f[6] || '').substring(0, 10),
                            estado: String(f[11] || ''), tipo: '' };
                 break;
+              }
+            }
+            // Libro por huésped: si el enlace trae &g=REGID, personalizar con ese huésped
+            var _gReg = new URLSearchParams(window.location.search).get('g');
+            _wbGuestRegId = '';
+            if (_gReg && _wbRes) {
+              for (var gi = 0; gi < regs.length; gi++) {
+                if (String(regs[gi][0]) === String(_gReg) && String(regs[gi][1]) === String(resId)) {
+                  _wbGuestRegId = String(regs[gi][0]);
+                  if (regs[gi][2]) _wbRes.huesped = String(regs[gi][2]); // nombre del huésped específico
+                  break;
+                }
               }
             }
             // Tipo de habitación (para foto del cuarto)
@@ -4144,7 +4158,10 @@
             }
             _wbBreakfast = des.filter(function(d) {
               var est = String(d[6] || 'Pendiente');
-              return String(d[1]) === String(resId) && est !== 'Cancelado' && est !== 'Expirado';
+              if (String(d[1]) !== String(resId) || est === 'Cancelado' || est === 'Expirado') return false;
+              // Si el libro es de un huésped específico, solo sus códigos (por regId).
+              if (_wbGuestRegId) return String(d[9] || '') === String(_wbGuestRegId);
+              return true;
             }).map(function(d) {
               return { codigo: String(d[0] || ''), fecha: String(d[4] || ''), personas: d[5] || '', estado: String(d[6] || 'Pendiente') };
             });
@@ -4645,6 +4662,31 @@
     function copyWelcomeBookLink(resId) {
       var link = getWelcomeBookLink(resId);
       navigator.clipboard.writeText(link).then(function() { toast('Enlace de la guía copiado'); });
+    }
+    // Enlace del libro para un huésped específico (su propia experiencia)
+    function getGuestBookLink(resId, regId) {
+      return getWelcomeBookLink(resId) + (regId ? ('&g=' + encodeURIComponent(regId)) : '');
+    }
+    function _guestPhoneDigits(reg, res) {
+      var ph = (reg && reg.telefono) ? reg.telefono : ((res && res.telefono) || '');
+      ph = String(ph).replace(/[^0-9]/g, '');
+      if (ph.length === 10) ph = '52' + ph;
+      return ph;
+    }
+    function sendGuestBookWhatsApp(resId, regId) {
+      var res = (S.reservas || []).find(function(r) { return r.id === resId; }); if (!res) return;
+      var reg = (S.registros || []).find(function(x) { return x.regId === regId; });
+      var nombre = (reg && reg.nombre) ? reg.nombre : res.huesped;
+      var link = getGuestBookLink(resId, regId);
+      var hi = getHotelInfo();
+      var text = '¡Hola ' + nombre + '! 🏨\n\nAquí tienes tu guía digital personal de *' + (hi.nombre || HOTEL_NAME) + '*: acceso, WiFi, desayuno, recomendaciones y contactos.\n\n' + link + '\n\n¡Te esperamos! 🌟';
+      var phone = _guestPhoneDigits(reg, res);
+      if (!phone) { toast('Este huésped no tiene celular registrado', true); return; }
+      window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(text), '_blank');
+    }
+    function copyGuestBookLink(resId, regId) {
+      var link = getGuestBookLink(resId, regId);
+      navigator.clipboard.writeText(link).then(function() { toast('Enlace del huésped copiado'); });
     }
     function previewWelcomeBook(resId) { window.open(getWelcomeBookLink(resId), '_blank'); }
     function shareWelcomeBookWhatsApp(resId) {
@@ -6017,7 +6059,7 @@
           sheets.read('👥 Clientes', 'A2:I5000').catch(function() { return []; }),
           sheets.read('📦 Inventario', 'A2:H500').catch(function() { return []; }),
           sheets.read('⚙️ Config', 'A2:B50').catch(function() { return []; }),
-          sheets.read('🍳 Desayunos', 'A2:I5000').catch(function() { return []; }),
+          sheets.read('🍳 Desayunos', 'A2:J5000').catch(function() { return []; }),
           sheets.read('📝 Cotizaciones', 'A2:P5000').catch(function() { return []; }),
           sheets.read('🔑 Accesos', 'A2:C5000').catch(function() { return []; })
         ]);
@@ -6044,9 +6086,9 @@
 
         // Cargar registros de huéspedes (varios por reserva)
         try {
-          var _regData = await sheets.read('📝 Registro', 'A2:L5000').catch(function(){ return []; });
+          var _regData = await sheets.read('📝 Registro', 'A2:M5000').catch(function(){ return []; });
           S.registros = (_regData || []).map(function(rr) {
-            return { regId:String(rr[0]||''), resId:String(rr[1]||''), nombre:String(rr[2]||''), habitacionNum:String(rr[3]||''), fecha:String(rr[4]||''), tipoId:String(rr[5]||''), numId:String(rr[6]||''), nacionalidad:String(rr[7]||''), procedencia:String(rr[8]||''), motivo:String(rr[9]||''), observaciones:String(rr[10]||''), ts:String(rr[11]||'') };
+            return { regId:String(rr[0]||''), resId:String(rr[1]||''), nombre:String(rr[2]||''), habitacionNum:String(rr[3]||''), fecha:String(rr[4]||''), tipoId:String(rr[5]||''), numId:String(rr[6]||''), nacionalidad:String(rr[7]||''), procedencia:String(rr[8]||''), motivo:String(rr[9]||''), observaciones:String(rr[10]||''), ts:String(rr[11]||''), telefono:String(rr[12]||'') };
           }).filter(function(x){ return x.regId; });
         } catch (e) { S.registros = []; }
 
@@ -6130,7 +6172,7 @@
           return {
             codigo: d[0], reservaId: d[1], huesped: d[2], habitacion: d[3],
             fecha: d[4], personas: parseInt(d[5]) || 1,
-            estado: d[6] || 'Pendiente', validadoPor: d[7] || '', horaValidacion: d[8] || ''
+            estado: d[6] || 'Pendiente', validadoPor: d[7] || '', horaValidacion: d[8] || '', regId: String(d[9] || '')
           };
         });
 
@@ -13181,8 +13223,10 @@
         const row = [id, roomNum, huesped, tel, email, checkin, checkout, adultos, niños, tarifa, total, _initEstado, notas, S.user.usuario, n];
         const logRow = [fecha, hora, S.user.usuario, 'Nueva Reserva', huesped + ' en Hab. ' + roomNum + (wantsFactura ? ' (Factura)' : ''), 'info'];
 
+        var _titRegId = 'REG-' + Date.now();
         var operations = [
           { type: 'append', sheet: '📋 Reservas', values: row },
+          { type: 'append', sheet: '📝 Registro', values: [_titRegId, id, huesped, roomNum, fecha, '', '', '', '', '', notasText || '', n, tel] },
           { type: 'append', sheet: '📜 Bitácora', values: logRow }
         ];
 
@@ -13203,6 +13247,8 @@
           id, habitacionNum: roomNum, huesped, telefono: tel, email, fechaEntrada: checkin, fechaSalida: checkout,
           adultos, niños, tarifa, tarifaTotal: total, estado: _initEstado, notas, creadoPor: S.user.usuario, fechaCreacion: n
         });
+        S.registros = S.registros || [];
+        S.registros.push({ regId: _titRegId, resId: id, nombre: huesped, habitacionNum: roomNum, fecha: fecha, tipoId: '', numId: '', nacionalidad: '', procedencia: '', motivo: '', observaciones: notasText || '', ts: n, telefono: tel });
 
         // Add payment to local state
         if (payId && payMonto > 0 && payMetodo) {
@@ -17362,18 +17408,30 @@
       h += '<button onclick="openGuestEditor(\'' + res.id + '\')" style="background:var(--accent);color:var(--bg);border:none;border-radius:8px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer;">＋ Agregar</button>';
       h += '</div>';
       if (!guests.length) {
-        h += '<div style="font-size:11px;color:var(--text2);">Aún no hay huéspedes registrados. Agrega el nombre y documento de cada persona de la habitación.</div>';
+        h += '<div style="font-size:11px;color:var(--text2);">Aún no hay huéspedes registrados. Agrega nombre, celular y documento de cada persona — cada uno tendrá su propio libro y sus propios códigos.</div>';
       } else {
         guests.forEach(function (g) {
           var doc = [g.tipoId, g.numId].filter(Boolean).join(' ');
-          h += '<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--surface2);">';
+          var hasCodes = _guestHasCodes(res.id, g.regId);
+          var hasPhone = !!(g.telefono && String(g.telefono).replace(/[^0-9]/g, ''));
+          h += '<div style="padding:8px 0;border-bottom:1px solid var(--surface2);">';
+          h += '<div style="display:flex;justify-content:space-between;align-items:flex-start;">';
           h += '<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:600;">' + _wbEsc(g.nombre || '(sin nombre)') + '</div>';
-          h += '<div style="font-size:11px;color:var(--text2);">' + (doc ? _wbEsc(doc) : 'sin documento') + (g.nacionalidad ? ' · ' + _wbEsc(g.nacionalidad) : '') + '</div></div>';
+          h += '<div style="font-size:11px;color:var(--text2);">' + (hasPhone ? '📱 ' + _wbEsc(g.telefono) : '<span style="color:var(--yellow)">sin celular</span>') + ' · ' + (doc ? _wbEsc(doc) : 'sin doc') + '</div></div>';
           h += '<div style="display:flex;gap:6px;flex-shrink:0;">';
           h += '<button onclick="openGuestEditor(\'' + res.id + '\',\'' + g.regId + '\')" style="background:var(--surface2);border:1px solid var(--surface3);border-radius:6px;padding:4px 9px;font-size:12px;cursor:pointer;color:var(--text);">✏️</button>';
           h += '<button onclick="removeResGuest(\'' + res.id + '\',\'' + g.regId + '\')" style="background:var(--surface2);border:1px solid var(--surface3);border-radius:6px;padding:4px 9px;font-size:12px;cursor:pointer;color:var(--red);">🗑️</button>';
           h += '</div></div>';
+          // Acciones por huésped: su libro y sus códigos
+          h += '<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;">';
+          h += '<button onclick="sendGuestBookWhatsApp(\'' + res.id + '\',\'' + g.regId + '\')" style="flex:1;min-width:90px;background:#25D366;color:#fff;border:none;border-radius:6px;padding:5px;font-size:11px;cursor:pointer;font-weight:600;">📖 Su libro</button>';
+          if (hasCodes) h += '<button onclick="sendGuestBreakfastWhatsApp(\'' + res.id + '\',\'' + g.regId + '\')" style="flex:1;min-width:90px;background:#2e7d32;color:#fff;border:none;border-radius:6px;padding:5px;font-size:11px;cursor:pointer;font-weight:600;">🍳 Sus códigos</button>';
+          else h += '<button onclick="generarDesayunosHuesped(\'' + res.id + '\',\'' + g.regId + '\')" style="flex:1;min-width:90px;background:var(--surface2);border:1px solid #2e7d32;color:#2e7d32;border-radius:6px;padding:5px;font-size:11px;cursor:pointer;font-weight:600;">🍳 Generar códigos</button>';
+          h += '<button onclick="copyGuestBookLink(\'' + res.id + '\',\'' + g.regId + '\')" style="background:var(--surface2);border:1px solid var(--surface3);border-radius:6px;padding:5px 8px;font-size:11px;cursor:pointer;color:var(--text);">📋</button>';
+          h += '</div>';
+          h += '</div>';
         });
+        h += '<button onclick="generarDesayunosPorHuesped(\'' + res.id + '\')" style="width:100%;margin-top:8px;background:var(--surface2);border:1px dashed #2e7d32;color:#2e7d32;border-radius:8px;padding:7px;font-size:11px;cursor:pointer;font-weight:600;">🍳 Generar códigos para todos los huéspedes</button>';
       }
       h += '</div>';
       return h;
@@ -17383,6 +17441,8 @@
       var h = '';
       h += '<label class="form-label" style="font-size:12px;">Nombre completo</label>';
       h += '<input type="text" id="ge_nombre" class="login-input" value="' + _wbEsc(g ? g.nombre : '') + '" style="margin-bottom:10px;">';
+      h += '<label class="form-label" style="font-size:12px;">📱 Celular (para enviarle su libro y sus códigos)</label>';
+      h += '<input type="tel" id="ge_tel" class="login-input" value="' + _wbEsc(g ? (g.telefono || '') : '') + '" placeholder="Ej: 9981234567" style="margin-bottom:10px;">';
       h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">';
       h += '<div><label class="form-label" style="font-size:12px;">Tipo de ID</label><select id="ge_tipoId" class="login-input" style="padding:10px;">';
       ['INE', 'Pasaporte', 'Licencia', 'Otro'].forEach(function (t) { h += '<option value="' + t + '"' + ((g && g.tipoId === t) ? ' selected' : '') + '>' + t + '</option>'; });
@@ -17396,6 +17456,7 @@
     }
     async function saveResGuestFromEditor(resId, regId) {
       var nombre = (document.getElementById('ge_nombre').value || '').trim();
+      var tel = (document.getElementById('ge_tel').value || '').trim();
       var tipoId = document.getElementById('ge_tipoId').value;
       var numId = (document.getElementById('ge_numId').value || '').trim();
       if (!nombre) { toast('Escribe el nombre', true); return; }
@@ -17405,16 +17466,16 @@
       await busy(async function () {
         if (regId) {
           var g = _resGuests(resId).find(function (x) { return x.regId === regId; }) || {};
-          var row = [regId, resId, nombre, hab, g.fecha || _f, tipoId, numId, g.nacionalidad || '', g.procedencia || '', g.motivo || '', g.observaciones || '', g.ts || _ts];
+          var row = [regId, resId, nombre, hab, g.fecha || _f, tipoId, numId, g.nacionalidad || '', g.procedencia || '', g.motivo || '', g.observaciones || '', g.ts || _ts, tel];
           await sheets.multi([{ type: 'updateById', sheet: '📝 Registro', id: regId, values: row }]);
           var i = S.registros.findIndex(function (x) { return x.regId === regId; });
-          if (i !== -1) { S.registros[i].nombre = nombre; S.registros[i].tipoId = tipoId; S.registros[i].numId = numId; S.registros[i].habitacionNum = hab; }
+          if (i !== -1) { S.registros[i].nombre = nombre; S.registros[i].tipoId = tipoId; S.registros[i].numId = numId; S.registros[i].habitacionNum = hab; S.registros[i].telefono = tel; }
         } else {
           var newId = 'REG-' + Date.now();
-          var row2 = [newId, resId, nombre, hab, _f, tipoId, numId, '', '', '', '', _ts];
+          var row2 = [newId, resId, nombre, hab, _f, tipoId, numId, '', '', '', '', _ts, tel];
           await sheets.multi([{ type: 'append', sheet: '📝 Registro', values: row2 }]);
           S.registros = S.registros || [];
-          S.registros.push({ regId: newId, resId: resId, nombre: nombre, habitacionNum: hab, fecha: _f, tipoId: tipoId, numId: numId, nacionalidad: '', procedencia: '', motivo: '', observaciones: '', ts: _ts });
+          S.registros.push({ regId: newId, resId: resId, nombre: nombre, habitacionNum: hab, fecha: _f, tipoId: tipoId, numId: numId, nacionalidad: '', procedencia: '', motivo: '', observaciones: '', ts: _ts, telefono: tel });
         }
         toast('Huésped guardado ✅');
         closeModal();
@@ -17430,6 +17491,61 @@
         closeModal();
         openReservaModal(resId);
       }, 'Eliminando…');
+    }
+
+    // ---- Desayunos POR HUÉSPED: un código por huésped por noche ----
+    async function _appendGuestBreakfastCodes(res, reg) {
+      var nights = Math.max(daysUntil(res.fechaEntrada, res.fechaSalida), 1);
+      var ops = [], added = [];
+      for (var di = 0; di < nights; di++) {
+        var d = new Date(res.fechaEntrada + 'T12:00:00'); d.setDate(d.getDate() + di + 1);
+        var ds = normDate(d); var code = generateBreakfastCode();
+        ops.push({ type: 'append', sheet: '🍳 Desayunos', values: [code, res.id, reg.nombre, res.habitacionNum, ds, 1, 'Pendiente', '', '', reg.regId] });
+        added.push({ codigo: code, reservaId: res.id, huesped: reg.nombre, habitacion: res.habitacionNum, fecha: ds, personas: 1, estado: 'Pendiente', validadoPor: '', horaValidacion: '', regId: reg.regId });
+      }
+      if (ops.length) { await sheets.multi(ops); S.desayunos = (S.desayunos || []).concat(added); }
+      return added.length;
+    }
+    function _guestHasCodes(resId, regId) {
+      return (S.desayunos || []).some(function (d) { return d.reservaId === resId && d.regId === regId; });
+    }
+    async function generarDesayunosPorHuesped(resId) {
+      var res = S.reservas.find(function (r) { return r.id === resId; }); if (!res) return;
+      var guests = _resGuests(resId);
+      if (!guests.length) { toast('Registra primero a los huéspedes para generar sus códigos', true); return; }
+      await busy(async function () {
+        var total = 0, skipped = 0;
+        for (var i = 0; i < guests.length; i++) {
+          if (_guestHasCodes(resId, guests[i].regId)) { skipped++; continue; }
+          total += await _appendGuestBreakfastCodes(res, guests[i]);
+        }
+        toast('🍳 ' + total + ' código(s) generados' + (skipped ? (' · ' + skipped + ' ya tenían') : ''));
+        closeModal(); openReservaModal(resId);
+      }, 'Generando desayunos por huésped…');
+    }
+    async function generarDesayunosHuesped(resId, regId) {
+      var res = S.reservas.find(function (r) { return r.id === resId; }); if (!res) return;
+      var g = _resGuests(resId).find(function (x) { return x.regId === regId; }); if (!g) { toast('Huésped no encontrado', true); return; }
+      if (_guestHasCodes(resId, regId)) { toast('Este huésped ya tiene códigos', false); return; }
+      await busy(async function () {
+        var c = await _appendGuestBreakfastCodes(res, g);
+        toast('🍳 ' + c + ' código(s) para ' + g.nombre);
+        closeModal(); openReservaModal(resId);
+      }, 'Generando…');
+    }
+    function sendGuestBreakfastWhatsApp(resId, regId) {
+      var res = S.reservas.find(function (r) { return r.id === resId; }); if (!res) return;
+      var reg = (S.registros || []).find(function (x) { return x.regId === regId; });
+      var nombre = (reg && reg.nombre) ? reg.nombre : res.huesped;
+      var codes = (S.desayunos || []).filter(function (d) { return d.reservaId === resId && d.regId === regId && d.estado === 'Pendiente'; });
+      if (!codes.length) { toast('Este huésped no tiene códigos pendientes', true); return; }
+      var promo = getBreakfastPromo();
+      var msg = '🍳 *DESAYUNO INCLUIDO* 🌿\n\nHola *' + nombre + '* 👋\n\nTus códigos de desayuno en *' + (promo.partner || 'nuestro restaurante') + '*:\n\n';
+      codes.forEach(function (c) { msg += '📅 ' + formatDate(c.fecha) + ' — 🔑 *' + c.codigo + '*\n'; });
+      msg += '\n📌 Muestra tu código al llegar al restaurante.\n_' + HOTEL_NAME + '_';
+      var phone = (typeof _guestPhoneDigits === 'function') ? _guestPhoneDigits(reg, res) : String((reg && reg.telefono) || res.telefono || '').replace(/[^0-9]/g, '');
+      if (!phone) { toast('Este huésped no tiene celular registrado', true); return; }
+      window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(msg), '_blank');
     }
 
     // ============ ACOMPAÑANTES DESDE EL LINK DEL HUÉSPED (público) ============
