@@ -5856,8 +5856,10 @@
       document.getElementById('appContainer').classList.remove('hidden');
       document.getElementById('guestScreen').classList.remove('active');
       // Add config tab for admin and recepcion roles
-      if (S.user && (S.user.rol === 'admin' || S.user.rol === 'recepcion')) {
+      if (S.user && S.user.rol === 'admin') {
         NAV_TABS = NAV_TABS_BASE.concat([{ id: 'config', icon: '⚙️', label: 'Ajustes' }]);
+      } else if (S.user && S.user.rol === 'recepcion') {
+        NAV_TABS = NAV_TABS_BASE.filter(function(t){ return t.id !== 'reports'; }).concat([{ id: 'config', icon: '⚙️', label: 'Ajustes' }]);
       } else {
         NAV_TABS = NAV_TABS_BASE;
       }
@@ -9245,16 +9247,17 @@
       var todayTransferencia = todayPay.filter(function(c){return c.metodoPago==='Transferencia'}).reduce(function(s,c){return s+c.monto},0);
       var todayTarjeta = todayPay.filter(function(c){return c.metodoPago!=='Efectivo'&&c.metodoPago!=='Transferencia'}).reduce(function(s,c){return s+c.monto},0);
 
+      var _cobAdmin = S.user && S.user.rol === 'admin';
       document.getElementById('cobrosStats').innerHTML =
-        '<div class="cobros-stats">'+
+        (_cobAdmin ? ('<div class="cobros-stats">'+
         '<div class="cobro-stat"><div class="cobro-stat-value" style="color:var(--green)">$'+todayTotal+'</div><div class="cobro-stat-label">Hoy</div></div>'+
         '<div class="cobro-stat"><div class="cobro-stat-value" style="color:var(--red)">$'+totalPending+'</div><div class="cobro-stat-label">Pendiente</div></div>'+
         '<div class="cobro-stat"><div class="cobro-stat-value" style="color:var(--accent)">$'+totalCollected+'</div><div class="cobro-stat-label">Recaudado</div></div>'+
-        '</div>'+
+        '</div>') : '')+
         '<button class="form-button secondary" onclick="openGroupsList()" style="width:100%;margin-bottom:8px;padding:10px;">👥 Ver grupos de reservas</button>'+
-        '<button class="form-button secondary" onclick="corteDeCaja()" style="width:100%;margin-bottom:12px;padding:10px;">💰 Corte de Caja del Día' +
+        (_cobAdmin ? ('<button class="form-button secondary" onclick="corteDeCaja()" style="width:100%;margin-bottom:12px;padding:10px;">💰 Corte de Caja del Día' +
         (todayPay.length > 0 ? ' <span style=\\"font-size:10px;color:var(--text2);font-weight:400\\">(' + todayPay.length + ' movimientos · $' + todayTotal + ')</span>' : '') +
-        '</button>';
+        '</button>') : '');
 
       var pills=[{id:'activas',label:'Hospedados'},{id:'pendientes',label:'Con Saldo'},{id:'proximas',label:'Próximas'},{id:'historial',label:'Historial'}];
       document.getElementById('cobrosPills').innerHTML = pills.map(function(p){
@@ -15591,6 +15594,7 @@
     var _navFromPopState = false;
 
     function switchTab(tabName) {
+      if (tabName === 'reports' && !(S.user && S.user.rol === 'admin')) { tabName = 'dashboard'; }
       document.querySelectorAll('.tab-content').forEach(function(t) { t.classList.remove('active'); });
       var tabEl = document.getElementById('tab' + tabName.charAt(0).toUpperCase() + tabName.slice(1));
       if (tabEl) tabEl.classList.add('active');
