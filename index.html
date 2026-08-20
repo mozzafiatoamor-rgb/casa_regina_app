@@ -13882,9 +13882,9 @@
     }
 
     function showGuestRegistration(res, room) {
-      // Look up previous registration data for returning guests
-      var prev = getGuestRegCache(res.huesped);
-      var hasPrev = prev && prev.tipoID;
+      // Pre-llenar con lo ya capturado en ESTA reserva (o visita anterior como respaldo)
+      var prev = _prevRegForCheckin(res);
+      var hasPrev = prev && (prev.tipoID || prev.numID || prev.nacionalidad);
 
       var h = '';
       h += '<div style="background:var(--surface3);padding:12px;border-radius:var(--radius);margin-bottom:14px;">';
@@ -13893,7 +13893,7 @@
       h += '</div>';
 
       if (hasPrev) {
-        h += '<div style="background:rgba(139,170,106,.1);border:1px solid var(--accent);border-radius:var(--radius);padding:10px;margin-bottom:12px;font-size:12px;color:var(--accent);">✅ Huésped recurrente — datos pre-llenados de visita anterior</div>';
+        h += '<div style="background:rgba(139,170,106,.1);border:1px solid var(--accent);border-radius:var(--radius);padding:10px;margin-bottom:12px;font-size:12px;color:var(--accent);">✅ Datos ya registrados ' + (prev._source === 'reserva' ? 'en la reserva' : 'de una visita anterior') + ' — pre-llenados, solo verifica</div>';
       }
 
       h += '<div style="font-size:12px;color:var(--text2);margin-bottom:12px;">Datos de registro del huésped (requerido por ley). Puedes omitir campos opcionales.</div>';
@@ -18087,6 +18087,41 @@
         toast('Factura del grupo actualizada ✅'); closeModal(); render();
         setTimeout(function () { openGroupSummary(groupId); }, 200);
       }, 'Aplicando factura al grupo…');
+    }
+
+    // ============ PRE-LLENAR CHECK-IN CON DATOS YA REGISTRADOS EN LA RESERVA ============
+    function _mapTipoIdCheckin(t) {
+      t = String(t || '');
+      if (/INE|IFE/i.test(t)) return 'INE / IFE';
+      if (/pasaporte|passport/i.test(t)) return 'Pasaporte';
+      if (/licencia|licen/i.test(t)) return 'Licencia de Conducir';
+      if (/c[eé]dula/i.test(t)) return 'Cédula Profesional';
+      if (/^otro|other/i.test(t)) return 'Otro';
+      return t;
+    }
+    // Reúne los datos ya capturados para ESTA reserva (booking web, pre-registro o recepción)
+    // y como respaldo el caché de visitas anteriores. La reserva gana sobre el caché.
+    function _prevRegForCheckin(res) {
+      var out = {}, src = '';
+      try {
+        var prev = (typeof getGuestRegCache === 'function') ? getGuestRegCache(res.huesped) : null;
+        if (prev) { out.tipoID = prev.tipoID; out.numID = prev.numID; out.nacionalidad = prev.nacionalidad; out.procedencia = prev.procedencia; out.motivo = prev.motivo; src = 'anterior'; }
+      } catch (e) {}
+      try {
+        var reg = (S.registros || []).filter(function (g) { return String(g.resId) === String(res.id); });
+        var mine = reg.filter(function (g) { return g.numId || g.tipoId || g.nacionalidad; });
+        var pick = mine.filter(function (g) { return String(g.nombre || '').toLowerCase().trim() === String(res.huesped || '').toLowerCase().trim(); })[0] || mine[0];
+        if (pick) {
+          if (pick.tipoId) out.tipoID = _mapTipoIdCheckin(pick.tipoId);
+          if (pick.numId) out.numID = pick.numId;
+          if (pick.nacionalidad) out.nacionalidad = pick.nacionalidad;
+          if (pick.procedencia) out.procedencia = pick.procedencia;
+          if (pick.motivo) out.motivo = pick.motivo;
+          src = 'reserva';
+        }
+      } catch (e) {}
+      out._source = src;
+      return out;
     }
 
     // ============ INIT ============
