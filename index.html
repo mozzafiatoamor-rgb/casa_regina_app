@@ -17502,6 +17502,14 @@
       h += '</div>';
       h += '<div style="font-size:12px;font-weight:700;margin-bottom:6px;">Habitaciones</div>';
       h += '<div id="groupRoomsList"></div>';
+      // Factura (impuestos combinados: ISH 3% y luego IVA 16% sobre subtotal+ISH)
+      h += '<div style="display:flex;align-items:center;gap:10px;margin:12px 0 6px;padding:10px;background:var(--surface2);border-radius:var(--radius);">';
+      h += '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;flex:1;"><input type="checkbox" id="grp_factura" onchange="_groupToggleFactura()" style="width:18px;height:18px;accent-color:var(--accent);"><div><div style="font-size:13px;font-weight:600;">🧾 ¿Requiere factura?</div><div style="font-size:11px;color:var(--text2);">Agrega ISH 3% y luego IVA 16% sobre (subtotal+ISH)</div></div></label>';
+      h += '</div>';
+      h += '<div id="grp_facturaFields" style="display:none;margin-bottom:6px;">';
+      h += '<input id="grp_rfc" class="login-input" placeholder="RFC" style="text-transform:uppercase;margin-bottom:6px;">';
+      h += '<input id="grp_razon" class="login-input" placeholder="Razón social">';
+      h += '</div>';
       h += '<div id="groupTotalBox" style="text-align:right;font-weight:700;margin-top:8px;font-size:13px;"></div>';
       document.getElementById('taskDetailContent').innerHTML = h;
       document.getElementById('taskDetailModal').querySelector('.modal-title').textContent = '👥 Reserva de grupo';
@@ -17535,13 +17543,29 @@
       _groupRefreshRooms();
     }
     function _groupSetGuest(num, val) { if (window._groupSel[num]) window._groupSel[num].guest = val; }
+    function _groupToggleFactura() {
+      var on = document.getElementById('grp_factura').checked;
+      var ff = document.getElementById('grp_facturaFields'); if (ff) ff.style.display = on ? '' : 'none';
+      _groupUpdateTotal();
+    }
     function _groupUpdateTotal() {
       var checkin = document.getElementById('grp_checkin').value;
       var checkout = document.getElementById('grp_checkout').value;
       var nights = Math.max(daysUntil(checkin, checkout), 1);
-      var total = 0; Object.keys(window._groupSel).forEach(function (k) { total += window._groupSel[k].tarifa * nights; });
+      var facturaEl = document.getElementById('grp_factura');
+      var factura = facturaEl ? facturaEl.checked : false;
+      var subtotal = 0; Object.keys(window._groupSel).forEach(function (k) { subtotal += window._groupSel[k].tarifa * nights; });
       var n = Object.keys(window._groupSel).length;
-      document.getElementById('groupTotalBox').innerHTML = n ? (n + ' hab. · ' + nights + ' noche(s) · Total: <span style="color:var(--accent);">$' + _fmt(total) + '</span>') : '';
+      var box = document.getElementById('groupTotalBox');
+      if (!n) { box.innerHTML = ''; return; }
+      var tb = _taxBreak(subtotal, factura);
+      if (factura) {
+        box.innerHTML = n + ' hab. · ' + nights + ' noche(s)<br>' +
+          '<span style="font-size:11px;color:var(--text2);font-weight:400;">Subtotal $' + _fmt(subtotal) + ' · ISH $' + _fmt(tb.ish) + ' · IVA $' + _fmt(tb.iva) + '</span><br>' +
+          'Total: <span style="color:var(--accent);">$' + _fmt(tb.total) + '</span>';
+      } else {
+        box.innerHTML = n + ' hab. · ' + nights + ' noche(s) · Total: <span style="color:var(--accent);">$' + _fmt(subtotal) + '</span>';
+      }
     }
     async function saveGroupReserva() {
       var nombre = (document.getElementById('grp_nombre').value || '').trim();
@@ -17556,6 +17580,15 @@
       if (checkin >= checkout) { toast('La salida debe ser después de la entrada', true); return; }
       var nights = Math.max(daysUntil(checkin, checkout), 1);
       var groupId = 'G-' + Date.now();
+      var facturaEl = document.getElementById('grp_factura');
+      var wantsFactura = facturaEl ? facturaEl.checked : false;
+      var rfc = wantsFactura ? ((document.getElementById('grp_rfc').value || '').trim().toUpperCase()) : '';
+      var razonSocial = wantsFactura ? ((document.getElementById('grp_razon').value || '').trim()) : '';
+      var _grpFolio = '', _hotelNombre = '';
+      if (wantsFactura) {
+        try { _grpFolio = nextFacturaFolio(); } catch (e) {}
+        try { _hotelNombre = getHotelInfo().nombre; } catch (e) {}
+      }
       var _aPct = 0; try { _aPct = getAnticipoPct(); } catch (e) {}
       var estado = (_aPct === 0) ? 'Confirmada' : 'Reservada';
       var n = now(), fecha = normDate(new Date()), hora = n.split(' ')[1];
@@ -17564,10 +17597,16 @@
         nums.forEach(function (num, idx) {
           var rm = (S.rooms || []).find(function (r) { return r.numero === num; });
           var tarifa = parseFloat(rm.tarifa) || 0;
-          var total = tarifa * nights;
+          var subtotal = tarifa * nights;
+          var _tb = _taxBreak(subtotal, wantsFactura);
+          var total = _tb.total; // incluye impuestos combinados si aplica
           var guestName = (sel[num].guest || '').trim() || nombre;
           var resId = nextId('R', S.reservas.concat(newRes));
           var notas = '[GRUPO:' + groupId + ']';
+          if (wantsFactura) {
+            var ivaData = JSON.stringify({ factura: true, folio: _grpFolio, hotel: _hotelNombre, rfc: rfc, razonSocial: razonSocial, subtotal: subtotal, iva: _tb.iva, ish: _tb.ish });
+            notas += '[IVA:' + ivaData + ']';
+          }
           var row = [resId, num, guestName, tel, email, checkin, checkout, 1, 0, tarifa, total, estado, notas, (S.user && S.user.usuario) || '', n];
           ops.push({ type: 'append', sheet: '📋 Reservas', values: row });
           var regId = 'REG-' + Date.now() + '-' + idx;
