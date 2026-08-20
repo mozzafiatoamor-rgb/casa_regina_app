@@ -2408,13 +2408,14 @@
         <div class="form-row">
           <div class="form-group">
             <label class="form-label">Adultos</label>
-            <input type="number" id="newResAdultos" class="form-input" value="1" min="1" />
+            <input type="number" id="newResAdultos" class="form-input" value="1" min="1" onchange="try{_renderNewResGuests()}catch(e){}" oninput="try{_renderNewResGuests()}catch(e){}" />
           </div>
           <div class="form-group">
             <label class="form-label">Niños</label>
             <input type="number" id="newResNinos" class="form-input" value="0" min="0" />
           </div>
         </div>
+        <div id="newResGuestsBox"></div>
         <div class="form-group">
           <label class="form-label">Tarifa Diaria</label>
           <input type="number" id="newResTarifa" class="form-input" placeholder="Tarifa" required />
@@ -13031,6 +13032,7 @@
       document.getElementById('newResEmail').value = '';
       document.getElementById('newResAdultos').value = '1';
       document.getElementById('newResNinos').value = '0';
+      try { var _nrb = document.getElementById('newResGuestsBox'); if (_nrb) _nrb.innerHTML = ''; _renderNewResGuests(); } catch (e) {}
       document.getElementById('newResNotas').value = '';
       // Reset factura/IVA fields
       document.getElementById('newResFactura').checked = false;
@@ -13229,11 +13231,13 @@
         const logRow = [fecha, hora, S.user.usuario, 'Nueva Reserva', huesped + ' en Hab. ' + roomNum + (wantsFactura ? ' (Factura)' : ''), 'info'];
 
         var _titRegId = 'REG-' + Date.now();
+        var _extraGuests = (typeof _collectNewResGuests === 'function') ? _collectNewResGuests().filter(function(g){ return g.nombre; }) : [];
+        var _extraRegOps = _extraGuests.map(function(g, gi){ var _gRegId = 'REG-' + Date.now() + '-' + (gi+1); g._regId = _gRegId; return { type: 'append', sheet: '📝 Registro', values: [_gRegId, id, g.nombre, roomNum, fecha, g.tipoId||'', g.numId||'', '', '', '', '', n, g.telefono||''] }; });
         var operations = [
           { type: 'append', sheet: '📋 Reservas', values: row },
           { type: 'append', sheet: '📝 Registro', values: [_titRegId, id, huesped, roomNum, fecha, '', '', '', '', '', notasText || '', n, tel] },
           { type: 'append', sheet: '📜 Bitácora', values: logRow }
-        ];
+        ].concat(_extraRegOps);
 
         // If payment was added, include it in the same batch
         var payId = null;
@@ -13254,6 +13258,7 @@
         });
         S.registros = S.registros || [];
         S.registros.push({ regId: _titRegId, resId: id, nombre: huesped, habitacionNum: roomNum, fecha: fecha, tipoId: '', numId: '', nacionalidad: '', procedencia: '', motivo: '', observaciones: notasText || '', ts: n, telefono: tel });
+        (_extraGuests || []).forEach(function(g){ S.registros.push({ regId: g._regId, resId: id, nombre: g.nombre, habitacionNum: roomNum, fecha: fecha, tipoId: g.tipoId||'', numId: g.numId||'', nacionalidad: '', procedencia: '', motivo: '', observaciones: '', ts: n, telefono: g.telefono||'' }); });
 
         // Add payment to local state
         if (payId && payMonto > 0 && payMetodo) {
@@ -16320,21 +16325,38 @@
     }
 
     // Núcleo compartido: escribe los códigos de desayuno en la hoja y en memoria. Devuelve cuántos.
-    async function _appendBreakfastCodes(res, personas) {
-      var nights = daysUntil(res.fechaEntrada, res.fechaSalida);
-      var count = Math.max(nights, 1);
+    // Lista de huéspedes de una reserva para generar UN código por huésped por noche.
+    // Usa los huéspedes registrados; si no hay, usa el conteo de adultos con nombres genéricos.
+    function _resGuestList(res) {
+      var reg = (typeof _resGuests === 'function') ? _resGuests(res.id) : [];
+      if (reg && reg.length) return reg.map(function (g) { return { nombre: g.nombre, regId: g.regId }; });
+      var num = parseInt(res.adultos) || 1;
+      var arr = [];
+      for (var i = 0; i < num; i++) arr.push({ nombre: (i === 0 ? res.huesped : (res.huesped + ' — huésped ' + (i + 1))), regId: '' });
+      return arr;
+    }
+    // Un código por huésped por noche (personas=1, cada código guarda el regId del huésped).
+    async function _appendBreakfastCodesPerGuest(res, guests) {
+      guests = (guests && guests.length) ? guests : _resGuestList(res);
+      var nights = Math.max(daysUntil(res.fechaEntrada, res.fechaSalida), 1);
       var ops = [], added = [], n = now();
-      for (var di = 0; di < count; di++) {
+      for (var di = 0; di < nights; di++) {
         var d = new Date(res.fechaEntrada + 'T12:00:00'); d.setDate(d.getDate() + di + 1);
         var ds = normDate(d);
-        var code = generateBreakfastCode();
-        ops.push({ type: 'append', sheet: '🍳 Desayunos', values: [code, res.id, res.huesped, res.habitacionNum, ds, personas, 'Pendiente', '', ''] });
-        added.push({ codigo: code, reservaId: res.id, huesped: res.huesped, habitacion: res.habitacionNum, fecha: ds, personas: personas, estado: 'Pendiente', validadoPor: '', horaValidacion: '' });
+        guests.forEach(function (g) {
+          var code = generateBreakfastCode();
+          ops.push({ type: 'append', sheet: '🍳 Desayunos', values: [code, res.id, g.nombre, res.habitacionNum, ds, 1, 'Pendiente', '', '', g.regId || ''] });
+          added.push({ codigo: code, reservaId: res.id, huesped: g.nombre, habitacion: res.habitacionNum, fecha: ds, personas: 1, estado: 'Pendiente', validadoPor: '', horaValidacion: '', regId: g.regId || '' });
+        });
       }
-      ops.push({ type: 'append', sheet: '📜 Bitácora', values: [normDate(new Date()), n.split(' ')[1], (S.user && S.user.usuario) || '', 'Desayunos Generados', 'Hab.' + res.habitacionNum + ' ' + added.length + ' código(s)', 'info'] });
+      ops.push({ type: 'append', sheet: '📜 Bitácora', values: [normDate(new Date()), n.split(' ')[1], (S.user && S.user.usuario) || '', 'Desayunos Generados', 'Hab.' + res.habitacionNum + ' ' + added.length + ' código(s) (' + guests.length + ' huésped(es))', 'info'] });
       await sheets.multi(ops);
       S.desayunos = (S.desayunos || []).concat(added);
       return added.length;
+    }
+    // Compat: rutas antiguas siguen funcionando pero ahora generan por huésped.
+    async function _appendBreakfastCodes(res, personas) {
+      return _appendBreakfastCodesPerGuest(res, _resGuestList(res));
     }
 
     // Sugerencia de personas para el desayuno según tipo de habitación (con respaldo)
@@ -16350,13 +16372,13 @@
     async function generarDesayunosReserva(resId) {
       var res = S.reservas.find(function(r) { return r.id === resId; });
       if (!res) { toast('Reserva no encontrada', true); return; }
-      var room = S.rooms.find(function(r) { return r.numero === res.habitacionNum; });
-      var ans = prompt('¿Cuántos desayunos por noche (personas)?', String(_bfPersonasSugeridas(room)));
-      if (ans === null) return;
-      var personas = parseInt(ans) || 0;
-      if (personas <= 0) { toast('Cantidad inválida', true); return; }
+      var guests = _resGuestList(res);
+      var nights = Math.max(daysUntil(res.fechaEntrada, res.fechaSalida), 1);
+      var reg = (typeof _resGuests === 'function') ? _resGuests(res.id) : [];
+      var fuente = reg.length ? (guests.length + ' huésped(es) registrado(s)') : (guests.length + ' huésped(es) por adultos de la reserva');
+      if (!confirm('Se generará UN código por huésped por noche:\n\n' + guests.length + ' huésped(es) × ' + nights + ' noche(s) = ' + (guests.length * nights) + ' códigos.\n(' + fuente + ')\n\n' + (reg.length ? '' : 'Tip: registra los nombres de los huéspedes en la ficha para códigos personalizados.\n\n') + '¿Continuar?')) return;
       await busy(async function() {
-        var c = await _appendBreakfastCodes(res, personas);
+        var c = await _appendBreakfastCodesPerGuest(res, guests);
         toast('🍳 ' + c + ' desayuno(s) generado(s)');
         closeModal();
         openReservaModal(resId);
@@ -16371,15 +16393,14 @@
         if ((S.desayunos || []).some(function(d) { return d.reservaId === res.id; })) return; // ya tiene
         var promo = getBreakfastPromo();
         if (!promo || !promo.partner) return; // sin promo configurada
-        var personas = _bfPersonasSugeridas(room);
-        var nights = daysUntil(res.fechaEntrada, res.fechaSalida);
-        var count = Math.max(nights, 1);
+        var guests = _resGuestList(res);
+        var nights = Math.max(daysUntil(res.fechaEntrada, res.fechaSalida), 1);
         var vig = isBreakfastPromoActive() ? '' : '\n(La promo está marcada inactiva, pero puedes agregarla igual.)';
         var msg = '¿Agregar la promoción de desayuno para ' + res.huesped + '?\n\n'
-          + (promo.partner || 'Desayuno') + ' · ' + personas + ' desayuno(s) por noche\n'
-          + 'Se generarán ' + count + ' código(s).' + vig;
+          + (promo.partner || 'Desayuno') + ' · un código por huésped por noche\n'
+          + 'Se generarán ' + (guests.length * nights) + ' código(s) (' + guests.length + ' huésped(es) × ' + nights + ' noche(s)).' + vig;
         if (!confirm(msg)) return;
-        var c = await _appendBreakfastCodes(res, personas);
+        var c = await _appendBreakfastCodesPerGuest(res, guests);
         toast('🍳 ' + c + ' desayuno(s) agregado(s)');
       } catch (e) { console.warn('offerBreakfastOnCheckin:', e.message); }
     }
@@ -18122,6 +18143,55 @@
       } catch (e) {}
       out._source = src;
       return out;
+    }
+
+    // Override: activar desayunos al check-in ahora genera UN código por huésped por noche.
+    async function activateBreakfastForRes(resId, roomTipo) {
+      var res = S.reservas.find(function (r) { return r.id === resId; });
+      if (!res) return;
+      closeModal();
+      await busy(async function () {
+        var c = await _appendBreakfastCodesPerGuest(res, _resGuestList(res));
+        toast('🍳 ' + c + ' desayuno(s) activado(s)');
+        render();
+        try { showPartnerRecommendation(res); } catch (e) {}
+      }, 'Generando códigos de desayuno...');
+    }
+
+    // ============ CAPTURA DE HUÉSPEDES EN EL FORMULARIO DE NUEVA RESERVA ============
+    function _collectNewResGuests() {
+      var box = document.getElementById('newResGuestsBox'); if (!box) return [];
+      var names = box.querySelectorAll('._nrgName'), tipos = box.querySelectorAll('._nrgTipo'),
+          nums = box.querySelectorAll('._nrgNum'), tels = box.querySelectorAll('._nrgTel');
+      var out = [];
+      for (var i = 0; i < names.length; i++) {
+        out.push({ nombre: (names[i].value || '').trim(), tipoId: tipos[i] ? tipos[i].value : '', numId: nums[i] ? (nums[i].value || '').trim() : '', telefono: tels[i] ? (tels[i].value || '').trim() : '' });
+      }
+      return out;
+    }
+    function _renderNewResGuests() {
+      var box = document.getElementById('newResGuestsBox'); if (!box) return;
+      var adultos = parseInt(document.getElementById('newResAdultos').value) || 1;
+      var extra = Math.max(adultos - 1, 0);
+      var prev = _collectNewResGuests();
+      var h = '';
+      if (extra > 0) {
+        h += '<div style="font-size:12px;font-weight:600;color:var(--text2);margin:8px 0 6px;">👥 Datos de los demás huéspedes (' + extra + ') — cada uno tendrá su libro y sus códigos</div>';
+        for (var i = 0; i < extra; i++) {
+          var pv = prev[i] || {};
+          h += '<div style="background:var(--surface2);border-radius:8px;padding:8px;margin-bottom:6px;">';
+          h += '<input type="text" class="_nrgName form-input" placeholder="Nombre huésped ' + (i + 2) + '" value="' + _wbEsc(pv.nombre || '') + '" style="margin-bottom:6px;">';
+          h += '<div style="display:flex;gap:6px;">';
+          h += '<select class="_nrgTipo form-select" style="flex:0 0 92px;">';
+          ['INE', 'Pasaporte', 'Licencia', 'Otro'].forEach(function (t) { h += '<option value="' + t + '"' + (pv.tipoId === t ? ' selected' : '') + '>' + t + '</option>'; });
+          h += '</select>';
+          h += '<input type="text" class="_nrgNum form-input" placeholder="No. de ID" value="' + _wbEsc(pv.numId || '') + '" style="flex:1;">';
+          h += '</div>';
+          h += '<input type="tel" class="_nrgTel form-input" placeholder="Celular (para enviarle su libro y códigos)" value="' + _wbEsc(pv.telefono || '') + '" style="margin-top:6px;">';
+          h += '</div>';
+        }
+      }
+      box.innerHTML = h;
     }
 
     // ============ INIT ============
