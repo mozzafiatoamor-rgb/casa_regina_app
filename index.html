@@ -9251,6 +9251,7 @@
         '<div class="cobro-stat"><div class="cobro-stat-value" style="color:var(--red)">$'+totalPending+'</div><div class="cobro-stat-label">Pendiente</div></div>'+
         '<div class="cobro-stat"><div class="cobro-stat-value" style="color:var(--accent)">$'+totalCollected+'</div><div class="cobro-stat-label">Recaudado</div></div>'+
         '</div>'+
+        '<button class="form-button secondary" onclick="openGroupsList()" style="width:100%;margin-bottom:8px;padding:10px;">👥 Ver grupos de reservas</button>'+
         '<button class="form-button secondary" onclick="corteDeCaja()" style="width:100%;margin-bottom:12px;padding:10px;">💰 Corte de Caja del Día' +
         (todayPay.length > 0 ? ' <span style=\\"font-size:10px;color:var(--text2);font-weight:400\\">(' + todayPay.length + ' movimientos · $' + todayTotal + ')</span>' : '') +
         '</button>';
@@ -9293,6 +9294,7 @@
           html+='<div class="cobro-card '+gsc+'" style="border-left:4px solid var(--accent);">';
           html+='<div class="cobro-head"><div><div class="cobro-guest">\uD83D\uDC65 Grupo \u00b7 '+title+'</div><div style="font-size:11px;color:var(--text2)">'+gt.count+' habitaciones \u00b7 '+rooms+'</div></div><div class="cobro-room">GRP</div></div>';
           html+='<div class="cobro-amounts"><div class="cobro-amt"><div class="cobro-amt-val">$'+_fmt(gt.total)+'</div><div class="cobro-amt-lbl">Total grupo</div></div><div class="cobro-amt"><div class="cobro-amt-val" style="color:var(--green)">$'+_fmt(gt.paid)+'</div><div class="cobro-amt-lbl">Pagado</div></div><div class="cobro-amt"><div class="cobro-amt-val" style="color:'+(gbal>0?'var(--red)':'var(--green)')+'">$'+_fmt(gbal)+'</div><div class="cobro-amt-lbl">Saldo</div></div></div>';
+          try { var _gttc=_groupTaxTotals(gid); if(_gttc.hasFactura) html+='<div style="font-size:10px;color:var(--text2);text-align:right;padding:2px 0;">\uD83E\uDDFE Sub $'+_fmt(_gttc.subtotal)+' \u00b7 ISH $'+_fmt(_gttc.ish)+' \u00b7 IVA $'+_fmt(_gttc.iva)+'</div>'; } catch(e){}
           html+='<div class="cobro-actions">';
           if(gbal>0) html+='<button class="cobro-btn primary" onclick="openGroupSummary(\''+gid+'\')">\uD83D\uDC65 Cobrar grupo $'+_fmt(gbal)+'</button>';
           else html+='<button class="cobro-btn" onclick="openGroupSummary(\''+gid+'\')">\uD83D\uDC65 Ver grupo</button>';
@@ -17619,6 +17621,59 @@
       rs.forEach(function (r) { total += (parseFloat(r.tarifaTotal) || 0); paid += _resBalance(r.id, r.tarifaTotal).paid; });
       return { total: total, paid: paid, balance: total - paid, count: rs.length, reservas: rs };
     }
+    // Desglose de impuestos combinado del grupo (suma de subtotales/ISH/IVA de las que llevan factura)
+    function _groupTaxTotals(groupId) {
+      var rs = _groupReservas(groupId);
+      var sub = 0, ish = 0, iva = 0, total = 0, hasF = false;
+      rs.forEach(function (r) {
+        var v = (typeof parseIVAData === 'function') ? parseIVAData(r.notas) : null;
+        total += parseFloat(r.tarifaTotal) || 0;
+        if (v) { hasF = true; sub += parseFloat(v.subtotal) || 0; ish += parseFloat(v.ish) || 0; iva += parseFloat(v.iva) || 0; }
+        else { sub += parseFloat(r.tarifaTotal) || 0; }
+      });
+      return { subtotal: sub, ish: ish, iva: iva, total: total, hasFactura: hasF };
+    }
+    // Bloque HTML del desglose de impuestos (reutilizable)
+    function _taxDesgloseHTML(sub, ish, iva, total, folio) {
+      var h = '<div style="background:var(--surface2);border-radius:8px;padding:10px;border:1px solid var(--accent);margin:8px 0;">';
+      h += '<div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:6px;">🧾 Desglose de factura' + (folio ? ' · ' + folio : '') + '</div>';
+      h += '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px;"><span style="color:var(--text2)">Subtotal</span><span style="font-family:Space Mono,monospace;">$' + _fmt(sub) + '</span></div>';
+      h += '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px;"><span style="color:var(--text2)">ISH (3%)</span><span style="font-family:Space Mono,monospace;">$' + _fmt(ish) + '</span></div>';
+      h += '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px;"><span style="color:var(--text2)">IVA (16%)</span><span style="font-family:Space Mono,monospace;">$' + _fmt(iva) + '</span></div>';
+      h += '<div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;border-top:1px solid var(--surface3);padding-top:5px;margin-top:4px;"><span>Total</span><span style="font-family:Space Mono,monospace;color:var(--accent)">$' + _fmt(total) + '</span></div>';
+      h += '</div>';
+      return h;
+    }
+    // Lista de todos los grupos activos (acceso rápido)
+    function openGroupsList() {
+      var seen = {}, groups = [];
+      (S.reservas || []).forEach(function (r) {
+        var g = _resGroupId(r);
+        if (g && !seen[g]) { seen[g] = true; groups.push(g); }
+      });
+      var h = '<div style="font-size:12px;color:var(--text2);margin-bottom:10px;">Grupos de reservas (varias habitaciones con cobro unido).</div>';
+      if (!groups.length) {
+        h += '<div style="text-align:center;color:var(--text2);padding:16px;">No hay grupos todavía.</div>';
+        h += '<button class="form-button secondary" onclick="openGroupReservaModal()" style="width:100%;">👥 Crear reserva de grupo</button>';
+      } else {
+        groups.forEach(function (gid) {
+          var t = _groupTotals(gid);
+          var tt = _groupTaxTotals(gid);
+          var titular = t.reservas[0] ? t.reservas[0].huesped : 'Grupo';
+          var rooms = t.reservas.map(function (x) { return x.habitacionNum; }).join(', ');
+          h += '<div onclick="openGroupSummary(\'' + gid + '\')" style="cursor:pointer;background:var(--surface2);border-left:4px solid var(--accent);border-radius:10px;padding:11px 12px;margin-bottom:8px;">';
+          h += '<div style="display:flex;justify-content:space-between;align-items:center;">';
+          h += '<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;">👥 ' + _wbEsc(titular) + (tt.hasFactura ? ' <span style="font-size:9px;background:#e8f5e9;color:#2e7d32;padding:1px 6px;border-radius:4px;">🧾</span>' : '') + '</div><div style="font-size:11px;color:var(--text2);">' + t.count + ' hab. · ' + rooms + '</div></div>';
+          h += '<div style="text-align:right;"><div style="font-size:13px;font-weight:700;font-family:Space Mono,monospace;">$' + _fmt(t.total) + '</div><div style="font-size:11px;color:' + (t.balance > 0 ? 'var(--red)' : 'var(--green)') + ';">Saldo $' + _fmt(t.balance) + '</div></div>';
+          h += '</div></div>';
+        });
+        h += '<button class="form-button secondary" onclick="openGroupReservaModal()" style="width:100%;margin-top:6px;">👥 Nueva reserva de grupo</button>';
+      }
+      document.getElementById('taskDetailContent').innerHTML = h;
+      document.getElementById('taskDetailModal').querySelector('.modal-title').textContent = '👥 Grupos de reservas';
+      document.getElementById('taskDetailActions').innerHTML = '';
+      openModal('taskDetailModal');
+    }
 
     function openGroupReservaModal() {
       window._groupSel = {};
@@ -17778,13 +17833,25 @@
       h += '</div>';
       t.reservas.forEach(function (r) {
         var b = _resBalance(r.id, r.tarifaTotal);
-        h += '<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 10px;background:var(--surface2);border-radius:8px;margin-bottom:6px;">';
-        h += '<div style="flex:1;min-width:0;cursor:pointer;" onclick="closeModal();openReservaModal(\'' + r.id + '\')"><div style="font-size:13px;font-weight:600;">Hab. ' + r.habitacionNum + ' · ' + _wbEsc(r.huesped) + '</div><div style="font-size:11px;color:var(--text2);">' + r.estado + ' · Total $' + _fmt(r.tarifaTotal) + '</div></div>';
+        var v = (typeof parseIVAData === 'function') ? parseIVAData(r.notas) : null;
+        h += '<div style="padding:9px 10px;background:var(--surface2);border-radius:8px;margin-bottom:6px;">';
+        h += '<div style="display:flex;justify-content:space-between;align-items:center;">';
+        h += '<div style="flex:1;min-width:0;cursor:pointer;" onclick="closeModal();openReservaModal(\'' + r.id + '\')"><div style="font-size:13px;font-weight:600;">Hab. ' + r.habitacionNum + ' · ' + _wbEsc(r.huesped) + (v ? ' <span style="font-size:9px;background:#e8f5e9;color:#2e7d32;padding:1px 5px;border-radius:4px;">🧾</span>' : '') + '</div><div style="font-size:11px;color:var(--text2);">' + r.estado + ' · Total $' + _fmt(r.tarifaTotal) + '</div></div>';
         h += '<div style="text-align:right;font-size:12px;"><div style="color:var(--green);">Pagado $' + _fmt(b.paid) + '</div><div style="color:' + (b.balance > 0 ? 'var(--red)' : 'var(--green)') + ';font-weight:700;">Saldo $' + _fmt(b.balance) + '</div></div>';
         h += '</div>';
+        if (v) {
+          var _ish = v.ish || 0;
+          h += '<div style="font-size:10px;color:var(--text2);margin-top:4px;border-top:1px dashed var(--surface3);padding-top:4px;">Sub $' + _fmt(v.subtotal) + ' · ISH $' + _fmt(_ish) + ' · IVA $' + _fmt(v.iva) + (v.rfc ? ' · RFC ' + _wbEsc(v.rfc) : '') + '</div>';
+        }
+        h += '</div>';
       });
+      // Desglose combinado del grupo (si hay facturas)
+      var _gtt = _groupTaxTotals(groupId);
+      if (_gtt.hasFactura) {
+        h += _taxDesgloseHTML(_gtt.subtotal, _gtt.ish, _gtt.iva, _gtt.total, '');
+      }
       h += '<div style="background:var(--surface3);padding:12px;border-radius:var(--radius);margin-top:10px;">';
-      h += '<div style="display:flex;justify-content:space-between;"><span>Total del grupo</span><b style="font-family:Space Mono,monospace;">$' + _fmt(t.total) + '</b></div>';
+      h += '<div style="display:flex;justify-content:space-between;"><span>Total del grupo' + (_gtt.hasFactura ? ' (c/imp.)' : '') + '</span><b style="font-family:Space Mono,monospace;">$' + _fmt(t.total) + '</b></div>';
       h += '<div style="display:flex;justify-content:space-between;"><span>Pagado</span><b style="color:var(--green);font-family:Space Mono,monospace;">$' + _fmt(t.paid) + '</b></div>';
       h += '<div style="display:flex;justify-content:space-between;"><span>Saldo</span><b style="color:' + (t.balance > 0 ? 'var(--red)' : 'var(--green)') + ';font-family:Space Mono,monospace;">$' + _fmt(t.balance) + '</b></div>';
       h += '</div>';
@@ -17801,6 +17868,8 @@
       var t = _groupTotals(groupId);
       var h = '';
       h += '<div style="font-size:12px;color:var(--text2);margin-bottom:10px;">El pago se reparte automáticamente entre las habitaciones del grupo (cubre saldos en orden).</div>';
+      var _gttP = _groupTaxTotals(groupId);
+      if (_gttP.hasFactura) { h += _taxDesgloseHTML(_gttP.subtotal, _gttP.ish, _gttP.iva, _gttP.total, ''); }
       h += '<div style="display:flex;justify-content:space-between;background:var(--surface3);padding:10px;border-radius:8px;margin-bottom:10px;"><span>Saldo del grupo</span><b style="font-family:Space Mono,monospace;">$' + _fmt(t.balance) + '</b></div>';
       h += '<label class="form-label" style="font-size:12px;">Monto a cobrar</label>';
       h += '<input type="number" id="grpPayMonto" class="login-input" value="' + (t.balance > 0 ? Math.round(t.balance * 100) / 100 : '') + '" style="margin-bottom:10px;">';
