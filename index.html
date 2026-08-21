@@ -17471,6 +17471,9 @@
           h += '</div>';
         });
         h += '<button onclick="generarDesayunosPorHuesped(\'' + res.id + '\')" style="width:100%;margin-top:8px;background:var(--surface2);border:1px dashed #2e7d32;color:#2e7d32;border-radius:8px;padding:7px;font-size:11px;cursor:pointer;font-weight:600;">🍳 Generar códigos para todos los huéspedes</button>';
+        if ((S.desayunos || []).some(function (d) { return d.reservaId === res.id; })) {
+          h += '<button onclick="openDeleteCodesSelector(\'' + res.id + '\')" style="width:100%;margin-top:6px;background:none;border:none;color:var(--red);font-size:11px;cursor:pointer;text-decoration:underline;">🗑️ Borrar códigos (elegir cuáles)</button>';
+        }
       }
       h += '</div>';
       return h;
@@ -18258,6 +18261,46 @@
         else alert('⚠️ Se guardó local pero no pude confirmar en la hoja. Revisa tu conexión e inténtalo de nuevo.');
         if (S.currentTab === 'desayunos' && typeof renderDesayunosTab === 'function') renderDesayunosTab();
       }, 'Publicando al book…');
+    }
+
+    // ============ BORRAR CÓDIGOS (ELEGIR CUÁLES) ============
+    function openDeleteCodesSelector(resId) {
+      var codes = (S.desayunos || []).filter(function (d) { return d.reservaId === resId; });
+      if (!codes.length) { toast('No hay códigos', false); return; }
+      codes.sort(function (a, b) { return String(a.fecha).localeCompare(String(b.fecha)) || String(a.huesped).localeCompare(String(b.huesped)); });
+      window._delCodesPool = codes;
+      var h = '<div style="font-size:12px;color:var(--text2);margin-bottom:10px;">Marca los códigos que quieres borrar. Luego puedes generar nuevos en la sección de Huéspedes.</div>';
+      h += '<div style="display:flex;gap:6px;margin-bottom:10px;">';
+      h += '<button class="form-button secondary" onclick="_delCodesAll(true)" style="flex:1;font-size:11px;padding:6px;">Todos</button>';
+      h += '<button class="form-button secondary" onclick="_delCodesAll(false)" style="flex:1;font-size:11px;padding:6px;">Ninguno</button>';
+      h += '</div>';
+      codes.forEach(function (c, i) {
+        var st = c.estado === 'Consumido' ? '✅' : c.estado === 'Cancelado' ? '❌' : '🟡';
+        h += '<label style="display:flex;align-items:center;gap:10px;padding:9px 10px;background:var(--surface2);border-radius:10px;margin-bottom:6px;cursor:pointer;">';
+        h += '<input type="checkbox" class="_delCodeCb" data-idx="' + i + '" style="width:18px;height:18px;accent-color:var(--red);flex-shrink:0;">';
+        h += '<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:600;"><span style="font-family:Space Mono,monospace;color:var(--accent);">' + c.codigo + '</span> ' + st + ' ' + c.estado + '</div>';
+        h += '<div style="font-size:11px;color:var(--text2);">' + _wbEsc(c.huesped || '') + ' · ' + formatDate(c.fecha) + '</div></div></label>';
+      });
+      document.getElementById('taskDetailContent').innerHTML = h;
+      document.getElementById('taskDetailModal').querySelector('.modal-title').textContent = '🗑️ Borrar códigos';
+      document.getElementById('taskDetailActions').innerHTML = '<button class="form-button" onclick="deleteSelectedCodes(\'' + resId + '\')" style="width:100%;background:var(--red);color:#fff;">Borrar seleccionados</button>';
+      openModal('taskDetailModal');
+    }
+    function _delCodesAll(val) { document.querySelectorAll('._delCodeCb').forEach(function (cb) { cb.checked = !!val; }); }
+    async function deleteSelectedCodes(resId) {
+      var pool = window._delCodesPool || [];
+      var chosen = [];
+      document.querySelectorAll('._delCodeCb').forEach(function (cb) { if (cb.checked) { var i = parseInt(cb.getAttribute('data-idx'), 10); if (pool[i]) chosen.push(pool[i]); } });
+      if (!chosen.length) { toast('Selecciona al menos un código', true); return; }
+      if (!confirm('¿Borrar ' + chosen.length + ' código(s)?')) return;
+      await busy(async function () {
+        for (var i = 0; i < chosen.length; i++) { try { await sheets.deleteById('🍳 Desayunos', chosen[i].codigo); } catch (e) {} }
+        var del = {}; chosen.forEach(function (c) { del[c.codigo] = true; });
+        S.desayunos = (S.desayunos || []).filter(function (d) { return !del[d.codigo]; });
+        toast('🗑️ ' + chosen.length + ' código(s) borrados');
+        closeModal();
+        openReservaModal(resId);
+      }, 'Borrando códigos…');
     }
 
     // ============ BORRAR TODOS LOS CÓDIGOS DE UNA RESERVA ============
