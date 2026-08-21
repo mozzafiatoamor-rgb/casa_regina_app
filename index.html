@@ -3234,7 +3234,8 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-08-21b';
+    var APP_BUILD = '2026-08-21c';
+    var _bfPromoRowCount = 0;
     var CONFIG_KEYS = ['hotelInfo', 'hotelTerms', 'dailyRoutine', 'msgTemplates', 'emergencyContacts', 'breakfastPromo', 'guestGuide'];
 
     // Cache raw Sheet config so getBreakfastPromo can fallback to it
@@ -3253,10 +3254,15 @@
 
     function applyConfigFromSheet(configData) {
       if (!configData || !configData.length) return;
+      try { _bfPromoRowCount = configData.filter(function(r){ return r[0] === 'breakfastPromo'; }).length; } catch(e) {}
+      var _seenCfgKeys = {};
       configData.forEach(function(row) {
         var key = row[0];
         var val = row[1];
         if (CONFIG_KEYS.indexOf(key) !== -1 && val) {
+          // Duplicados: la PRIMERA fila gana (coincide con updateById)
+          if (_seenCfgKeys[key]) return;
+          _seenCfgKeys[key] = 1;
           // Cache raw value for fallback
           _sheetConfigCache[key] = val;
           try {
@@ -4418,7 +4424,8 @@
       // Sello de versión (discreto) para confirmar que el libro publicado es el más reciente
       try {
         var _src = (S._publicMode && typeof _sheetConfigCache !== 'undefined' && _sheetConfigCache && _sheetConfigCache['breakfastPromo']) ? 'hoja' : 'local';
-        out += '<div style="text-align:center;font-size:9px;color:#cbbfa6;margin-top:10px;">v' + (typeof APP_BUILD !== 'undefined' ? APP_BUILD : '?') + ' · ' + _src + '</div>';
+        var _dup = (typeof _bfPromoRowCount !== 'undefined' && _bfPromoRowCount > 1) ? (' · ' + _bfPromoRowCount + ' filas') : '';
+        out += '<div style="text-align:center;font-size:9px;color:#cbbfa6;margin-top:10px;">v' + (typeof APP_BUILD !== 'undefined' ? APP_BUILD : '?') + ' · ' + _src + _dup + '</div>';
       } catch (e) {}
 
       return out || _wbText(null, g);
@@ -16381,7 +16388,9 @@
         var jsonVal = JSON.stringify(promo);
         var cfg = await sheets.read('⚙️ Config', 'A2:B50').catch(function () { return []; });
         var exists = cfg.some(function (r) { return r[0] === 'breakfastPromo'; });
-        if (exists) await sheets.multi([{ type: 'updateById', sheet: '⚙️ Config', id: 'breakfastPromo', values: ['breakfastPromo', jsonVal] }]);
+        // Solo agregar (append) si la lectura fue exitosa (trajo filas) y NO existe la fila.
+        // Si la lectura falló (cfg vacío), hacemos updateById para NO crear filas duplicadas.
+        if (exists || !cfg.length) await sheets.multi([{ type: 'updateById', sheet: '⚙️ Config', id: 'breakfastPromo', values: ['breakfastPromo', jsonVal] }]);
         else await sheets.multi([{ type: 'append', sheet: '⚙️ Config', values: ['breakfastPromo', jsonVal] }]);
         try { if (typeof _sheetConfigCache !== 'undefined') _sheetConfigCache['breakfastPromo'] = jsonVal; } catch (e) {}
       } catch (e) {}
@@ -18273,19 +18282,31 @@
         try { localStorage.setItem('breakfastPromo', JSON.stringify(promo)); } catch (e) {}
         var jsonVal = JSON.stringify(promo);
         var configData = await sheets.read('⚙️ Config', 'A2:B50').catch(function () { return []; });
-        var exists = configData.some(function (r) { return r[0] === 'breakfastPromo'; });
+        var dupCount = configData.filter(function (r) { return r[0] === 'breakfastPromo'; }).length;
+        var exists = dupCount > 0;
         var resp;
-        if (exists) resp = await sheets.multi([{ type: 'updateById', sheet: '⚙️ Config', id: 'breakfastPromo', values: ['breakfastPromo', jsonVal] }]);
+        if (exists || !configData.length) resp = await sheets.multi([{ type: 'updateById', sheet: '⚙️ Config', id: 'breakfastPromo', values: ['breakfastPromo', jsonVal] }]);
         else resp = await sheets.multi([{ type: 'append', sheet: '⚙️ Config', values: ['breakfastPromo', jsonVal] }]);
-        // verificar leyendo de nuevo
+        // LIMPIEZA: si hay filas breakfastPromo duplicadas, borrar las de más (dejar solo 1).
+        // updateById actualiza la PRIMERA fila; deleteById borra la ÚLTIMA que coincide.
+        // Repetimos deleteById hasta que quede una sola.
+        var cleaned = 0;
+        for (var d = 0; d < (dupCount - 1); d++) {
+          try { await sheets.deleteById('⚙️ Config', 'breakfastPromo'); cleaned++; } catch (e) { break; }
+        }
+        // Si borramos de más por error, re-escribir para garantizar que quede la fila buena.
         var chk = await sheets.read('⚙️ Config', 'A2:B50').catch(function () { return []; });
+        var stillExists = chk.some(function (r) { return r[0] === 'breakfastPromo'; });
+        if (!stillExists) { try { await sheets.multi([{ type: 'append', sheet: '⚙️ Config', values: ['breakfastPromo', jsonVal] }]); } catch (e) {} chk = await sheets.read('⚙️ Config', 'A2:B50').catch(function () { return []; }); }
+        // verificar leyendo de nuevo (primera fila = la que edita updateById y la que lee el book)
         var row = null; for (var i = 0; i < chk.length; i++) { if (chk[i][0] === 'breakfastPromo') { row = chk[i]; break; } }
         var okDesc = false, okPrecio = false;
         if (row) { try { var sp = JSON.parse(row[1]); okDesc = (sp.descripcion || '') === desc; okPrecio = (precio === null) || (Number(sp.precioPorPersona) === Number(precio)); } catch (e) {} }
         try { if (typeof _sheetConfigCache !== 'undefined') _sheetConfigCache['breakfastPromo'] = jsonVal; } catch (e) {}
         closeModal();
-        if (okDesc && okPrecio) alert('✅ Publicado y verificado en la hoja.\n\nAbre el book en incógnito (o recárgalo) para ver el texto y precio nuevos.');
-        else alert('⚠️ No pude confirmar el cambio en la hoja (' + (exists ? 'updateById' : 'append') + ').\n\nEsto suele ser un problema de permisos/implementación del Apps Script. Verifica que tu implementación esté como "Cualquiera" y en la versión nueva, e inténtalo de nuevo.');
+        var dupMsg = cleaned > 0 ? ('\n\n🧹 Se limpiaron ' + cleaned + ' fila(s) duplicada(s) de desayuno en la hoja (esa era la causa del texto viejo).') : '';
+        if (okDesc && okPrecio) alert('✅ Publicado y verificado en la hoja.' + dupMsg + '\n\nAbre el book en incógnito (o recárgalo) para ver el texto y precio nuevos.');
+        else alert('⚠️ No pude confirmar el cambio en la hoja (' + (exists ? 'updateById' : 'append') + ').' + dupMsg + '\n\nEsto suele ser un problema de permisos/implementación del Apps Script. Verifica que tu implementación esté como "Cualquiera" y en la versión nueva, e inténtalo de nuevo.');
         if (S.currentTab === 'desayunos' && typeof renderDesayunosTab === 'function') renderDesayunosTab();
       }, 'Publicando al book…');
     }
