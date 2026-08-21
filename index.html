@@ -3977,6 +3977,9 @@
       occupancyPolicies: { es:'Políticas de Ocupación', en:'Occupancy Policies', fr:'Politiques d\'occupation', it:'Politiche di occupazione', de:'Belegungsrichtlinien' },
       scanToConnect: { es:'Escanea para conectarte al WiFi automáticamente', en:'Scan to connect to WiFi automatically', fr:'Scannez pour vous connecter au WiFi', it:'Scansiona per connetterti al WiFi', de:'Scannen, um automatisch mit dem WLAN zu verbinden' },
       habitaciones: { es:'Habitaciones', en:'Rooms', fr:'Chambres', it:'Camere', de:'Zimmer' },
+      acceso:       { es:'Código de acceso', en:'Access code', fr:"Code d'accès", it:'Codice di accesso', de:'Zugangscode' },
+      recepcion:    { es:'Recepción', en:'Reception', fr:'Réception', it:'Reception', de:'Rezeption' },
+      recepcionMsg: { es:'Nuestra recepción atiende hasta las 10:00 PM. Después de esa hora no hay personal en recepción: ingresa con tu código de acceso personal. Para cualquier necesidad o emergencia, escríbenos por WhatsApp.', en:'Our reception is open until 10:00 PM. After that time there is no staff at the front desk: enter using your personal access code. For anything you need or any emergency, message us on WhatsApp.', fr:"Notre réception est ouverte jusqu'à 22h00. Après cette heure, il n'y a personne à l'accueil : entrez avec votre code d'accès personnel. Pour tout besoin ou urgence, écrivez-nous sur WhatsApp.", it:'La nostra reception è aperta fino alle 22:00. Dopo quell\'ora non c\'è personale: entra con il tuo codice di accesso personale. Per qualsiasi necessità o emergenza, scrivici su WhatsApp.', de:'Unsere Rezeption ist bis 22:00 Uhr besetzt. Danach ist kein Personal vor Ort: Nutzen Sie Ihren persönlichen Zugangscode. Bei Bedarf oder im Notfall schreiben Sie uns über WhatsApp.' },
       yourRoom:     { es:'Tu habitación', en:'Your room', fr:'Votre chambre', it:'La tua camera', de:'Dein Zimmer' },
       upTo:         { es:'Hasta', en:'Up to', fr:"Jusqu'à", it:'Fino a', de:'Bis zu' },
       swipeHint:    { es:'Desliza', en:'Swipe', fr:'Glissez', it:'Scorri', de:'Wischen' },
@@ -4041,7 +4044,9 @@
       contacto:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5a2 2 0 0 1 2-2h2l1.5 4-2 1.3a12 12 0 0 0 5.7 5.7l1.3-2 4 1.5v2a2 2 0 0 1-2 2A16 16 0 0 1 4 5z"/></svg>',
       desayuno:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h12a4 4 0 0 1 0 8h-1"/><path d="M4 8v6a4 4 0 0 0 4 4h4a4 4 0 0 0 4-4"/><path d="M7 3c-.5.8-.5 1.5 0 2.3"/><path d="M11 3c-.5.8-.5 1.5 0 2.3"/></svg>',
       habitaciones:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18v-5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v5"/><path d="M3 18v2"/><path d="M21 18v2"/><path d="M3 14h18"/><path d="M7 11V9a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v2"/></svg>',
-      pagos:       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/><path d="M6.5 15h4"/></svg>'
+      pagos:       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/><path d="M6.5 15h4"/></svg>',
+      acceso:      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="4"/><path d="M11 11l7 7"/><path d="M16 16l2-2"/><path d="M18.5 13.5l2 2"/></svg>',
+      recepcion:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>'
     };
 
     var WB_HOME_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.6"/></svg>';
@@ -4215,8 +4220,16 @@
       return !!(p && p.partner);
     }
     function _wbActiveTiles() {
-      var tiles = WB_TILES.slice();
-      if (_wbShowDesayuno()) tiles.splice(1, 0, 'desayuno');
+      var tiles = [];
+      var showBf = _wbShowDesayuno();
+      WB_TILES.forEach(function (k) {
+        tiles.push(k);
+        if (k === 'welcome') {
+          if (_wbAccess) tiles.push('acceso');   // código de acceso como botón propio
+          if (showBf) tiles.push('desayuno');
+        }
+        if (k === 'checkin') tiles.push('recepcion'); // horario de recepción
+      });
       return tiles;
     }
 
@@ -4495,13 +4508,28 @@
         } else if (hi.checkin_hora) {
           h += _wbCard('<div class="wb-kv"><span>' + _wbEsc(_wbLabel('checkinTime')) + '</span><b>' + _wbEsc(formatHoraDisplay(hi.checkin_hora)) + '</b></div>');
         }
-        if (_wbAccess) {
-          h += '<div class="wb-card wb-access"><div class="wb-access-lb">🔑 ' + _wbEsc(_wbLabel('accessCode')) + '</div><div class="wb-access-code">' + _wbEsc(_wbAccess) + '</div></div>';
-          var ai = _wbT(g.accesoInstr, g);
-          if (ai) h += _wbCard('<div class="wb-body">' + _wbNl2br(ai) + '</div>');
-        }
         h += _wbText(g.checkin, g);
         return h;
+      }
+      if (key === 'acceso') {
+        var ha = '';
+        if (_wbAccess) {
+          ha += '<div class="wb-card wb-access"><div class="wb-access-lb">🔑 ' + _wbEsc(_wbLabel('accessCode')) + '</div><div class="wb-access-code">' + _wbEsc(_wbAccess) + '</div></div>';
+          var ai = _wbT(g.accesoInstr, g);
+          if (ai) ha += _wbCard('<div class="wb-body">' + _wbNl2br(ai) + '</div>');
+        } else {
+          ha += _wbCard('<div class="wb-body">' + _wbEsc(_wbLabel('noInfo')) + '</div>');
+        }
+        return ha;
+      }
+      if (key === 'recepcion') {
+        var hr = _wbPhoto((typeof _BK_ASSETS !== 'undefined' ? _BK_ASSETS : '') + 'aviso-recepcion.jpg', 'wb-photo-full');
+        hr += _wbCard('<div class="wb-body">' + _wbNl2br(_wbLabel('recepcionMsg')) + '</div>');
+        try {
+          var _rwa = (typeof getHotelWhatsApp === 'function') ? getHotelWhatsApp() : '';
+          if (_rwa) { var _rwd = String(_rwa).replace(/[^0-9]/g, ''); if (_rwd.length === 10) _rwd = '52' + _rwd; hr += '<a class="wb-btn wb-wa" href="https://wa.me/' + _rwd + '" target="_blank" rel="noopener">💬 WhatsApp</a>'; }
+        } catch (e) {}
+        return hr;
       }
       if (key === 'checkout') {
         var hc = '';
@@ -12298,7 +12326,9 @@
         bfSection += '<div style="display:flex;gap:6px;margin-top:6px">';
         bfSection += '<button onclick="generateBreakfastVoucherPDF(\'' + resId + '\',\'share\')" style="flex:1;background:#2e7d32;color:white;border:none;border-radius:8px;padding:8px;font-size:11px;cursor:pointer;font-weight:600">🎫 Voucher PDF WhatsApp</button>';
         bfSection += '<button onclick="generateBreakfastVoucherPDF(\'' + resId + '\',\'download\')" style="flex:1;background:var(--surface2);border:1px solid #2e7d32;border-radius:8px;padding:8px;font-size:11px;cursor:pointer;color:#2e7d32;font-weight:600">📄 Descargar Voucher</button>';
-        bfSection += '</div></div>';
+        bfSection += '</div>';
+        bfSection += '<button onclick="deleteAllBreakfastCodes(\'' + resId + '\')" style="width:100%;margin-top:8px;background:none;border:none;color:var(--red);font-size:11px;cursor:pointer;text-decoration:underline">\uD83D\uDDD1\uFE0F Borrar todos los c\u00f3digos (para regenerar)</button>';
+        bfSection += '</div>';
         document.getElementById('reservaModalContent').insertAdjacentHTML('beforeend', bfSection);
       } else if (res.estado !== 'Cancelada') {
         var _gpActive = isBreakfastPromoActive();
@@ -16191,6 +16221,9 @@
         h += '</div>';
       }
 
+      // Publicar el texto del desayuno al book (fuente de verdad del texto que ven los huéspedes)
+      h += '<button class="form-button secondary" onclick="openBreakfastTextSync()" style="width:100%;margin-bottom:14px;border-color:var(--accent);color:var(--accent);">📢 Publicar texto del desayuno al book</button>';
+
       var todayCodes = des.filter(function(d) { return d.fecha === today; });
       var todayPendientes = todayCodes.filter(function(d) { return d.estado === 'Pendiente'; });
       var todayConsumidos = todayCodes.filter(function(d) { return d.estado === 'Consumido'; });
@@ -18212,6 +18245,60 @@
         }
       }
       box.innerHTML = h;
+    }
+
+    // ============ PUBLICAR EL TEXTO DEL DESAYUNO AL BOOK (fuente: hoja) ============
+    function openBreakfastTextSync() {
+      var promo = getBreakfastPromo();
+      var h = '';
+      h += '<div style="font-size:12px;color:var(--text2);margin-bottom:10px;">Este es el texto que ven los huéspedes en su Welcome Book. Edítalo y publícalo para que se actualice para todos (el book lo toma de aquí).</div>';
+      h += '<label class="form-label" style="font-size:12px;">Descripción del desayuno</label>';
+      h += '<textarea id="bts_desc" class="login-input" rows="4" style="width:100%;box-sizing:border-box;resize:vertical;">' + _wbEsc(promo.descripcion || '') + '</textarea>';
+      h += '<label class="form-label" style="font-size:12px;margin-top:8px;">Horario</label>';
+      h += '<input id="bts_horario" class="login-input" value="' + _wbEsc(promo.horario || '') + '">';
+      document.getElementById('taskDetailContent').innerHTML = h;
+      document.getElementById('taskDetailModal').querySelector('.modal-title').textContent = '📢 Texto del desayuno (book)';
+      document.getElementById('taskDetailActions').innerHTML = '<button class="form-button" onclick="publishBreakfastText()" style="width:100%;">Publicar al book</button>';
+      openModal('taskDetailModal');
+    }
+    async function publishBreakfastText() {
+      var desc = (document.getElementById('bts_desc').value || '').trim();
+      var horario = (document.getElementById('bts_horario').value || '').trim();
+      var promo = getBreakfastPromo();
+      promo.descripcion = desc; if (horario) promo.horario = horario;
+      await busy(async function () {
+        try { localStorage.setItem('breakfastPromo', JSON.stringify(promo)); } catch (e) {}
+        var jsonVal = JSON.stringify(promo);
+        var configData = await sheets.read('⚙️ Config', 'A2:B50').catch(function () { return []; });
+        var exists = configData.some(function (r) { return r[0] === 'breakfastPromo'; });
+        if (exists) await sheets.multi([{ type: 'updateById', sheet: '⚙️ Config', id: 'breakfastPromo', values: ['breakfastPromo', jsonVal] }]);
+        else await sheets.multi([{ type: 'append', sheet: '⚙️ Config', values: ['breakfastPromo', jsonVal] }]);
+        // verificar
+        var chk = await sheets.read('⚙️ Config', 'A2:B50').catch(function () { return []; });
+        var row = null; for (var i = 0; i < chk.length; i++) { if (chk[i][0] === 'breakfastPromo') { row = chk[i]; break; } }
+        var ok = row && String(row[1] || '').indexOf(desc.substring(0, Math.min(18, desc.length))) > -1;
+        try { if (typeof _sheetConfigCache !== 'undefined') _sheetConfigCache['breakfastPromo'] = jsonVal; } catch (e) {}
+        closeModal();
+        if (ok) alert('✅ Publicado a la hoja. El book mostrará el texto nuevo.\n\nNota: si abres el book en un celular donde ya lo habías visto, recárgalo (o ábrelo en incógnito) para ver el cambio.');
+        else alert('⚠️ Se guardó local pero no pude confirmar en la hoja. Revisa tu conexión e inténtalo de nuevo.');
+        if (S.currentTab === 'desayunos' && typeof renderDesayunosTab === 'function') renderDesayunosTab();
+      }, 'Publicando al book…');
+    }
+
+    // ============ BORRAR TODOS LOS CÓDIGOS DE UNA RESERVA ============
+    async function deleteAllBreakfastCodes(resId) {
+      var codes = (S.desayunos || []).filter(function (d) { return d.reservaId === resId; });
+      if (!codes.length) { toast('No hay códigos para borrar', false); return; }
+      if (!confirm('¿Borrar TODOS los ' + codes.length + ' código(s) de desayuno de esta reserva?\n\nDespués podrás generar nuevos.')) return;
+      await busy(async function () {
+        for (var i = 0; i < codes.length; i++) {
+          try { await sheets.deleteById('🍳 Desayunos', codes[i].codigo); } catch (e) {}
+        }
+        S.desayunos = (S.desayunos || []).filter(function (d) { return d.reservaId !== resId; });
+        toast('🗑️ ' + codes.length + ' código(s) borrados');
+        closeModal();
+        openReservaModal(resId);
+      }, 'Borrando códigos…');
     }
 
     // ============ INIT ============
