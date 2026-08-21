@@ -3980,6 +3980,8 @@
       acceso:       { es:'Código de acceso', en:'Access code', fr:"Code d'accès", it:'Codice di accesso', de:'Zugangscode' },
       recepcion:    { es:'Recepción', en:'Reception', fr:'Réception', it:'Reception', de:'Rezeption' },
       recepcionMsg: { es:'Nuestra recepción atiende hasta las 10:00 PM. Después de esa hora no hay personal en recepción: ingresa con tu código de acceso personal. Para cualquier necesidad o emergencia, escríbenos por WhatsApp.', en:'Our reception is open until 10:00 PM. After that time there is no staff at the front desk: enter using your personal access code. For anything you need or any emergency, message us on WhatsApp.', fr:"Notre réception est ouverte jusqu'à 22h00. Après cette heure, il n'y a personne à l'accueil : entrez avec votre code d'accès personnel. Pour tout besoin ou urgence, écrivez-nous sur WhatsApp.", it:'La nostra reception è aperta fino alle 22:00. Dopo quell\'ora non c\'è personale: entra con il tuo codice di accesso personale. Per qualsiasi necessità o emergenza, scrivici su WhatsApp.', de:'Unsere Rezeption ist bis 22:00 Uhr besetzt. Danach ist kein Personal vor Ort: Nutzen Sie Ihren persönlichen Zugangscode. Bei Bedarf oder im Notfall schreiben Sie uns über WhatsApp.' },
+      breakfastValue: { es:'Valor de tus desayunos', en:'Value of your breakfasts', fr:'Valeur de vos petits-déjeuners', it:'Valore delle tue colazioni', de:'Wert Ihrer Frühstücke' },
+      courtesy:     { es:'Cortesía · sin costo para ti', en:'Complimentary · free for you', fr:'Offert · gratuit pour vous', it:'Omaggio · gratis per te', de:'Gratis · für Sie kostenlos' },
       yourRoom:     { es:'Tu habitación', en:'Your room', fr:'Votre chambre', it:'La tua camera', de:'Dein Zimmer' },
       upTo:         { es:'Hasta', en:'Up to', fr:"Jusqu'à", it:'Fino a', de:'Bis zu' },
       swipeHint:    { es:'Desliza', en:'Swipe', fr:'Glissez', it:'Scorri', de:'Wischen' },
@@ -4372,6 +4374,19 @@
       // Tarjeta del restaurante asociado (Mozzafiato) con logo
       if (promo && promo.partner) {
         out += _wbMozzaCard(promo, { address: false, map: false, fb: false });
+      }
+
+      // Valor / ahorro de cortesía
+      if (_wbBreakfast.length && promo && promo.precioPorPersona > 0) {
+        var _bfTot = _wbBreakfast.reduce(function (s, b) { return s + (parseInt(b.personas) || 1); }, 0);
+        var _bfVal = _bfTot * (promo.precioPorPersona || 0);
+        if (_bfVal > 0) {
+          out += _wbCard('<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">'
+            + '<div><div style="font-size:12.5px;color:#7a6a4f;font-weight:600;">🎁 ' + _wbEsc(_wbLabel('breakfastValue')) + '</div>'
+            + '<div style="font-size:11px;color:#2e7d32;font-weight:700;margin-top:2px;">' + _wbEsc(_wbLabel('courtesy')) + '</div></div>'
+            + '<div style="text-align:right;white-space:nowrap;"><span style="text-decoration:line-through;color:#b0a488;font-size:13px;">$' + _fmt(_bfVal) + '</span> <span style="font-size:22px;font-weight:800;color:#2e7d32;">$0</span></div>'
+            + '</div>');
+        }
       }
 
       // Códigos personales del huésped (QR → página real de validación)
@@ -12275,69 +12290,11 @@
         document.getElementById('reservaModalContent').insertAdjacentHTML('beforeend', wbSec);
       }
 
-      // Breakfast codes section — wow style
+      // Desayunos en la ficha: solo avisar al restaurante (gestión en Huéspedes, pestaña Desayunos y book)
       var resBf = (S.desayunos || []).filter(function(d) { return d.reservaId === resId; });
-      if (resBf.length > 0) {
-        var _bfPromo = getBreakfastPromo();
-        var _bfPendientes = resBf.filter(function(d) { return d.estado === 'Pendiente'; });
-        var _bfConsumidos = resBf.filter(function(d) { return d.estado === 'Consumido'; });
-        var _bfTotalPersonas = resBf.reduce(function(s, d) { return s + d.personas; }, 0);
-        var _bfValorReal = _bfTotalPersonas * (_bfPromo.precioPorPersona || 0);
-
-        var bfSection = '<div style="background:linear-gradient(135deg,rgba(46,125,50,0.1),rgba(76,175,80,0.05));padding:14px;border-radius:var(--radius);margin-bottom:12px;border:1px solid rgba(76,175,80,0.3);position:relative;overflow:hidden;">';
-        // Ribbon
-        bfSection += '<div style="position:absolute;top:8px;right:-30px;background:#2e7d32;color:#fff;font-size:8px;font-weight:700;padding:2px 34px;transform:rotate(45deg);letter-spacing:1px;">GRATIS</div>';
-        bfSection += '<div style="font-size:14px;font-weight:800;color:#2e7d32;margin-bottom:2px;">🍳 DESAYUNO INCLUIDO SIN COSTO</div>';
-        bfSection += '<div style="font-size:12px;color:var(--text2);margin-bottom:4px;">' + _bfPromo.partner + '</div>';
-        if (_bfPromo.descripcion) {
-          bfSection += '<div style="font-size:11px;color:var(--text1);margin-bottom:8px;padding:6px 8px;background:rgba(255,255,255,0.5);border-radius:6px;border-left:3px solid #2e7d32;line-height:1.3;">🍽️ ' + _bfPromo.descripcion + '</div>';
-        }
-        // Value callout
-        if (_bfValorReal > 0) {
-          bfSection += '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:#2e7d32;border-radius:8px;color:#fff;margin-bottom:10px;font-size:12px;">';
-          bfSection += '<span>Valor real:</span>';
-          bfSection += '<span><span style="text-decoration:line-through;opacity:.7;">$' + _fmt(_bfValorReal) + '</span> → <span style="font-size:15px;font-weight:800;">$0</span></span>';
-          bfSection += '</div>';
-        }
-        // Stats
-        bfSection += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px;text-align:center;">';
-        bfSection += '<div style="background:rgba(255,255,255,0.5);border-radius:6px;padding:6px;"><div style="font-size:18px;font-weight:800;color:var(--accent);">' + resBf.length + '</div><div style="font-size:9px;color:var(--text2);">Total</div></div>';
-        bfSection += '<div style="background:rgba(255,255,255,0.5);border-radius:6px;padding:6px;"><div style="font-size:18px;font-weight:800;color:var(--green);">' + _bfConsumidos.length + '</div><div style="font-size:9px;color:var(--text2);">Usados</div></div>';
-        bfSection += '<div style="background:rgba(255,255,255,0.5);border-radius:6px;padding:6px;"><div style="font-size:18px;font-weight:800;color:var(--yellow);">' + _bfPendientes.length + '</div><div style="font-size:9px;color:var(--text2);">Pendientes</div></div>';
-        bfSection += '</div>';
-        // Code list
-        resBf.forEach(function(bf) {
-          var stColor = bf.estado === 'Consumido' ? 'var(--green)' : bf.estado === 'Cancelado' ? 'var(--red)' : bf.estado === 'Expirado' ? 'var(--text2)' : 'var(--accent)';
-          var stIcon = bf.estado === 'Consumido' ? '✅' : bf.estado === 'Cancelado' ? '❌' : bf.estado === 'Expirado' ? '⏰' : '🎟️';
-          bfSection += '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(0,0,0,0.06);font-size:12px">';
-          bfSection += '<div><span style="font-family:Space Mono,monospace;font-weight:700;color:' + stColor + '">' + bf.codigo + '</span>';
-          bfSection += '<span style="color:var(--text2);margin-left:6px">' + formatDate(bf.fecha) + '</span>';
-          bfSection += '<span style="color:var(--text2);margin-left:4px">(' + bf.personas + ' pers.)</span></div>';
-          bfSection += '<div style="display:flex;align-items:center;gap:6px;">';
-          if (bf.estado === 'Pendiente') bfSection += '<button onclick="shareBreakfastQRCard(\'' + bf.codigo + '\')" style="background:#25D366;color:#fff;border:none;border-radius:6px;padding:3px 8px;font-size:10px;cursor:pointer;font-weight:600">📱 QR</button>';
-          bfSection += '<span style="font-size:11px">' + stIcon + ' ' + bf.estado + '</span>';
-          bfSection += '</div></div>';
-        });
-        bfSection += '<div style="display:flex;gap:6px;margin-top:10px">';
-        bfSection += '<button onclick="shareBreakfastCodes(\'' + resId + '\')" style="flex:1;background:#25D366;color:white;border:none;border-radius:8px;padding:8px;font-size:12px;cursor:pointer;font-weight:600">📲 Enviar códigos</button>';
-        bfSection += '<button onclick="cancelBreakfastCodes(\'' + resId + '\')" style="background:var(--surface2);border:1px solid var(--surface3);border-radius:8px;padding:8px 12px;font-size:11px;cursor:pointer;color:var(--red)">Cancelar</button>';
-        bfSection += '</div>';
-        bfSection += '<button onclick="sendCodesToRestaurant(\'' + resId + '\')" style="width:100%;margin-top:6px;background:var(--surface2);border:1px solid #2e7d32;border-radius:8px;padding:8px;font-size:11px;cursor:pointer;color:#2e7d32;font-weight:600">\uD83C\uDF7D\uFE0F Avisar c\u00f3digos al restaurante</button>';
-        bfSection += '<div style="display:flex;gap:6px;margin-top:6px">';
-        bfSection += '<button onclick="generateBreakfastVoucherPDF(\'' + resId + '\',\'share\')" style="flex:1;background:#2e7d32;color:white;border:none;border-radius:8px;padding:8px;font-size:11px;cursor:pointer;font-weight:600">🎫 Voucher PDF WhatsApp</button>';
-        bfSection += '<button onclick="generateBreakfastVoucherPDF(\'' + resId + '\',\'download\')" style="flex:1;background:var(--surface2);border:1px solid #2e7d32;border-radius:8px;padding:8px;font-size:11px;cursor:pointer;color:#2e7d32;font-weight:600">📄 Descargar Voucher</button>';
-        bfSection += '</div>';
-        bfSection += '<button onclick="deleteAllBreakfastCodes(\'' + resId + '\')" style="width:100%;margin-top:8px;background:none;border:none;color:var(--red);font-size:11px;cursor:pointer;text-decoration:underline">\uD83D\uDDD1\uFE0F Borrar todos los c\u00f3digos (para regenerar)</button>';
-        bfSection += '</div>';
-        document.getElementById('reservaModalContent').insertAdjacentHTML('beforeend', bfSection);
-      } else if (res.estado !== 'Cancelada') {
-        var _gpActive = isBreakfastPromoActive();
-        var genSec = '<div style="background:linear-gradient(135deg,rgba(46,125,50,0.10),rgba(76,175,80,0.04));padding:14px;border-radius:var(--radius);margin-bottom:12px;border:1px dashed #2e7d32;">';
-        genSec += '<div style="font-size:13px;font-weight:800;color:#2e7d32;margin-bottom:6px;">\ud83c\udf73 Desayunos</div>';
-        genSec += '<div style="font-size:11px;color:var(--text2);margin-bottom:10px;line-height:1.4;">' + (_gpActive ? 'Genera los c\u00f3digos de desayuno para este hu\u00e9sped.' : '\u26a0\ufe0f La promo est\u00e1 marcada inactiva, pero puedes generar los c\u00f3digos igual.') + '</div>';
-        genSec += '<button onclick="generarDesayunosReserva(\'' + resId + '\')" style="width:100%;background:#2e7d32;color:#fff;border:none;border-radius:8px;padding:11px;font-size:13px;font-weight:700;cursor:pointer">\ud83c\udf73 Generar c\u00f3digos de desayuno</button>';
-        genSec += '</div>';
-        document.getElementById('reservaModalContent').insertAdjacentHTML('beforeend', genSec);
+      if (resBf.length > 0 && res.estado !== 'Cancelada') {
+        var _bfMini = '<button onclick="sendCodesToRestaurant(\'' + resId + '\')" style="width:100%;margin-bottom:12px;background:var(--surface2);border:1px solid #2e7d32;border-radius:var(--radius);padding:10px;font-size:12px;cursor:pointer;color:#2e7d32;font-weight:600">\uD83C\uDF7D\uFE0F Avisar códigos de desayuno al restaurante</button>';
+        document.getElementById('reservaModalContent').insertAdjacentHTML('beforeend', _bfMini);
       }
 
       // Add action buttons based on estado
