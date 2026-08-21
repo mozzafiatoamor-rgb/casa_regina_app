@@ -18228,39 +18228,57 @@
     }
 
     // ============ PUBLICAR EL TEXTO DEL DESAYUNO AL BOOK (fuente: hoja) ============
-    function openBreakfastTextSync() {
+    async function openBreakfastTextSync() {
       var promo = getBreakfastPromo();
+      // Leer lo que hay AHORA en la hoja (lo que ve el book)
+      var sheetDesc = '(no hay nada en la hoja — el book usa el texto de fábrica)';
+      var sheetPrecio = '';
+      try {
+        var cfg = await sheets.read('⚙️ Config', 'A2:B50').catch(function () { return []; });
+        var row = null; for (var i = 0; i < cfg.length; i++) { if (cfg[i][0] === 'breakfastPromo') { row = cfg[i]; break; } }
+        if (row) { try { var sp = JSON.parse(row[1]); sheetDesc = sp.descripcion || '(vacío)'; sheetPrecio = sp.precioPorPersona; } catch (e) { sheetDesc = '(dato ilegible)'; } }
+      } catch (e) {}
       var h = '';
-      h += '<div style="font-size:12px;color:var(--text2);margin-bottom:10px;">Este es el texto que ven los huéspedes en su Welcome Book. Edítalo y publícalo para que se actualice para todos (el book lo toma de aquí).</div>';
+      h += '<div style="background:var(--surface3);border-radius:8px;padding:10px;margin-bottom:10px;font-size:11px;">';
+      h += '<div style="color:var(--text2);margin-bottom:4px;">📄 <b>En la hoja ahora</b> (lo que ve el book):</div>';
+      h += '<div style="color:var(--red);">' + _wbEsc(String(sheetDesc).slice(0, 120)) + (sheetPrecio !== '' ? ' · $' + sheetPrecio : '') + '</div>';
+      h += '</div>';
+      h += '<div style="font-size:12px;color:var(--text2);margin-bottom:8px;">Corrige aquí el texto y precio reales y presiona <b>Publicar</b> — se escribe a la hoja y el book lo tomará.</div>';
       h += '<label class="form-label" style="font-size:12px;">Descripción del desayuno</label>';
       h += '<textarea id="bts_desc" class="login-input" rows="4" style="width:100%;box-sizing:border-box;resize:vertical;">' + _wbEsc(promo.descripcion || '') + '</textarea>';
-      h += '<label class="form-label" style="font-size:12px;margin-top:8px;">Horario</label>';
-      h += '<input id="bts_horario" class="login-input" value="' + _wbEsc(promo.horario || '') + '">';
+      h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">';
+      h += '<div><label class="form-label" style="font-size:12px;">Precio/persona</label><input id="bts_precio" type="number" class="login-input" value="' + (promo.precioPorPersona || 0) + '"></div>';
+      h += '<div><label class="form-label" style="font-size:12px;">Horario</label><input id="bts_horario" class="login-input" value="' + _wbEsc(promo.horario || '') + '"></div>';
+      h += '</div>';
       document.getElementById('taskDetailContent').innerHTML = h;
-      document.getElementById('taskDetailModal').querySelector('.modal-title').textContent = '📢 Texto del desayuno (book)';
+      document.getElementById('taskDetailModal').querySelector('.modal-title').textContent = '📢 Publicar desayuno al book';
       document.getElementById('taskDetailActions').innerHTML = '<button class="form-button" onclick="publishBreakfastText()" style="width:100%;">Publicar al book</button>';
       openModal('taskDetailModal');
     }
     async function publishBreakfastText() {
       var desc = (document.getElementById('bts_desc').value || '').trim();
       var horario = (document.getElementById('bts_horario').value || '').trim();
+      var precioEl = document.getElementById('bts_precio');
+      var precio = precioEl ? (parseFloat(precioEl.value) || 0) : null;
       var promo = getBreakfastPromo();
-      promo.descripcion = desc; if (horario) promo.horario = horario;
+      promo.descripcion = desc; if (horario) promo.horario = horario; if (precio !== null && precio > 0) promo.precioPorPersona = precio;
       await busy(async function () {
         try { localStorage.setItem('breakfastPromo', JSON.stringify(promo)); } catch (e) {}
         var jsonVal = JSON.stringify(promo);
         var configData = await sheets.read('⚙️ Config', 'A2:B50').catch(function () { return []; });
         var exists = configData.some(function (r) { return r[0] === 'breakfastPromo'; });
-        if (exists) await sheets.multi([{ type: 'updateById', sheet: '⚙️ Config', id: 'breakfastPromo', values: ['breakfastPromo', jsonVal] }]);
-        else await sheets.multi([{ type: 'append', sheet: '⚙️ Config', values: ['breakfastPromo', jsonVal] }]);
-        // verificar
+        var resp;
+        if (exists) resp = await sheets.multi([{ type: 'updateById', sheet: '⚙️ Config', id: 'breakfastPromo', values: ['breakfastPromo', jsonVal] }]);
+        else resp = await sheets.multi([{ type: 'append', sheet: '⚙️ Config', values: ['breakfastPromo', jsonVal] }]);
+        // verificar leyendo de nuevo
         var chk = await sheets.read('⚙️ Config', 'A2:B50').catch(function () { return []; });
         var row = null; for (var i = 0; i < chk.length; i++) { if (chk[i][0] === 'breakfastPromo') { row = chk[i]; break; } }
-        var ok = row && String(row[1] || '').indexOf(desc.substring(0, Math.min(18, desc.length))) > -1;
+        var okDesc = false, okPrecio = false;
+        if (row) { try { var sp = JSON.parse(row[1]); okDesc = (sp.descripcion || '') === desc; okPrecio = (precio === null) || (Number(sp.precioPorPersona) === Number(precio)); } catch (e) {} }
         try { if (typeof _sheetConfigCache !== 'undefined') _sheetConfigCache['breakfastPromo'] = jsonVal; } catch (e) {}
         closeModal();
-        if (ok) alert('✅ Publicado a la hoja. El book mostrará el texto nuevo.\n\nNota: si abres el book en un celular donde ya lo habías visto, recárgalo (o ábrelo en incógnito) para ver el cambio.');
-        else alert('⚠️ Se guardó local pero no pude confirmar en la hoja. Revisa tu conexión e inténtalo de nuevo.');
+        if (okDesc && okPrecio) alert('✅ Publicado y verificado en la hoja.\n\nAbre el book en incógnito (o recárgalo) para ver el texto y precio nuevos.');
+        else alert('⚠️ No pude confirmar el cambio en la hoja (' + (exists ? 'updateById' : 'append') + ').\n\nEsto suele ser un problema de permisos/implementación del Apps Script. Verifica que tu implementación esté como "Cualquiera" y en la versión nueva, e inténtalo de nuevo.');
         if (S.currentTab === 'desayunos' && typeof renderDesayunosTab === 'function') renderDesayunosTab();
       }, 'Publicando al book…');
     }
