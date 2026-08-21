@@ -16407,6 +16407,21 @@
 
     // Generar códigos de desayuno de forma directa y confiable para una reserva
     // (funciona en cualquier estado, aunque la promo esté "inactiva", con conteo manual).
+    // Publica (silenciosamente) el texto/config actual del desayuno a la hoja,
+    // para que el book siempre muestre el texto real. Se usa al generar códigos.
+    async function _ensureBreakfastTextPublished() {
+      try {
+        if (!S.scriptUrl) return;
+        var promo = getBreakfastPromo();
+        if (!promo || !promo.partner) return;
+        var jsonVal = JSON.stringify(promo);
+        var cfg = await sheets.read('⚙️ Config', 'A2:B50').catch(function () { return []; });
+        var exists = cfg.some(function (r) { return r[0] === 'breakfastPromo'; });
+        if (exists) await sheets.multi([{ type: 'updateById', sheet: '⚙️ Config', id: 'breakfastPromo', values: ['breakfastPromo', jsonVal] }]);
+        else await sheets.multi([{ type: 'append', sheet: '⚙️ Config', values: ['breakfastPromo', jsonVal] }]);
+        try { if (typeof _sheetConfigCache !== 'undefined') _sheetConfigCache['breakfastPromo'] = jsonVal; } catch (e) {}
+      } catch (e) {}
+    }
     async function generarDesayunosReserva(resId) {
       var res = S.reservas.find(function(r) { return r.id === resId; });
       if (!res) { toast('Reserva no encontrada', true); return; }
@@ -16417,6 +16432,7 @@
       if (!confirm('Se generará UN código por huésped por noche:\n\n' + guests.length + ' huésped(es) × ' + nights + ' noche(s) = ' + (guests.length * nights) + ' códigos.\n(' + fuente + ')\n\n' + (reg.length ? '' : 'Tip: registra los nombres de los huéspedes en la ficha para códigos personalizados.\n\n') + '¿Continuar?')) return;
       await busy(async function() {
         var c = await _appendBreakfastCodesPerGuest(res, guests);
+        await _ensureBreakfastTextPublished();   // el book queda con el texto real
         toast('🍳 ' + c + ' desayuno(s) generado(s)');
         closeModal();
         openReservaModal(resId);
@@ -16439,6 +16455,7 @@
           + 'Se generarán ' + (guests.length * nights) + ' código(s) (' + guests.length + ' huésped(es) × ' + nights + ' noche(s)).' + vig;
         if (!confirm(msg)) return;
         var c = await _appendBreakfastCodesPerGuest(res, guests);
+        try { await _ensureBreakfastTextPublished(); } catch (e) {}
         toast('🍳 ' + c + ' desayuno(s) agregado(s)');
       } catch (e) { console.warn('offerBreakfastOnCheckin:', e.message); }
     }
@@ -18205,6 +18222,7 @@
       closeModal();
       await busy(async function () {
         var c = await _appendBreakfastCodesPerGuest(res, _resGuestList(res));
+        try { await _ensureBreakfastTextPublished(); } catch (e) {}
         toast('🍳 ' + c + ' desayuno(s) activado(s)');
         render();
         try { showPartnerRecommendation(res); } catch (e) {}
