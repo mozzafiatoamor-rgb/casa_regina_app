@@ -3234,6 +3234,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
+    var APP_BUILD = '2026-08-21b';
     var CONFIG_KEYS = ['hotelInfo', 'hotelTerms', 'dailyRoutine', 'msgTemplates', 'emergencyContacts', 'breakfastPromo', 'guestGuide'];
 
     // Cache raw Sheet config so getBreakfastPromo can fallback to it
@@ -3261,7 +3262,7 @@
           try {
             // For breakfastPromo: localStorage wins if it has valid data
             // (user may have changed config locally and sync hasn't completed yet)
-            if (key === 'breakfastPromo' && localStorage.getItem('breakfastPromo')) {
+            if (key === 'breakfastPromo' && localStorage.getItem('breakfastPromo') && !(typeof S !== 'undefined' && S._publicMode)) {
               try {
                 var localVal = JSON.parse(localStorage.getItem('breakfastPromo'));
                 if (typeof localVal === 'object' && localVal !== null && localVal.partner) {
@@ -4413,6 +4414,12 @@
       if (promo && promo.restricciones) {
         out += _wbCard('<div class="wb-restr-h">' + _wbEsc(_wbLabel('restrictions')) + '</div><div class="wb-body" style="font-size:12.5px;color:#7a6a4f;">' + _wbNl2br(promo.restricciones) + '</div>');
       }
+
+      // Sello de versión (discreto) para confirmar que el libro publicado es el más reciente
+      try {
+        var _src = (S._publicMode && typeof _sheetConfigCache !== 'undefined' && _sheetConfigCache && _sheetConfigCache['breakfastPromo']) ? 'hoja' : 'local';
+        out += '<div style="text-align:center;font-size:9px;color:#cbbfa6;margin-top:10px;">v' + (typeof APP_BUILD !== 'undefined' ? APP_BUILD : '?') + ' · ' + _src + '</div>';
+      } catch (e) {}
 
       return out || _wbText(null, g);
     }
