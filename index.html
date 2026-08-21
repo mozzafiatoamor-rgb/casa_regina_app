@@ -17561,6 +17561,7 @@
           if (_guestHasCodes(resId, guests[i].regId)) { skipped++; continue; }
           total += await _appendGuestBreakfastCodes(res, guests[i]);
         }
+        try { await _ensureBreakfastTextPublished(); } catch (e) {}
         toast('🍳 ' + total + ' código(s) generados' + (skipped ? (' · ' + skipped + ' ya tenían') : ''));
         closeModal(); openReservaModal(resId);
       }, 'Generando desayunos por huésped…');
@@ -17571,6 +17572,7 @@
       if (_guestHasCodes(resId, regId)) { toast('Este huésped ya tiene códigos', false); return; }
       await busy(async function () {
         var c = await _appendGuestBreakfastCodes(res, g);
+        try { await _ensureBreakfastTextPublished(); } catch (e) {}
         toast('🍳 ' + c + ' código(s) para ' + g.nombre);
         closeModal(); openReservaModal(resId);
       }, 'Generando…');
