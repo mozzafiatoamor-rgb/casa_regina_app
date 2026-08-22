@@ -3234,7 +3234,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-08-22c';
+    var APP_BUILD = '2026-08-22d';
     var _bfPromoRowCount = 0;
     var CONFIG_KEYS = ['hotelInfo', 'hotelTerms', 'dailyRoutine', 'msgTemplates', 'emergencyContacts', 'breakfastPromo', 'guestGuide'];
 
@@ -4003,6 +4003,8 @@
       tourExplore:  { es:'Explorar la guía', en:'Explore the guide', fr:'Explorer le guide', it:'Esplora la guida', de:'Zum Reiseführer' },
       tourDone:     { es:'¡Todo listo!', en:"You're all set!", fr:'Tout est prêt !', it:'Tutto pronto!', de:'Alles bereit!' },
       tourDoneSub:  { es:'Ya conoces lo esencial', en:'You know the essentials', fr:"Vous connaissez l'essentiel", it:"Conosci l'essenziale", de:'Sie kennen das Wichtigste' },
+      tourStartCap: { es:'Esta es tu guía. Toca Siguiente y te mostramos cómo usarla.', en:'This is your guide. Tap Next and we\'ll show you how to use it.', fr:'Voici votre guide. Appuyez sur Suivant, on vous montre.', it:'Questa è la tua guida. Tocca Avanti e ti mostriamo come usarla.', de:'Das ist Ihr Reiseführer. Tippen Sie auf Weiter, wir zeigen es Ihnen.' },
+      tourTapHint:  { es:'Así se abre esta sección en tu book', en:'This is how you open this section in your book', fr:'Voici comment ouvrir cette section', it:'Ecco come aprire questa sezione', de:'So öffnen Sie diesen Bereich' },
       wifiHow:      { es:'Conéctate en segundos: escanea el código QR o usa la red y la contraseña.', en:'Connect in seconds: scan the QR code or use the network and password.', fr:'Connectez-vous en quelques secondes : scannez le QR code ou utilisez le réseau et le mot de passe.', it:'Connettiti in pochi secondi: scansiona il QR o usa rete e password.', de:'In Sekunden verbinden: QR-Code scannen oder Netzwerk und Passwort verwenden.' },
       sub_acceso:   { es:'Así entras a tu habitación', en:'How you get into your room', fr:'Pour entrer dans votre chambre', it:'Come entrare in camera', de:'So kommen Sie ins Zimmer' },
       sub_wifi:     { es:'Conéctate a internet', en:'Get online', fr:'Connectez-vous', it:'Vai online', de:'Online gehen' },
@@ -4287,27 +4289,29 @@
       var g = getGuestGuide();
       var hi = (typeof getHotelInfo === 'function') ? getHotelInfo() : {};
       var S2 = [];
+      S2.push({ key: 'portada', portada: true });
       if (_wbAccess) {
-        S2.push({ key: 'acceso', title: _wbLabel('acceso'), sub: _wbLabel('sub_acceso'), code: _wbAccess, body: (_wbT(g.accesoInstr, g) || '') });
+        S2.push({ key: 'acceso', tileKey: 'acceso', title: _wbLabel('acceso'), sub: _wbLabel('sub_acceso'), code: _wbAccess, body: (_wbT(g.accesoInstr, g) || '') });
       }
       if (hi && hi.wifi_red) {
-        S2.push({ key: 'wifi', title: _wbLabel('wifi'), sub: _wbLabel('sub_wifi'), wifi: { red: hi.wifi_red, pass: hi.wifi_pass || '' }, body: (_wbT(g.wifiNotas, g) || _wbLabel('wifiHow')) });
+        S2.push({ key: 'wifi', tileKey: 'wifi', title: _wbLabel('wifi'), sub: _wbLabel('sub_wifi'), wifi: { red: hi.wifi_red, pass: hi.wifi_pass || '' }, body: (_wbT(g.wifiNotas, g) || _wbLabel('wifiHow')) });
       }
       var reglas = _wbT(g.reglas, g);
       if (reglas && reglas.trim()) {
         var items = reglas.split('\n').map(function (s) { return s.replace(/^[•\-•\s]+/, '').trim(); }).filter(function (s) { return !!s; });
-        S2.push({ key: 'reglas', title: _wbLabel('reglas'), sub: _wbLabel('sub_reglas'), list: items });
+        S2.push({ key: 'reglas', tileKey: 'reglas', title: _wbLabel('reglas'), sub: _wbLabel('sub_reglas'), list: items });
       }
       var promo = _wbBreakfastPromo();
       if ((_wbBreakfast && _wbBreakfast.length) || (promo && promo.partner)) {
-        S2.push({ key: 'desayuno', title: _wbLabel('desayuno'), sub: _wbLabel('sub_desayuno'), partner: (promo && promo.partner) || '', body: (promo && promo.descripcion) || '', count: (_wbBreakfast ? _wbBreakfast.length : 0) });
+        S2.push({ key: 'desayuno', tileKey: 'desayuno', title: _wbLabel('desayuno'), sub: _wbLabel('sub_desayuno'), partner: (promo && promo.partner) || '', body: (promo && promo.descripcion) || '', count: (_wbBreakfast ? _wbBreakfast.length : 0) });
       }
-      S2.push({ key: 'recepcion', title: _wbLabel('recepcion'), sub: _wbLabel('sub_recepcion'), body: _wbLabel('recepcionMsg') });
+      S2.push({ key: 'recepcion', tileKey: 'recepcion', title: _wbLabel('recepcion'), sub: _wbLabel('sub_recepcion'), body: _wbLabel('recepcionMsg') });
       S2.push({ key: 'done', final: true, title: _wbLabel('tourDone'), sub: _wbLabel('tourDoneSub') });
       return S2;
     }
     var _WBT_DONE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
-    function _wbTourSlideHTML(s, idx) {
+    var _wbTourBusy = false;
+    function _wbTourCardHTML(s) {
       var icon = s.final ? _WBT_DONE_ICON : (WB_ICONS[s.key] || WB_ICONS.informacion || '');
       var cont = '';
       if (s.code) {
@@ -4332,7 +4336,7 @@
       } else if (s.body) {
         cont += '<div class="wbt-body">' + _wbNl2br(s.body) + '</div>';
       }
-      return '<div class="wbt-panel">'
+      return '<div class="wbt-card">'
         + '<div class="wbt-ic">' + icon + '</div>'
         + '<div class="wbt-sub">' + _wbEsc(s.sub || '') + '</div>'
         + '<div class="wbt-title">' + _wbEsc(s.title) + '</div>'
@@ -4341,46 +4345,55 @@
     }
     function _wbTourCSS() {
       return '<style>'
-        + '#wbTourOverlay{position:fixed;inset:0;z-index:100000;background:linear-gradient(165deg,#2b2117,#16100a);color:#f4ecdd;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column;overflow:hidden;}'
-        + '#wbTourOverlay .wbt-top{display:flex;align-items:center;justify-content:space-between;padding:16px 18px 4px;}'
+        + '#wbTourOverlay{position:fixed;inset:0;z-index:100000;color:#f4ecdd;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column;overflow:hidden;}'
+        + '#wbTourOverlay .wbt-scrim{position:absolute;inset:0;background:rgba(20,14,9,.42);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);transition:background .45s ease,backdrop-filter .45s ease;pointer-events:none;}'
+        + '#wbTourOverlay.showcard .wbt-scrim{background:rgba(20,14,9,.68);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);}'
+        + '#wbTourOverlay .wbt-top{position:relative;display:flex;align-items:center;justify-content:space-between;padding:16px 18px 4px;}'
         + '#wbTourOverlay .wbt-dots{display:flex;gap:6px;}'
-        + '#wbTourOverlay .wbt-dot{width:7px;height:7px;border-radius:50%;background:rgba(244,236,221,.26);transition:all .35s;}'
+        + '#wbTourOverlay .wbt-dot{width:7px;height:7px;border-radius:50%;background:rgba(244,236,221,.3);transition:all .35s;}'
         + '#wbTourOverlay .wbt-dot.on{background:#c2a25e;width:22px;border-radius:4px;}'
-        + '#wbTourOverlay .wbt-skip{background:none;border:none;color:rgba(244,236,221,.55);font-size:13px;cursor:pointer;padding:6px 4px;}'
-        + '#wbTourOverlay .wbt-viewport{flex:1;overflow:hidden;position:relative;}'
-        + '#wbTourOverlay .wbt-track{display:flex;height:100%;transition:transform .45s cubic-bezier(.4,0,.2,1);}'
-        + '#wbTourOverlay .wbt-panel{min-width:100%;height:100%;box-sizing:border-box;padding:8px 26px 18px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;overflow-y:auto;}'
-        + '#wbTourOverlay .wbt-ic{width:78px;height:78px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#e8cd8c;background:radial-gradient(circle at 50% 38%,rgba(194,162,94,.28),rgba(194,162,94,.04));box-shadow:0 0 0 1px rgba(194,162,94,.4),0 10px 34px rgba(0,0,0,.45);margin-bottom:18px;}'
-        + '#wbTourOverlay .wbt-ic svg{width:38px;height:38px;}'
-        + '#wbTourOverlay .wbt-sub{font-size:11.5px;letter-spacing:2.5px;text-transform:uppercase;color:#c2a25e;font-weight:700;margin-bottom:7px;}'
-        + '#wbTourOverlay .wbt-title{font-family:"Playfair Display",Georgia,serif;font-size:29px;font-weight:800;line-height:1.12;margin-bottom:16px;}'
-        + '#wbTourOverlay .wbt-body{font-size:15px;line-height:1.6;color:rgba(244,236,221,.85);max-width:340px;}'
-        + '#wbTourOverlay .wbt-code{font-family:"Space Mono",ui-monospace,monospace;font-size:38px;font-weight:700;letter-spacing:9px;color:#fff;background:rgba(194,162,94,.12);border:1.5px solid #c2a25e;border-radius:16px;padding:16px 22px;margin-bottom:14px;}'
-        + '#wbTourOverlay .wbt-wifi{width:100%;max-width:320px;background:rgba(244,236,221,.06);border:1px solid rgba(194,162,94,.3);border-radius:16px;padding:16px;margin-bottom:12px;}'
+        + '#wbTourOverlay .wbt-skip{background:rgba(20,14,9,.4);border:none;color:rgba(244,236,221,.8);font-size:13px;cursor:pointer;padding:6px 12px;border-radius:16px;}'
+        + '#wbTourOverlay .wbt-stage{position:relative;flex:1;display:flex;align-items:center;justify-content:center;padding:10px 20px;min-height:0;}'
+        + '#wbTourOverlay .wbt-card{position:relative;width:100%;max-width:380px;max-height:100%;overflow-y:auto;background:linear-gradient(165deg,rgba(43,33,23,.9),rgba(22,16,10,.9));-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border:1px solid rgba(194,162,94,.4);border-radius:24px;box-shadow:0 26px 70px rgba(0,0,0,.55);padding:24px 22px;text-align:center;animation:wbtCardIn .45s cubic-bezier(.2,.8,.25,1);}'
+        + '@keyframes wbtCardIn{from{opacity:0;transform:translateY(26px) scale(.95);}to{opacity:1;transform:none;}}'
+        + '#wbTourOverlay .wbt-ic{width:74px;height:74px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#e8cd8c;background:radial-gradient(circle at 50% 38%,rgba(194,162,94,.28),rgba(194,162,94,.04));box-shadow:0 0 0 1px rgba(194,162,94,.4),0 10px 34px rgba(0,0,0,.45);margin:0 auto 16px;}'
+        + '#wbTourOverlay .wbt-ic svg{width:36px;height:36px;}'
+        + '#wbTourOverlay .wbt-sub{font-size:11px;letter-spacing:2.5px;text-transform:uppercase;color:#c2a25e;font-weight:700;margin-bottom:6px;}'
+        + '#wbTourOverlay .wbt-title{font-family:"Playfair Display",Georgia,serif;font-size:27px;font-weight:800;line-height:1.12;margin-bottom:15px;}'
+        + '#wbTourOverlay .wbt-body{font-size:14.5px;line-height:1.6;color:rgba(244,236,221,.85);max-width:320px;margin:0 auto;}'
+        + '#wbTourOverlay .wbt-code{font-family:"Space Mono",ui-monospace,monospace;font-size:36px;font-weight:700;letter-spacing:8px;color:#fff;background:rgba(194,162,94,.12);border:1.5px solid #c2a25e;border-radius:16px;padding:15px 20px;margin-bottom:14px;}'
+        + '#wbTourOverlay .wbt-wifi{width:100%;max-width:320px;margin:0 auto 12px;background:rgba(244,236,221,.06);border:1px solid rgba(194,162,94,.3);border-radius:16px;padding:16px;}'
         + '#wbTourOverlay .wbt-wrow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid rgba(244,236,221,.08);}'
         + '#wbTourOverlay .wbt-wrow span{font-size:12px;color:rgba(244,236,221,.6);text-transform:uppercase;letter-spacing:1px;}'
         + '#wbTourOverlay .wbt-wrow b{font-size:16px;color:#fff;font-family:"Space Mono",monospace;}'
         + '#wbTourOverlay .wbt-copy{margin-top:10px;background:rgba(194,162,94,.16);border:1px solid #c2a25e;color:#e8cd8c;border-radius:10px;padding:8px 16px;font-size:12.5px;font-weight:700;cursor:pointer;}'
-        + '#wbTourOverlay .wbt-qr{width:120px;height:120px;border-radius:12px;background:#fff;padding:7px;margin:14px auto 4px;display:block;}'
+        + '#wbTourOverlay .wbt-qr{width:112px;height:112px;border-radius:12px;background:#fff;padding:7px;margin:14px auto 4px;display:block;}'
         + '#wbTourOverlay .wbt-qrhint{font-size:11.5px;color:rgba(244,236,221,.6);}'
-        + '#wbTourOverlay .wbt-list{width:100%;max-width:340px;text-align:left;}'
-        + '#wbTourOverlay .wbt-li{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px solid rgba(244,236,221,.08);font-size:15px;line-height:1.4;}'
+        + '#wbTourOverlay .wbt-list{width:100%;max-width:340px;margin:0 auto;text-align:left;}'
+        + '#wbTourOverlay .wbt-li{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px solid rgba(244,236,221,.08);font-size:14.5px;line-height:1.4;}'
         + '#wbTourOverlay .wbt-chk{color:#c2a25e;font-weight:800;flex:0 0 auto;}'
         + '#wbTourOverlay .wbt-partner{font-size:17px;font-weight:700;color:#e8cd8c;margin-bottom:10px;}'
         + '#wbTourOverlay .wbt-badge{display:inline-block;margin-top:14px;background:rgba(139,170,106,.18);border:1px solid #8baa6a;color:#c8e0b0;border-radius:20px;padding:7px 16px;font-size:13px;font-weight:700;}'
         + '#wbTourOverlay .wbt-explore{margin-top:8px;background:linear-gradient(135deg,#c2a25e,#a98b4e);color:#fff;border:none;border-radius:30px;padding:15px 34px;font-size:16px;font-weight:800;cursor:pointer;box-shadow:0 8px 24px rgba(169,139,78,.5);}'
-        + '#wbTourOverlay .wbt-bottom{display:flex;align-items:center;justify-content:space-between;padding:10px 18px 22px;gap:12px;}'
-        + '#wbTourOverlay .wbt-prev{background:none;border:none;color:rgba(244,236,221,.7);font-size:14px;cursor:pointer;padding:10px;}'
+        + '#wbTourOverlay .wbt-cap{position:relative;text-align:center;font-size:13.5px;color:#f4ecdd;background:rgba(20,14,9,.5);margin:0 auto;padding:8px 16px;border-radius:16px;max-width:320px;min-height:0;}'
+        + '#wbTourOverlay .wbt-caphold{position:relative;display:flex;justify-content:center;padding:0 18px 4px;}'
+        + '#wbTourOverlay .wbt-bottom{position:relative;display:flex;align-items:center;justify-content:space-between;padding:10px 18px 22px;gap:12px;}'
+        + '#wbTourOverlay .wbt-prev{background:none;border:none;color:rgba(244,236,221,.75);font-size:14px;cursor:pointer;padding:10px;}'
         + '#wbTourOverlay .wbt-next{background:linear-gradient(135deg,#c2a25e,#a98b4e);color:#fff;border:none;border-radius:30px;padding:13px 26px;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 6px 18px rgba(169,139,78,.45);white-space:nowrap;}'
-        + '#wbTourOverlay .wbt-panel .wbt-ic,#wbTourOverlay .wbt-panel .wbt-sub,#wbTourOverlay .wbt-panel .wbt-title,#wbTourOverlay .wbt-panel .wbt-cont{opacity:0;transform:translateY(18px);}'
-        + '#wbTourOverlay .wbt-panel.active .wbt-ic{animation:wbtIn .5s .04s forwards,wbtPop .55s .04s;}'
-        + '#wbTourOverlay .wbt-panel.active .wbt-sub{animation:wbtIn .5s .15s forwards;}'
-        + '#wbTourOverlay .wbt-panel.active .wbt-title{animation:wbtIn .5s .23s forwards;}'
-        + '#wbTourOverlay .wbt-panel.active .wbt-cont{animation:wbtIn .5s .33s forwards;}'
-        + '@keyframes wbtIn{to{opacity:1;transform:translateY(0);}}'
+        + '#wbTourOverlay .wbt-card .wbt-ic{opacity:0;animation:wbtIn .5s .06s forwards,wbtPop .55s .06s;}'
+        + '#wbTourOverlay .wbt-card .wbt-sub{opacity:0;animation:wbtIn .5s .16s forwards;}'
+        + '#wbTourOverlay .wbt-card .wbt-title{opacity:0;animation:wbtIn .5s .24s forwards;}'
+        + '#wbTourOverlay .wbt-card .wbt-cont{opacity:0;animation:wbtIn .5s .34s forwards;}'
+        + '@keyframes wbtIn{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);}}'
         + '@keyframes wbtPop{0%{transform:scale(.6)}60%{transform:scale(1.14)}100%{transform:scale(1)}}'
-        + '.wbt-ripple{position:absolute;width:12px;height:12px;border-radius:50%;background:rgba(194,162,94,.4);transform:translate(-50%,-50%) scale(0);pointer-events:none;animation:wbtRip .6s ease-out forwards;}'
-        + '@keyframes wbtRip{to{transform:translate(-50%,-50%) scale(16);opacity:0;}}'
+        + '.wbt-ghost{position:fixed;z-index:100002;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;border-radius:16px;background:linear-gradient(160deg,rgba(43,33,23,.96),rgba(22,16,10,.96));border:1.5px solid #c2a25e;box-shadow:0 0 30px rgba(194,162,94,.75),0 8px 26px rgba(0,0,0,.5);box-sizing:border-box;padding:6px;transition:transform .18s ease;pointer-events:none;}'
+        + '.wbt-ghost.press{transform:scale(.9);}'
+        + '.wbt-ghost .wb-pill-ic{color:#e8cd8c;display:block;}'
+        + '.wbt-ghost .wb-pill-ic svg{width:26px;height:26px;}'
+        + '.wbt-ghost .wb-pill-lb{color:#f4ecdd;font-size:12.5px;font-weight:700;}'
+        + '.wbt-ghost .wb-badge,.wbt-ghost .wb-nav-badge{display:none;}'
+        + '.wbt-finger{position:fixed;z-index:100003;width:44px;height:44px;border-radius:50%;border:2px solid #fff;background:rgba(255,255,255,.35);box-shadow:0 0 18px rgba(255,255,255,.6);transform:translate(-50%,-50%) scale(.4);pointer-events:none;animation:wbtFinger .72s ease-out forwards;}'
+        + '@keyframes wbtFinger{0%{opacity:0;transform:translate(-50%,-50%) scale(.4);}28%{opacity:1;transform:translate(-50%,-50%) scale(.82);}100%{opacity:0;transform:translate(-50%,-50%) scale(1.7);}}'
         + '</style>';
     }
     function _wbStartTour() {
@@ -4390,77 +4403,109 @@
       if (!slides.length) return;
       _wbTourSlidesCache = slides;
       _wbTourIdx = 0;
+      _wbView = null;
+      try { renderWelcomeBook(); } catch (e) {}
       var old = document.getElementById('wbTourOverlay'); if (old && old.parentNode) old.parentNode.removeChild(old);
       var dots = slides.map(function () { return '<span class="wbt-dot"></span>'; }).join('');
-      var panels = slides.map(function (s, i) { return _wbTourSlideHTML(s, i); }).join('');
       var html = _wbTourCSS()
+        + '<div class="wbt-scrim"></div>'
         + '<div class="wbt-top"><div class="wbt-dots">' + dots + '</div><button class="wbt-skip" onclick="_wbCloseTour()">' + _wbEsc(_wbLabel('tourSkip')) + '</button></div>'
-        + '<div class="wbt-viewport"><div class="wbt-track">' + panels + '</div></div>'
+        + '<div class="wbt-stage"></div>'
+        + '<div class="wbt-caphold"><div class="wbt-cap"></div></div>'
         + '<div class="wbt-bottom"><button class="wbt-prev" onclick="_wbTourGo(-1)">‹ ' + _wbEsc(_wbLabel('back')) + '</button><button class="wbt-next" onclick="_wbTourNext()"></button></div>';
       var ov = document.createElement('div');
       ov.id = 'wbTourOverlay';
       ov.innerHTML = html;
       document.body.appendChild(ov);
       _wbTourBind(ov);
-      _wbTourUpdate();
+      _wbTourShow(0);
     }
-    function _wbTourUpdate() {
+    function _wbTourChrome() {
       var ov = document.getElementById('wbTourOverlay'); if (!ov) return;
-      var track = ov.querySelector('.wbt-track'); if (track) track.style.transform = 'translateX(' + (-_wbTourIdx * 100) + '%)';
-      var panels = ov.querySelectorAll('.wbt-panel');
-      for (var i = 0; i < panels.length; i++) { if (i === _wbTourIdx) panels[i].classList.add('active'); else panels[i].classList.remove('active'); }
       var dots = ov.querySelectorAll('.wbt-dot');
       for (var j = 0; j < dots.length; j++) { if (j === _wbTourIdx) dots[j].classList.add('on'); else dots[j].classList.remove('on'); }
       var prev = ov.querySelector('.wbt-prev'); if (prev) prev.style.visibility = (_wbTourIdx === 0) ? 'hidden' : 'visible';
       var last = _wbTourIdx === _wbTourSlidesCache.length - 1;
       var next = ov.querySelector('.wbt-next');
       if (next) { next.style.display = last ? 'none' : 'block'; next.innerHTML = _wbEsc(_wbLabel('tourNext')) + ' ›'; }
+      var cap = ov.querySelector('.wbt-cap');
+      var s = _wbTourSlidesCache[_wbTourIdx];
+      if (cap) {
+        if (s && s.portada) { cap.textContent = _wbLabel('tourStartCap'); cap.style.display = 'block'; }
+        else if (s && s.tileKey) { cap.textContent = '👆 ' + _wbLabel('tourTapHint'); cap.style.display = 'block'; }
+        else { cap.textContent = ''; cap.style.display = 'none'; }
+      }
+    }
+    function _wbTourShow(i) {
+      var ov = document.getElementById('wbTourOverlay'); if (!ov) return;
+      _wbTourIdx = i;
+      var s = _wbTourSlidesCache[i];
+      var stage = ov.querySelector('.wbt-stage');
+      // 1) Limpiar la tarjeta anterior → se ve el book
+      if (stage) stage.innerHTML = '';
+      ov.classList.remove('showcard');
+      _wbTourChrome();
+      function openCard() {
+        if (_wbTourIdx !== i) return;
+        if (stage) stage.innerHTML = _wbTourCardHTML(s);
+        ov.classList.add('showcard');
+        _wbTourBusy = false;
+      }
+      if (s && s.portada) { _wbTourBusy = false; return; }        // solo se ve el book (portada)
+      if (s && s.tileKey) { _wbTourBusy = true; _wbTourTapTile(s.tileKey, openCard); }
+      else { openCard(); }
+    }
+    function _wbTourTapTile(key, cb) {
+      var ov = document.getElementById('wbTourOverlay');
+      var el = document.querySelector('#welcomeBookScreen [data-tile="' + key + '"]');
+      if (!ov || !el) { cb && cb(); return; }
+      try { el.scrollIntoView({ block: 'center' }); } catch (e) {}
+      setTimeout(function () {
+        var r = el.getBoundingClientRect();
+        var ghost = document.createElement('div');
+        ghost.className = 'wbt-ghost';
+        ghost.style.left = r.left + 'px'; ghost.style.top = r.top + 'px';
+        ghost.style.width = r.width + 'px'; ghost.style.height = r.height + 'px';
+        ghost.innerHTML = el.innerHTML;
+        ov.appendChild(ghost);
+        var fx = r.left + r.width / 2, fy = r.top + r.height / 2;
+        var finger = document.createElement('div');
+        finger.className = 'wbt-finger';
+        finger.style.left = fx + 'px'; finger.style.top = fy + 'px';
+        ov.appendChild(finger);
+        setTimeout(function () { ghost.classList.add('press'); }, 130);
+        setTimeout(function () {
+          if (ghost.parentNode) ghost.parentNode.removeChild(ghost);
+          if (finger.parentNode) finger.parentNode.removeChild(finger);
+          cb && cb();
+        }, 760);
+      }, 220);
     }
     function _wbTourTo(i) {
+      if (_wbTourBusy) return;
       var n = _wbTourSlidesCache.length;
       if (i < 0) i = 0; if (i > n - 1) i = n - 1;
-      _wbTourIdx = i; _wbTourUpdate();
+      if (i === _wbTourIdx) return;
+      _wbTourShow(i);
     }
     function _wbTourGo(d) { _wbTourTo(_wbTourIdx + d); }
     function _wbTourNext() { if (_wbTourIdx >= _wbTourSlidesCache.length - 1) { _wbCloseTour(); } else { _wbTourGo(1); } }
-    function _wbCloseTour() { var ov = document.getElementById('wbTourOverlay'); if (ov && ov.parentNode) ov.parentNode.removeChild(ov); }
+    function _wbCloseTour() { var ov = document.getElementById('wbTourOverlay'); if (ov && ov.parentNode) ov.parentNode.removeChild(ov); _wbTourBusy = false; }
     function _wbCopyFlash(el) {
       var txt = el.getAttribute('data-copy') || '';
       try { if (navigator.clipboard) navigator.clipboard.writeText(txt); else { var t = document.createElement('textarea'); t.value = txt; document.body.appendChild(t); t.select(); document.execCommand('copy'); document.body.removeChild(t); } } catch (e) {}
       var prev = el.textContent; el.textContent = '✓ ' + _wbLabel('copied');
       setTimeout(function () { el.textContent = prev; }, 1400);
     }
-    function _wbTourRipple(x, y) {
-      var ov = document.getElementById('wbTourOverlay'); if (!ov) return;
-      var panel = ov.querySelectorAll('.wbt-panel')[_wbTourIdx]; if (!panel) return;
-      var r = panel.getBoundingClientRect();
-      var sp = document.createElement('span'); sp.className = 'wbt-ripple';
-      sp.style.left = (x - r.left) + 'px'; sp.style.top = (y - r.top) + 'px';
-      panel.appendChild(sp); setTimeout(function () { if (sp.parentNode) sp.parentNode.removeChild(sp); }, 650);
-    }
     function _wbTourBind(ov) {
-      var vp = ov.querySelector('.wbt-viewport'); if (!vp) return;
-      var sx = 0, sy = 0, lastTouch = 0;
+      var sx = 0, sy = 0;
       function isInteractive(t) { return t && t.closest && t.closest('button,a,img'); }
-      vp.addEventListener('touchstart', function (e) { var t = e.changedTouches[0]; sx = t.clientX; sy = t.clientY; }, { passive: true });
-      vp.addEventListener('touchend', function (e) {
-        lastTouch = (new Date()).getTime();
+      ov.addEventListener('touchstart', function (e) { var t = e.changedTouches[0]; sx = t.clientX; sy = t.clientY; }, { passive: true });
+      ov.addEventListener('touchend', function (e) {
+        if (_wbTourBusy) return;
         var t = e.changedTouches[0]; var dx = t.clientX - sx, dy = t.clientY - sy;
-        if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy)) { if (dx < 0) _wbTourNext(); else _wbTourGo(-1); return; }
-        if (Math.abs(dx) < 14 && Math.abs(dy) < 14) {
-          if (isInteractive(t.target)) return;
-          _wbTourRipple(t.clientX, t.clientY);
-          var r = vp.getBoundingClientRect();
-          if (t.clientX < r.left + r.width * 0.28) _wbTourGo(-1); else _wbTourNext();
-        }
+        if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy)) { if (dx < 0) _wbTourNext(); else _wbTourGo(-1); }
       }, { passive: true });
-      vp.addEventListener('click', function (e) {
-        if ((new Date()).getTime() - lastTouch < 700) return;
-        if (isInteractive(e.target)) return;
-        _wbTourRipple(e.clientX, e.clientY);
-        var r = vp.getBoundingClientRect();
-        if (e.clientX < r.left + r.width * 0.28) _wbTourGo(-1); else _wbTourNext();
-      });
     }
 
     function _wbBreakfastPromo() {
@@ -4573,7 +4618,7 @@
       if (!_wbView) {
         var pillsInner = _wbActiveTiles().map(function(key) {
           var badge = (key === 'desayuno' && _wbBreakfast.length) ? '<span class="wb-badge">' + _wbBreakfast.length + '</span>' : '';
-          return '<button class="wb-pill" onclick="wbOpen(\'' + key + '\')">' +
+          return '<button class="wb-pill" data-tile="' + key + '" onclick="wbOpen(\'' + key + '\')">' +
                  '<span class="wb-pill-ic">' + (WB_ICONS[key] || '') + '</span>' +
                  '<span class="wb-pill-lb">' + _wbEsc(_wbLabel(key)) + '</span>' + badge + '</button>';
         }).join('');
