@@ -3234,7 +3234,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-08-22d';
+    var APP_BUILD = '2026-08-22e';
     var _bfPromoRowCount = 0;
     var CONFIG_KEYS = ['hotelInfo', 'hotelTerms', 'dailyRoutine', 'msgTemplates', 'emergencyContacts', 'breakfastPromo', 'guestGuide'];
 
@@ -4346,8 +4346,8 @@
     function _wbTourCSS() {
       return '<style>'
         + '#wbTourOverlay{position:fixed;inset:0;z-index:100000;color:#f4ecdd;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column;overflow:hidden;}'
-        + '#wbTourOverlay .wbt-scrim{position:absolute;inset:0;background:rgba(20,14,9,.42);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);transition:background .45s ease,backdrop-filter .45s ease;pointer-events:none;}'
-        + '#wbTourOverlay.showcard .wbt-scrim{background:rgba(20,14,9,.68);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);}'
+        + '#wbTourOverlay .wbt-scrim{position:absolute;inset:0;background:rgba(20,14,9,.32);-webkit-backdrop-filter:none;backdrop-filter:none;transition:background .45s ease,backdrop-filter .45s ease;pointer-events:none;}'
+        + '#wbTourOverlay.showcard .wbt-scrim{background:rgba(20,14,9,.68);-webkit-backdrop-filter:blur(5px);backdrop-filter:blur(5px);}'
         + '#wbTourOverlay .wbt-top{position:relative;display:flex;align-items:center;justify-content:space-between;padding:16px 18px 4px;}'
         + '#wbTourOverlay .wbt-dots{display:flex;gap:6px;}'
         + '#wbTourOverlay .wbt-dot{width:7px;height:7px;border-radius:50%;background:rgba(244,236,221,.3);transition:all .35s;}'
