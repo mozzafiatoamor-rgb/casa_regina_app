@@ -3234,7 +3234,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-08-21c';
+    var APP_BUILD = '2026-08-22a';
     var _bfPromoRowCount = 0;
     var CONFIG_KEYS = ['hotelInfo', 'hotelTerms', 'dailyRoutine', 'msgTemplates', 'emergencyContacts', 'breakfastPromo', 'guestGuide'];
 
@@ -3882,6 +3882,7 @@
       informacion:  { es: 'Recepción abierta 24 horas.\nDesayuno disponible según promoción vigente.\nSolicita toallas o amenidades extra en recepción.', en: 'Reception open 24 hours.\nBreakfast available per current promotion.\nAsk reception for extra towels or amenities.', fr: '', it: '', de: '' },
       contactoNotas: { es: '', en: '', fr: '', it: '', de: '' },
       accesoInstr:  { es: 'Tu código personal de acceso aparece abajo. Ingrésalo en el teclado de la cerradura principal seguido de la tecla de confirmación.', en: 'Your personal access code is shown below. Enter it on the main lock keypad followed by the confirm key.', fr: '', it: '', de: '' },
+      introMsg:     { es: 'Esta es tu guía digital: todo lo que necesitas para tu estancia en un solo lugar. Aquí tienes tu código de acceso, la red WiFi, tu desayuno, recomendaciones de la zona y los horarios de recepción. Toca cualquier sección para ver los detalles. ¡Disfruta tu estancia!', en: "This is your digital guide: everything you need for your stay in one place. Here you'll find your access code, the WiFi network, your breakfast, local recommendations and reception hours. Tap any section to see the details. Enjoy your stay!", fr: '', it: '', de: '' },
       heroPhoto:    'https://raw.githubusercontent.com/mozzafiatoamor-rgb/casa_regina_app/main/assets/portada.jpg',
       photos:       { welcome: 'https://raw.githubusercontent.com/mozzafiatoamor-rgb/casa_regina_app/main/assets/bienvenida.jpg', ubicacion: '', servicios: 'https://raw.githubusercontent.com/mozzafiatoamor-rgb/casa_regina_app/main/assets/servicios.jpg', pagos: 'https://raw.githubusercontent.com/mozzafiatoamor-rgb/casa_regina_app/main/assets/transferencias.jpg' },
       roomPhotos:   { 'Doble Matrimonial': 'https://raw.githubusercontent.com/mozzafiatoamor-rgb/casa_regina_app/main/assets/habitacion-doble-matrimonial.jpg', 'Queen Size': 'https://raw.githubusercontent.com/mozzafiatoamor-rgb/casa_regina_app/main/assets/habitacion-queen-size.jpg' },
@@ -3903,7 +3904,7 @@
     function _wbHealLangs(g) {
       try {
         var D = DEFAULT_GUEST_GUIDE;
-        var fields = ['welcome', 'checkin', 'checkout', 'reglas', 'transporte', 'servicios', 'informacion', 'accesoInstr', 'pagosNotas', 'ubicacionNotas', 'wifiNotas', 'contactoNotas'];
+        var fields = ['welcome', 'checkin', 'checkout', 'reglas', 'transporte', 'servicios', 'informacion', 'accesoInstr', 'introMsg', 'pagosNotas', 'ubicacionNotas', 'wifiNotas', 'contactoNotas'];
         var langs = ['en', 'fr', 'it', 'de'];
         fields.forEach(function(f) {
           if (!g[f] || typeof g[f] !== 'object' || !D[f]) return;
@@ -3992,6 +3993,10 @@
       yourRoom:     { es:'Tu habitación', en:'Your room', fr:'Votre chambre', it:'La tua camera', de:'Dein Zimmer' },
       upTo:         { es:'Hasta', en:'Up to', fr:"Jusqu'à", it:'Fino a', de:'Bis zu' },
       swipeHint:    { es:'Desliza', en:'Swipe', fr:'Glissez', it:'Scorri', de:'Wischen' },
+      introTitle:   { es:'Bienvenido a tu guía digital', en:'Welcome to your digital guide', fr:'Bienvenue dans votre guide numérique', it:'Benvenuto nella tua guida digitale', de:'Willkommen in Ihrem digitalen Reiseführer' },
+      introInside:  { es:'Lo que encontrarás', en:"What you'll find", fr:'Ce que vous trouverez', it:'Cosa troverai', de:'Was Sie finden' },
+      introStart:   { es:'Comenzar', en:'Start', fr:'Commencer', it:'Inizia', de:"Los geht's" },
+      introHelp:    { es:'Ver introducción', en:'View intro', fr:"Voir l'intro", it:"Vedi l'intro", de:'Intro ansehen' },
       pagos:        { es:'Pagos', en:'Payments', fr:'Paiements', it:'Pagamenti', de:'Zahlungen' },
       copyClabe:    { es:'Copiar CLABE', en:'Copy CLABE', fr:'Copier la CLABE', it:'Copia CLABE', de:'CLABE kopieren' },
       copyAccount:  { es:'Copiar cuenta', en:'Copy account', fr:'Copier le compte', it:'Copia conto', de:'Konto kopieren' },
@@ -4201,11 +4206,66 @@
       _wbLang = (g.langs && g.langs[0]) || 'es';
       _wbView = null;
       renderWelcomeBook();
+      if (!_wbEnded) { try { _wbShowIntro(false); } catch (e) {} }
     }
 
-    function wbSetLang(lang) { _wbLang = lang; renderWelcomeBook(); }
+    function wbSetLang(lang) { _wbLang = lang; renderWelcomeBook(); var ov = document.getElementById('wbIntroOverlay'); if (ov) { _wbShowIntro(true); } }
     function wbOpen(view) { _wbView = view; renderWelcomeBook(); window.scrollTo(0, 0); }
     function wbHome() { _wbView = null; renderWelcomeBook(); window.scrollTo(0, 0); }
+
+    // ====== Ventana de bienvenida (introducción la 1ra vez) ======
+    function _wbIntroKey() { return 'wb_introSeen_' + ((_wbRes && _wbRes.id) ? _wbRes.id : 'gen'); }
+    function _wbIntroSeen() { try { return localStorage.getItem(_wbIntroKey()) === '1'; } catch (e) { return false; } }
+    function _wbIntroMarkSeen() { try { localStorage.setItem(_wbIntroKey(), '1'); } catch (e) {} }
+    function _wbIntroInsideItems() {
+      var pri = ['acceso', 'wifi', 'desayuno', 'recepcion', 'checkin', 'restaurantes', 'ubicacion'];
+      var active = _wbActiveTiles();
+      var picked = [];
+      pri.forEach(function (k) { if (active.indexOf(k) !== -1) picked.push(k); });
+      active.forEach(function (k) { if (picked.length < 6 && picked.indexOf(k) === -1) picked.push(k); });
+      return picked.slice(0, 6);
+    }
+    function _wbShowIntro(force) {
+      try {
+        if (!force && (_wbEnded || _wbIntroSeen())) return;
+        var old = document.getElementById('wbIntroOverlay');
+        if (old && old.parentNode) old.parentNode.removeChild(old);
+        var ov = document.createElement('div');
+        ov.id = 'wbIntroOverlay';
+        ov.innerHTML = _wbIntroHTML();
+        document.body.appendChild(ov);
+      } catch (e) {}
+    }
+    function _wbCloseIntro() {
+      _wbIntroMarkSeen();
+      var ov = document.getElementById('wbIntroOverlay');
+      if (ov && ov.parentNode) ov.parentNode.removeChild(ov);
+    }
+    function _wbIntroHTML() {
+      var g = getGuestGuide();
+      var logo = (typeof LOGO_V_DARK !== 'undefined' && LOGO_V_DARK) ? LOGO_V_DARK : '';
+      var intro = _wbT(g.introMsg, g) || '';
+      var hello = _wbRes ? (_wbLabel('hello') + ', ' + _wbEsc(_wbRes.huesped) + ' 👋') : '';
+      var chips = _wbIntroInsideItems().map(function (k) {
+        return '<div style="display:flex;align-items:center;gap:8px;padding:9px 10px;background:#f4eee1;border-radius:12px;">'
+          + '<span style="width:20px;height:20px;flex:0 0 20px;color:#a98b4e;display:inline-flex;">' + (WB_ICONS[k] || '') + '</span>'
+          + '<span style="font-size:12.5px;color:#5a4a33;font-weight:600;">' + _wbEsc(_wbLabel(k)) + '</span></div>';
+      }).join('');
+      var h = '';
+      h += '<div style="position:fixed;inset:0;z-index:99999;background:rgba(46,38,26,.55);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;padding:18px;box-sizing:border-box;" onclick="if(event.target===this)_wbCloseIntro()">';
+      h += '<div style="max-width:420px;width:100%;max-height:90vh;overflow-y:auto;background:#fffdf7;border-radius:22px;box-shadow:0 20px 60px rgba(0,0,0,.35);padding:24px 22px 20px;box-sizing:border-box;text-align:center;">';
+      if (logo) h += '<img src="' + logo + '" alt="" style="height:52px;object-fit:contain;margin-bottom:10px;" onerror="this.style.display=\'none\'">';
+      h += '<div style="font-family:\'Playfair Display\',Georgia,serif;font-size:21px;font-weight:700;color:#6b5836;line-height:1.25;margin-bottom:4px;">' + _wbEsc(_wbLabel('introTitle')) + '</div>';
+      if (hello) h += '<div style="font-size:13px;color:#a98b4e;font-weight:600;margin-bottom:12px;">' + hello + '</div>';
+      if (intro) h += '<div style="font-size:14px;color:#5a4a33;line-height:1.55;margin:10px 0 16px;text-align:left;">' + _wbNl2br(intro) + '</div>';
+      if (chips) {
+        h += '<div style="font-size:11px;font-weight:700;color:#a98b4e;text-transform:uppercase;letter-spacing:.5px;text-align:left;margin-bottom:8px;">' + _wbEsc(_wbLabel('introInside')) + '</div>';
+        h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:20px;">' + chips + '</div>';
+      }
+      h += '<button onclick="_wbCloseIntro()" style="width:100%;border:none;border-radius:14px;padding:14px;font-size:15px;font-weight:700;color:#fff;background:linear-gradient(135deg,#c2a25e,#a98b4e);cursor:pointer;box-shadow:0 6px 16px rgba(169,139,78,.4);">' + _wbEsc(_wbLabel('introStart')) + ' →</button>';
+      h += '</div></div>';
+      return h;
+    }
 
     function _wbBreakfastPromo() {
       // En el libro del huésped (modo público) el localStorage del dispositivo es
@@ -4338,7 +4398,8 @@
       if (logo) foot += '<img class="wb-foot-logo" src="' + logo + '" alt="' + _wbEsc(hi.nombre || '') + '" onerror="this.parentNode.style.display=\'none\'">';
       foot += '</div>';
       var bg = (!_wbView && g.heroPhoto) ? '<div class="wb-bg" style="background-image:linear-gradient(rgba(248,243,233,.40) 0%, rgba(248,243,233,.40) 44%, rgba(233,226,214,.78) 84%, #e9e2d6 100%),url(\'' + _wbEsc(g.heroPhoto) + '\')"></div>' : '';
-      scr.innerHTML = '<div class="wb-phone">' + bg + head + body + foot + '</div>';
+      var helpBtn = _wbEnded ? '' : ('<button onclick="_wbShowIntro(true)" aria-label="' + _wbEsc(_wbLabel('introHelp')) + '" title="' + _wbEsc(_wbLabel('introHelp')) + '" style="position:fixed;right:14px;bottom:16px;z-index:9998;width:38px;height:38px;border-radius:50%;border:none;background:rgba(107,88,54,.9);color:#fff;font-size:18px;font-weight:700;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.28);line-height:1;">?</button>');
+      scr.innerHTML = '<div class="wb-phone">' + bg + head + body + foot + '</div>' + helpBtn;
       if (_wbView) {
         var _av = scr.querySelector('.wb-nav-ic.active');
         if (_av && _av.scrollIntoView) { try { _av.scrollIntoView({ inline: 'center', block: 'nearest' }); } catch (e) {} }
@@ -4806,6 +4867,7 @@
     var _wbEditLang = 'es';
     var WB_ALL_LANGS = [ ['es','🇲🇽 Español'], ['en','🇬🇧 English'], ['fr','🇫🇷 Français'], ['it','🇮🇹 Italiano'], ['de','🇩🇪 Deutsch'] ];
     var WB_TEXT_FIELDS = [
+      ['introMsg','👋 Introducción (ventana de bienvenida)','Aparece en la ventana que ve el huésped la PRIMERA vez que abre el book. Explícale lo más importante que contiene.'],
       ['welcome','Bienvenida','Mensaje de bienvenida para el huésped'],
       ['checkin','Instrucciones de Check-In','Cómo llegar, recoger llaves, horario'],
       ['accesoInstr','Instrucciones de acceso (cerradura)','Cómo usar el código de acceso personal (aparece junto al código del huésped)'],
