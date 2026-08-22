@@ -3234,7 +3234,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-08-22b';
+    var APP_BUILD = '2026-08-22c';
     var _bfPromoRowCount = 0;
     var CONFIG_KEYS = ['hotelInfo', 'hotelTerms', 'dailyRoutine', 'msgTemplates', 'emergencyContacts', 'breakfastPromo', 'guestGuide'];
 
@@ -3997,6 +3997,7 @@
       introInside:  { es:'Lo que encontrarás', en:"What you'll find", fr:'Ce que vous trouverez', it:'Cosa troverai', de:'Was Sie finden' },
       introStart:   { es:'Comenzar', en:'Start', fr:'Commencer', it:'Inizia', de:"Los geht's" },
       introHelp:    { es:'Ver introducción', en:'View intro', fr:"Voir l'intro", it:"Vedi l'intro", de:'Intro ansehen' },
+      introTourNote:{ es:'Antes de explorar la guía, daremos un breve paseo por lo primordial.', en:"Before exploring the guide, we'll take a quick tour of the essentials.", fr:'Avant d\'explorer le guide, faisons un petit tour de l\'essentiel.', it:"Prima di esplorare la guida, faremo un breve giro sull'essenziale.", de:'Bevor Sie den Reiseführer erkunden, zeigen wir Ihnen kurz das Wichtigste.' },
       tourSkip:     { es:'Saltar', en:'Skip', fr:'Passer', it:'Salta', de:'Überspringen' },
       tourNext:     { es:'Siguiente', en:'Next', fr:'Suivant', it:'Avanti', de:'Weiter' },
       tourExplore:  { es:'Explorar la guía', en:'Explore the guide', fr:'Explorer le guide', it:'Esplora la guida', de:'Zum Reiseführer' },
@@ -4258,22 +4259,23 @@
       var intro = _wbT(g.introMsg, g) || '';
       var hello = _wbRes ? (_wbLabel('hello') + ', ' + _wbEsc(_wbRes.huesped) + ' 👋') : '';
       var chips = _wbIntroInsideItems().map(function (k) {
-        return '<div style="display:flex;align-items:center;gap:8px;padding:9px 10px;background:#f4eee1;border-radius:12px;">'
-          + '<span style="width:20px;height:20px;flex:0 0 20px;color:#a98b4e;display:inline-flex;">' + (WB_ICONS[k] || '') + '</span>'
-          + '<span style="font-size:12.5px;color:#5a4a33;font-weight:600;">' + _wbEsc(_wbLabel(k)) + '</span></div>';
+        return '<div style="display:flex;align-items:center;gap:8px;padding:9px 10px;background:rgba(244,236,221,.06);border:1px solid rgba(194,162,94,.28);border-radius:12px;">'
+          + '<span style="width:20px;height:20px;flex:0 0 20px;color:#e8cd8c;display:inline-flex;">' + (WB_ICONS[k] || '') + '</span>'
+          + '<span style="font-size:12.5px;color:#f4ecdd;font-weight:600;">' + _wbEsc(_wbLabel(k)) + '</span></div>';
       }).join('');
       var h = '';
-      h += '<div style="position:fixed;inset:0;z-index:99999;background:rgba(46,38,26,.55);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;padding:18px;box-sizing:border-box;" onclick="if(event.target===this)_wbCloseIntro()">';
-      h += '<div style="max-width:420px;width:100%;max-height:90vh;overflow-y:auto;background:#fffdf7;border-radius:22px;box-shadow:0 20px 60px rgba(0,0,0,.35);padding:24px 22px 20px;box-sizing:border-box;text-align:center;">';
-      if (logo) h += '<img src="' + logo + '" alt="" style="height:52px;object-fit:contain;margin-bottom:10px;" onerror="this.style.display=\'none\'">';
-      h += '<div style="font-family:\'Playfair Display\',Georgia,serif;font-size:21px;font-weight:700;color:#6b5836;line-height:1.25;margin-bottom:4px;">' + _wbEsc(_wbLabel('introTitle')) + '</div>';
-      if (hello) h += '<div style="font-size:13px;color:#a98b4e;font-weight:600;margin-bottom:12px;">' + hello + '</div>';
-      if (intro) h += '<div style="font-size:14px;color:#5a4a33;line-height:1.55;margin:10px 0 16px;text-align:left;">' + _wbNl2br(intro) + '</div>';
+      h += '<div style="position:fixed;inset:0;z-index:99999;background:rgba(22,16,10,.5);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:18px;box-sizing:border-box;" onclick="if(event.target===this)_wbCloseIntro()">';
+      h += '<div style="max-width:420px;width:100%;max-height:90vh;overflow-y:auto;background:linear-gradient(165deg,rgba(43,33,23,.92),rgba(22,16,10,.92));-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border:1px solid rgba(194,162,94,.35);border-radius:22px;box-shadow:0 24px 70px rgba(0,0,0,.55),0 0 0 1px rgba(194,162,94,.1);padding:26px 22px 20px;box-sizing:border-box;text-align:center;color:#f4ecdd;">';
+      if (logo) h += '<img src="' + logo + '" alt="" style="height:54px;object-fit:contain;margin-bottom:12px;" onerror="this.style.display=\'none\'">';
+      h += '<div style="font-family:\'Playfair Display\',Georgia,serif;font-size:23px;font-weight:800;color:#f4ecdd;line-height:1.2;margin-bottom:4px;">' + _wbEsc(_wbLabel('introTitle')) + '</div>';
+      if (hello) h += '<div style="font-size:13px;color:#e8cd8c;font-weight:700;margin-bottom:12px;">' + hello + '</div>';
+      if (intro) h += '<div style="font-size:14px;color:rgba(244,236,221,.85);line-height:1.55;margin:10px 0 16px;text-align:left;">' + _wbNl2br(intro) + '</div>';
       if (chips) {
-        h += '<div style="font-size:11px;font-weight:700;color:#a98b4e;text-transform:uppercase;letter-spacing:.5px;text-align:left;margin-bottom:8px;">' + _wbEsc(_wbLabel('introInside')) + '</div>';
-        h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:20px;">' + chips + '</div>';
+        h += '<div style="font-size:11px;font-weight:700;color:#c2a25e;text-transform:uppercase;letter-spacing:1px;text-align:left;margin-bottom:8px;">' + _wbEsc(_wbLabel('introInside')) + '</div>';
+        h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">' + chips + '</div>';
       }
-      h += '<button onclick="_wbStartTour()" style="width:100%;border:none;border-radius:14px;padding:14px;font-size:15px;font-weight:700;color:#fff;background:linear-gradient(135deg,#c2a25e,#a98b4e);cursor:pointer;box-shadow:0 6px 16px rgba(169,139,78,.4);">' + _wbEsc(_wbLabel('introStart')) + ' →</button>';
+      h += '<div style="font-size:12.5px;color:#e8cd8c;line-height:1.45;margin-bottom:14px;display:flex;align-items:center;justify-content:center;gap:6px;">✨ ' + _wbEsc(_wbLabel('introTourNote')) + '</div>';
+      h += '<button onclick="_wbStartTour()" style="width:100%;border:none;border-radius:14px;padding:15px;font-size:15px;font-weight:800;color:#fff;background:linear-gradient(135deg,#c2a25e,#a98b4e);cursor:pointer;box-shadow:0 8px 22px rgba(169,139,78,.5);">' + _wbEsc(_wbLabel('introStart')) + ' →</button>';
       h += '</div></div>';
       return h;
     }
