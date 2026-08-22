@@ -3234,7 +3234,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-08-22e';
+    var APP_BUILD = '2026-08-22f';
     var _bfPromoRowCount = 0;
     var CONFIG_KEYS = ['hotelInfo', 'hotelTerms', 'dailyRoutine', 'msgTemplates', 'emergencyContacts', 'breakfastPromo', 'guestGuide'];
 
@@ -4289,7 +4289,6 @@
       var g = getGuestGuide();
       var hi = (typeof getHotelInfo === 'function') ? getHotelInfo() : {};
       var S2 = [];
-      S2.push({ key: 'portada', portada: true });
       if (_wbAccess) {
         S2.push({ key: 'acceso', tileKey: 'acceso', title: _wbLabel('acceso'), sub: _wbLabel('sub_acceso'), code: _wbAccess, body: (_wbT(g.accesoInstr, g) || '') });
       }
