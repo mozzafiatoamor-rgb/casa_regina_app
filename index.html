@@ -2608,6 +2608,8 @@
         <div class="form-group">
           <label class="form-label">Monto</label>
           <input type="number" id="payMonto" class="form-input" placeholder="0.00" step="0.01" min="0" required />
+          <button type="button" id="payFillBalance" onclick="document.getElementById('payMonto').value=(window._payBalance||'');if(typeof calcPayCashCambio==='function')calcPayCashCambio();" style="margin-top:6px;background:var(--surface2);border:1px dashed var(--accent);color:var(--accent);border-radius:8px;padding:6px 10px;font-size:11px;cursor:pointer;">Usar saldo total: $<span id="payBalanceLbl">0</span></button>
+          <div style="font-size:11px;color:var(--text2);margin-top:5px;">Escribe solo lo que el huésped paga ahora. Si pagará después, usa “Check-in a crédito”.</div>
         </div>
         <div class="form-group">
           <label class="form-label">Método de Pago</label>
@@ -3234,7 +3236,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-08-22f';
+    var APP_BUILD = '2026-08-25a';
     var _bfPromoRowCount = 0;
     var CONFIG_KEYS = ['hotelInfo', 'hotelTerms', 'dailyRoutine', 'msgTemplates', 'emergencyContacts', 'breakfastPromo', 'guestGuide'];
 
@@ -3881,6 +3883,7 @@
       servicios:    { es: 'Aire acondicionado: usa el control remoto de la habitación.\nTV: enciende con el control; canales locales y streaming.\nAgua caliente disponible 24h.', en: 'Air conditioning: use the in-room remote.\nTV: turn on with the remote; local channels and streaming.\nHot water available 24h.', fr: '', it: '', de: '' },
       informacion:  { es: 'Recepción abierta 24 horas.\nDesayuno disponible según promoción vigente.\nSolicita toallas o amenidades extra en recepción.', en: 'Reception open 24 hours.\nBreakfast available per current promotion.\nAsk reception for extra towels or amenities.', fr: '', it: '', de: '' },
       contactoNotas: { es: '', en: '', fr: '', it: '', de: '' },
+      facturaNotas: { es: '', en: '', fr: '', it: '', de: '' },
       accesoInstr:  { es: 'Tu código personal de acceso aparece abajo. Ingrésalo en el teclado de la cerradura principal seguido de la tecla de confirmación.', en: 'Your personal access code is shown below. Enter it on the main lock keypad followed by the confirm key.', fr: '', it: '', de: '' },
       introMsg:     { es: 'Esta es tu guía digital: todo lo que necesitas para tu estancia en un solo lugar. Aquí tienes tu código de acceso, la red WiFi, tu desayuno, recomendaciones de la zona y los horarios de recepción. Toca cualquier sección para ver los detalles. ¡Disfruta tu estancia!', en: "This is your digital guide: everything you need for your stay in one place. Here you'll find your access code, the WiFi network, your breakfast, local recommendations and reception hours. Tap any section to see the details. Enjoy your stay!", fr: '', it: '', de: '' },
       heroPhoto:    'https://raw.githubusercontent.com/mozzafiatoamor-rgb/casa_regina_app/main/assets/portada.jpg',
@@ -4015,7 +4018,9 @@
       copyClabe:    { es:'Copiar CLABE', en:'Copy CLABE', fr:'Copier la CLABE', it:'Copia CLABE', de:'CLABE kopieren' },
       copyAccount:  { es:'Copiar cuenta', en:'Copy account', fr:'Copier le compte', it:'Copia conto', de:'Konto kopieren' },
       bankLbl:      { es:'Banco', en:'Bank', fr:'Banque', it:'Banca', de:'Bank' },
-      accountLbl:   { es:'Cuenta', en:'Account', fr:'Compte', it:'Conto', de:'Konto' }
+      accountLbl:   { es:'Cuenta', en:'Account', fr:'Compte', it:'Conto', de:'Konto' },
+      factura:      { es:'Factura', en:'Invoice', fr:'Facture', it:'Fattura', de:'Rechnung' },
+      requestInvoice:{ es:'Solicitar factura', en:'Request invoice', fr:'Demander une facture', it:'Richiedi fattura', de:'Rechnung anfordern' }
     };
     // Datos fijos de Mozzafiato (mismos que usa el resto del app)
     var WB_MOZZA_MENU = 'https://mozzafiatoamor-rgb.github.io/mozzafiato-menu/index.html';
@@ -4073,6 +4078,7 @@
       desayuno:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h12a4 4 0 0 1 0 8h-1"/><path d="M4 8v6a4 4 0 0 0 4 4h4a4 4 0 0 0 4-4"/><path d="M7 3c-.5.8-.5 1.5 0 2.3"/><path d="M11 3c-.5.8-.5 1.5 0 2.3"/></svg>',
       habitaciones:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18v-5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v5"/><path d="M3 18v2"/><path d="M21 18v2"/><path d="M3 14h18"/><path d="M7 11V9a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v2"/></svg>',
       pagos:       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/><path d="M6.5 15h4"/></svg>',
+      factura:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h9l3 3v15l-2.2-1.2L13.6 20l-2.1-1.2L9.4 20l-2.2-1.2L5 20V4a2 2 0 0 1 1-2z"/><path d="M9 8h6"/><path d="M9 12h6"/></svg>',
       acceso:      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="4"/><path d="M11 11l7 7"/><path d="M16 16l2-2"/><path d="M18.5 13.5l2 2"/></svg>',
       recepcion:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>'
     };
@@ -4538,8 +4544,24 @@
           if (showBf) tiles.push('desayuno');
         }
         if (k === 'checkin') tiles.push('recepcion'); // horario de recepción
+        if (k === 'pagos' && _wbHasFactura()) tiles.push('factura'); // solicitar factura
       });
       return tiles;
+    }
+    function _wbHasFactura() {
+      try { var g = getGuestGuide(); var t = _wbT(g.facturaNotas, g); return !!(t && String(t).trim()); } catch (e) { return false; }
+    }
+    function _wbLinkify(s) {
+      var esc = _wbEsc(String(s == null ? '' : s));
+      esc = esc.replace(/(https?:\/\/[^\s<]+)/g, function (m) {
+        var clean = m.replace(/[.,;:)]+$/, ''); var tail = m.slice(clean.length);
+        return '<a href="' + clean + '" target="_blank" rel="noopener" style="color:#a98b4e;text-decoration:underline;word-break:break-all;">' + clean + '</a>' + tail;
+      });
+      return esc.replace(/\n/g, '<br>');
+    }
+    function _wbFirstUrl(s) {
+      var m = String(s == null ? '' : s).match(/https?:\/\/[^\s]+/);
+      return m ? m[0].replace(/[.,;:)]+$/, '') : '';
     }
 
     // Estancia terminada: pantalla de despedida (sin código de acceso ni datos personales)
@@ -4918,6 +4940,14 @@
         if (cn) hcon += _wbCard('<div class="wb-body">' + _wbNl2br(cn) + '</div>');
         return hcon || _wbText(null, g);
       }
+      if (key === 'factura') {
+        var tf = _wbT(g.facturaNotas, g);
+        if (!tf || !String(tf).trim()) return _wbText(null, g);
+        var hf = _wbCard('<div class="wb-body">🧾 ' + _wbLinkify(tf) + '</div>');
+        var furl = _wbFirstUrl(tf);
+        if (furl) hf += '<a class="wb-btn" href="' + _wbEsc(furl) + '" target="_blank" rel="noopener">🧾 ' + _wbEsc(_wbLabel('requestInvoice')) + '</a>';
+        return hf;
+      }
       if (key === 'emergencias') {
         var contacts = [];
         try { contacts = getEmergencyContacts(); } catch (e) {}
@@ -5117,7 +5147,8 @@
       ['transporte','Transporte','Taxis, estacionamiento, transporte público'],
       ['servicios','Servicios e información','A/C, TV, electrodomésticos, amenidades'],
       ['informacion','Información general','Recepción, horarios, servicios del hotel'],
-      ['contactoNotas','Contacto — notas','Texto opcional (WhatsApp/tel/email se toman de Hotel Info)']
+      ['contactoNotas','Contacto — notas','Texto opcional (WhatsApp/tel/email se toman de Hotel Info)'],
+      ['facturaNotas','🧾 Factura (Solicitar Factura)','Pega tu mensaje y el enlace para solicitar factura. El enlace se vuelve un botón. Si lo dejas vacío, el apartado no aparece en el book.']
     ];
     var WB_LIST_CATS = [ ['restaurantes','🍽️ Restaurantes'], ['bares','🍸 Bares y Clubs'], ['compras','🛍️ Compras'], ['actividades','🎯 Actividades'] ];
 
@@ -13111,7 +13142,11 @@
 
       document.getElementById('paymentResInfo').innerHTML = info;
       document.getElementById('payResId').value = resId;
-      document.getElementById('payMonto').value = balance > 0 ? balance : '';
+      document.getElementById('payMonto').value = '';
+      window._payBalance = balance;
+      var _pmInp = document.getElementById('payMonto'); if (_pmInp) _pmInp.placeholder = balance > 0 ? ('Monto recibido ahora (saldo $' + balance + ')') : '0.00';
+      var _pbl = document.getElementById('payBalanceLbl'); if (_pbl) _pbl.textContent = balance;
+      var _pfbBtn = document.getElementById('payFillBalance'); if (_pfbBtn) _pfbBtn.style.display = (balance > 0) ? '' : 'none';
       document.getElementById('payMetodo').value = '';
       document.getElementById('payNotas').value = '';
       document.getElementById('payFactura').checked = false;
