@@ -3236,7 +3236,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-08-25b';
+    var APP_BUILD = '2026-08-25c';
     var _bfPromoRowCount = 0;
     var CONFIG_KEYS = ['hotelInfo', 'hotelTerms', 'dailyRoutine', 'msgTemplates', 'emergencyContacts', 'breakfastPromo', 'guestGuide'];
 
@@ -4001,6 +4001,7 @@
       introStart:   { es:'Comenzar', en:'Start', fr:'Commencer', it:'Inizia', de:"Los geht's" },
       introHelp:    { es:'Ver introducción', en:'View intro', fr:"Voir l'intro", it:"Vedi l'intro", de:'Intro ansehen' },
       introTourNote:{ es:'Antes de explorar la guía, daremos un breve paseo por lo primordial.', en:"Before exploring the guide, we'll take a quick tour of the essentials.", fr:'Avant d\'explorer le guide, faisons un petit tour de l\'essentiel.', it:"Prima di esplorare la guida, faremo un breve giro sull'essenziale.", de:'Bevor Sie den Reiseführer erkunden, zeigen wir Ihnen kurz das Wichtigste.' },
+      introFacturaNote:{ es:'¿Necesitas factura? Aquí encontrarás el enlace y las instrucciones para solicitarla.', en:'Need an invoice? Here you\'ll find the link and steps to request it.', fr:'Besoin d\'une facture ? Vous trouverez ici le lien et les étapes.', it:'Serve la fattura? Qui trovi il link e le istruzioni.', de:'Rechnung nötig? Hier finden Sie den Link und die Schritte.' },
       tourSkip:     { es:'Saltar', en:'Skip', fr:'Passer', it:'Salta', de:'Überspringen' },
       tourNext:     { es:'Siguiente', en:'Next', fr:'Suivant', it:'Avanti', de:'Weiter' },
       tourExplore:  { es:'Explorar la guía', en:'Explore the guide', fr:'Explorer le guide', it:'Esplora la guida', de:'Zum Reiseführer' },
@@ -4014,6 +4015,7 @@
       sub_reglas:   { es:'Para una estancia agradable', en:'For a pleasant stay', fr:'Pour un séjour agréable', it:'Per un soggiorno piacevole', de:'Für einen angenehmen Aufenthalt' },
       sub_desayuno: { es:'Tu desayuno de cortesía', en:'Your complimentary breakfast', fr:'Votre petit-déjeuner offert', it:'La tua colazione omaggio', de:'Ihr kostenloses Frühstück' },
       sub_recepcion:{ es:'Horarios y contacto', en:'Hours and contact', fr:'Horaires et contact', it:'Orari e contatto', de:'Zeiten und Kontakt' },
+      sub_factura:  { es:'Aquí está el link e instrucciones para solicitar tu factura', en:'Here is the link and steps to request your invoice', fr:'Voici le lien et les étapes pour demander votre facture', it:'Qui trovi il link e le istruzioni per la fattura', de:'Hier finden Sie den Link und die Schritte für Ihre Rechnung' },
       pagos:        { es:'Pagos', en:'Payments', fr:'Paiements', it:'Pagamenti', de:'Zahlungen' },
       copyClabe:    { es:'Copiar CLABE', en:'Copy CLABE', fr:'Copier la CLABE', it:'Copia CLABE', de:'CLABE kopieren' },
       copyAccount:  { es:'Copiar cuenta', en:'Copy account', fr:'Copier le compte', it:'Copia conto', de:'Konto kopieren' },
@@ -4240,7 +4242,7 @@
     function _wbIntroSeen() { try { return localStorage.getItem(_wbIntroKey()) === '1'; } catch (e) { return false; } }
     function _wbIntroMarkSeen() { try { localStorage.setItem(_wbIntroKey(), '1'); } catch (e) {} }
     function _wbIntroInsideItems() {
-      var pri = ['acceso', 'wifi', 'desayuno', 'recepcion', 'checkin', 'restaurantes', 'ubicacion'];
+      var pri = ['acceso', 'wifi', 'desayuno', 'recepcion', 'factura', 'checkin', 'restaurantes', 'ubicacion'];
       var active = _wbActiveTiles();
       var picked = [];
       pri.forEach(function (k) { if (active.indexOf(k) !== -1) picked.push(k); });
@@ -4284,6 +4286,9 @@
         h += '<div style="font-size:11px;font-weight:700;color:#c2a25e;text-transform:uppercase;letter-spacing:1px;text-align:left;margin-bottom:8px;">' + _wbEsc(_wbLabel('introInside')) + '</div>';
         h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">' + chips + '</div>';
       }
+      if (_wbHasFactura()) {
+        h += '<div style="font-size:12px;color:rgba(244,236,221,.85);background:rgba(194,162,94,.12);border:1px solid rgba(194,162,94,.28);border-radius:12px;padding:9px 11px;margin-bottom:14px;text-align:left;line-height:1.4;">🧾 ' + _wbEsc(_wbLabel('introFacturaNote')) + '</div>';
+      }
       h += '<div style="font-size:12.5px;color:#e8cd8c;line-height:1.45;margin-bottom:14px;display:flex;align-items:center;justify-content:center;gap:6px;">✨ ' + _wbEsc(_wbLabel('introTourNote')) + '</div>';
       h += '<button onclick="_wbStartTour()" style="width:100%;border:none;border-radius:14px;padding:15px;font-size:15px;font-weight:800;color:#fff;background:linear-gradient(135deg,#c2a25e,#a98b4e);cursor:pointer;box-shadow:0 8px 22px rgba(169,139,78,.5);">' + _wbEsc(_wbLabel('introStart')) + ' →</button>';
       h += '</div></div>';
@@ -4313,6 +4318,9 @@
         S2.push({ key: 'desayuno', tileKey: 'desayuno', title: _wbLabel('desayuno'), sub: _wbLabel('sub_desayuno'), partner: (promo && promo.partner) || '', body: (promo && promo.descripcion) || '', count: (_wbBreakfast ? _wbBreakfast.length : 0) });
       }
       S2.push({ key: 'recepcion', tileKey: 'recepcion', title: _wbLabel('recepcion'), sub: _wbLabel('sub_recepcion'), body: _wbLabel('recepcionMsg') });
+      if (_wbHasFactura()) {
+        S2.push({ key: 'factura', tileKey: 'factura', title: _wbLabel('factura'), sub: _wbLabel('sub_factura'), factura: _wbFacturaText() });
+      }
       S2.push({ key: 'done', final: true, title: _wbLabel('tourDone'), sub: _wbLabel('tourDoneSub') });
       return S2;
     }
@@ -4338,6 +4346,10 @@
         if (s.partner) cont += '<div class="wbt-partner">☕ ' + _wbEsc(s.partner) + '</div>';
         if (s.body) cont += '<div class="wbt-body">' + _wbNl2br(s.body) + '</div>';
         if (s.count > 0) cont += '<div class="wbt-badge">🍳 ' + s.count + ' ' + _wbEsc(_wbLabel('desayuno')) + '</div>';
+      } else if (s.factura) {
+        cont += '<div class="wbt-body" style="text-align:left;">🧾 ' + _wbLinkify(s.factura) + '</div>';
+        var _fu = _wbFirstUrl(s.factura);
+        if (_fu) cont += '<a class="wbt-explore" href="' + _wbEsc(_fu) + '" target="_blank" rel="noopener" style="display:inline-block;text-decoration:none;margin-top:16px;">🧾 ' + _wbEsc(_wbLabel('requestInvoice')) + ' →</a>';
       } else if (s.final) {
         cont += '<button class="wbt-explore" onclick="_wbCloseTour()">' + _wbEsc(_wbLabel('tourExplore')) + ' →</button>';
       } else if (s.body) {
