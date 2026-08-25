@@ -3236,7 +3236,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-08-25a';
+    var APP_BUILD = '2026-08-25b';
     var _bfPromoRowCount = 0;
     var CONFIG_KEYS = ['hotelInfo', 'hotelTerms', 'dailyRoutine', 'msgTemplates', 'emergencyContacts', 'breakfastPromo', 'guestGuide'];
 
@@ -4092,6 +4092,7 @@
     var _wbBreakfast = [];    // códigos de desayuno del huésped
     var _wbGuestRegId = '';   // si el libro es de un huésped específico (&g=REGID)
     var _wbAccess = '';       // código de acceso personal
+    var _wbFactura = '';      // texto de factura personalizado de la reserva ([FACT:...] en notas)
     var _wbEnded = false;     // la estancia ya terminó (checkout pasado / cancelada)
 
     function _wbBaseLang(g) { return (g.langs && g.langs[0]) || 'es'; }
@@ -4142,7 +4143,7 @@
       scr.classList.add('active');
       scr.innerHTML = '<div class="wb-loading">' + _wbLabel('loading') + '</div>';
 
-      _wbRes = null; _wbBreakfast = []; _wbAccess = ''; _wbEnded = false;
+      _wbRes = null; _wbBreakfast = []; _wbAccess = ''; _wbFactura = ''; _wbEnded = false;
       var pub = S._publicMode || (S.sheetId && S.apiKey);
       if (pub) {
         try {
@@ -4175,6 +4176,7 @@
                 _wbRes = { id: String(f[0]), habitacionNum: String(f[1]), huesped: String(f[2] || ''),
                            fechaEntrada: String(f[5] || '').substring(0, 10), fechaSalida: String(f[6] || '').substring(0, 10),
                            estado: String(f[11] || ''), tipo: '' };
+                _wbFactura = _wbExtractFactura(String(f[12] || ''));  // factura personalizada de esta reserva
                 break;
               }
             }
@@ -4548,8 +4550,19 @@
       });
       return tiles;
     }
+    function _wbFacturaB64Decode(b64) {
+      try { return decodeURIComponent(escape(atob(b64))); } catch (e) { try { return atob(b64); } catch (e2) { return ''; } }
+    }
+    function _wbExtractFactura(notas) {
+      try { var m = String(notas || '').match(/\[FACT:([^\]]*)\]/); return m ? _wbFacturaB64Decode(m[1]) : ''; } catch (e) { return ''; }
+    }
+    // Texto de factura a mostrar: primero el personalizado de la reserva, si no, el global de Ajustes.
+    function _wbFacturaText() {
+      if (_wbFactura && String(_wbFactura).trim()) return _wbFactura;
+      try { var g = getGuestGuide(); var t = _wbT(g.facturaNotas, g); return (t && String(t).trim()) ? t : ''; } catch (e) { return ''; }
+    }
     function _wbHasFactura() {
-      try { var g = getGuestGuide(); var t = _wbT(g.facturaNotas, g); return !!(t && String(t).trim()); } catch (e) { return false; }
+      return !!String(_wbFacturaText() || '').trim();
     }
     function _wbLinkify(s) {
       var esc = _wbEsc(String(s == null ? '' : s));
@@ -4941,7 +4954,7 @@
         return hcon || _wbText(null, g);
       }
       if (key === 'factura') {
-        var tf = _wbT(g.facturaNotas, g);
+        var tf = _wbFacturaText();
         if (!tf || !String(tf).trim()) return _wbText(null, g);
         var hf = _wbCard('<div class="wb-body">🧾 ' + _wbLinkify(tf) + '</div>');
         var furl = _wbFirstUrl(tf);
@@ -5148,7 +5161,7 @@
       ['servicios','Servicios e información','A/C, TV, electrodomésticos, amenidades'],
       ['informacion','Información general','Recepción, horarios, servicios del hotel'],
       ['contactoNotas','Contacto — notas','Texto opcional (WhatsApp/tel/email se toman de Hotel Info)'],
-      ['facturaNotas','🧾 Factura (Solicitar Factura)','Pega tu mensaje y el enlace para solicitar factura. El enlace se vuelve un botón. Si lo dejas vacío, el apartado no aparece en el book.']
+      ['facturaNotas','🧾 Factura — mensaje general (opcional)','Mensaje por defecto de factura para TODOS los huéspedes. Lo personalizado por reserva (en la ficha del huésped) tiene prioridad. Si ambos están vacíos, el apartado no aparece.']
     ];
     var WB_LIST_CATS = [ ['restaurantes','🍽️ Restaurantes'], ['bares','🍸 Bares y Clubs'], ['compras','🛍️ Compras'], ['actividades','🎯 Actividades'] ];
 
@@ -12635,6 +12648,15 @@
         wbSec += '<button onclick="closeModal();setTimeout(function(){showWelcomeBookQR(\'' + resId + '\')},300)" style="background:var(--surface2);border:1px solid var(--surface3);border-radius:8px;padding:8px 6px;font-size:11px;cursor:pointer;color:var(--text);text-align:center;">\uD83D\uDCF1 QR</button>';
         wbSec += '</div></div>';
         document.getElementById('reservaModalContent').insertAdjacentHTML('beforeend', wbSec);
+
+        // Factura personalizada por hu\u00e9sped (se guarda en la reserva y aparece en SU book)
+        var _facTxt = (typeof _resFacturaMsg === 'function') ? _resFacturaMsg(res) : '';
+        var facSec = '<div style="background:var(--surface3);padding:12px;border-radius:var(--radius);margin-bottom:12px;">';
+        facSec += '<div style="font-size:12px;color:var(--text2);margin-bottom:6px;">\uD83E\uDDFE FACTURA (para el book de este hu\u00e9sped)</div>';
+        facSec += '<textarea id="facInput_' + resId + '" placeholder="Pega el mensaje y el enlace para que ESTE hu\u00e9sped solicite su factura. Si lo dejas vac\u00edo, no aparece en su book." style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--surface3);border-radius:8px;padding:10px;font-size:12px;color:var(--text);min-height:70px;resize:vertical;margin-bottom:8px;font-family:inherit;">' + _wbEsc(_facTxt) + '</textarea>';
+        facSec += '<button onclick="saveResFactura(\'' + resId + '\')" style="width:100%;background:var(--accent);color:var(--bg);border:none;border-radius:8px;padding:9px;font-size:12px;font-weight:700;cursor:pointer;">\uD83D\uDCBE Guardar factura del hu\u00e9sped</button>';
+        facSec += '</div>';
+        document.getElementById('reservaModalContent').insertAdjacentHTML('beforeend', facSec);
       }
 
       // Desayunos en la ficha: solo avisar al restaurante (gestión en Huéspedes, pestaña Desayunos y book)
@@ -13312,7 +13334,7 @@
 
     function getNotasWithoutIVA(notas) {
       if (!notas) return '';
-      return notas.replace(/\s*\|\s*\[IVA:\{.*?\}\]/, '').replace(/\[IVA:\{.*?\}\]/, '').trim();
+      return notas.replace(/\s*\|\s*\[IVA:\{.*?\}\]/, '').replace(/\[IVA:\{.*?\}\]/, '').replace(/\s*\|\s*\[FACT:[^\]]*\]/g, '').replace(/\[FACT:[^\]]*\]/g, '').replace(/\s*\|\s*\[GRUPO:[^\]]*\]/g, '').replace(/\[GRUPO:[^\]]*\]/g, '').trim();
     }
 
     function toggleNewResIVA() {
@@ -16731,6 +16753,34 @@
         else await sheets.multi([{ type: 'append', sheet: '⚙️ Config', values: ['breakfastPromo', jsonVal] }]);
         try { if (typeof _sheetConfigCache !== 'undefined') _sheetConfigCache['breakfastPromo'] = jsonVal; } catch (e) {}
       } catch (e) {}
+    }
+
+    // ============ FACTURA POR HUÉSPED (mensaje/enlace guardado en la reserva) ============
+    function _resFacturaMsg(res) {
+      try {
+        var m = String((res && res.notas) || '').match(/\[FACT:([^\]]*)\]/);
+        if (!m) return '';
+        try { return decodeURIComponent(escape(atob(m[1]))); } catch (e) { try { return atob(m[1]); } catch (e2) { return ''; } }
+      } catch (e) { return ''; }
+    }
+    async function saveResFactura(resId) {
+      var res = S.reservas.find(function (r) { return r.id === resId; });
+      if (!res) { toast('Reserva no encontrada', true); return; }
+      var el = document.getElementById('facInput_' + resId);
+      var txt = el ? (el.value || '').trim() : '';
+      var base = String(res.notas || '').replace(/\s*\|\s*\[FACT:[^\]]*\]/g, '').replace(/\[FACT:[^\]]*\]/g, '').trim();
+      var newNotas = base;
+      if (txt) {
+        var b64 = '';
+        try { b64 = btoa(unescape(encodeURIComponent(txt))); } catch (e) { b64 = btoa(txt); }
+        newNotas = (base ? base + ' | ' : '') + '[FACT:' + b64 + ']';
+      }
+      await busy(async function () {
+        var resRow = [res.id, res.habitacionNum, res.huesped, res.telefono, res.email, res.fechaEntrada, res.fechaSalida, res.adultos, res.niños, res.tarifa, res.tarifaTotal, res.estado, newNotas, res.creadoPor, res.fechaCreacion];
+        await sheets.multi([{ type: 'updateById', sheet: '📋 Reservas', id: res.id, values: resRow }]);
+        res.notas = newNotas;
+        toast(txt ? '🧾 Factura guardada para ' + res.huesped : 'Factura eliminada');
+      }, 'Guardando factura...');
     }
     async function generarDesayunosReserva(resId) {
       var res = S.reservas.find(function(r) { return r.id === resId; });
