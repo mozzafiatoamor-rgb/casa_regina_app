@@ -1999,6 +1999,21 @@
     .room-card.status-limpieza .status-badge { color:#a06cd5; }
     .room-clean-done { margin-top:6px; width:100%; background:#2e9e6b; color:#fff; border:none; border-radius:8px; padding:9px; font-size:12px; font-weight:700; cursor:pointer; -webkit-tap-highlight-color:transparent; transition:transform .12s; }
     .room-clean-done:active { transform:scale(.97); }
+
+/* ===== Alerta de Reservas Online (dashboard) ===== */
+.onres-alert{background:linear-gradient(135deg,#b8862b,#8a5a1a);border:2px solid #ffd36b;border-radius:14px;padding:12px 14px;margin-bottom:16px;box-shadow:0 6px 22px rgba(184,134,43,.45);animation:onresPulse 1.7s ease-in-out infinite;}
+.onres-head{display:flex;align-items:center;gap:8px;color:#fff;font-size:14px;font-weight:800;margin-bottom:10px;text-shadow:0 1px 2px rgba(0,0,0,.3);}
+.onres-bell{display:inline-block;font-size:19px;animation:onresBell 1.3s ease-in-out infinite;transform-origin:50% 10%;}
+.onres-item{display:flex;align-items:center;justify-content:space-between;gap:10px;background:rgba(255,255,255,.15);border-radius:10px;padding:9px 11px;margin-bottom:7px;}
+.onres-item:last-child{margin-bottom:0;}
+.onres-name{color:#fff;font-size:13.5px;font-weight:700;}
+.onres-meta{color:rgba(255,255,255,.88);font-size:11.5px;margin-top:2px;}
+.onres-btn{flex:0 0 auto;background:#fff;color:#8a5a1a;border:none;border-radius:20px;padding:8px 14px;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap;}
+.onres-btn:active{transform:scale(.96);}
+.onres-flash{animation:onresFlash .4s ease-in-out 3;}
+@keyframes onresPulse{0%,100%{box-shadow:0 6px 22px rgba(184,134,43,.4);}50%{box-shadow:0 8px 34px rgba(255,211,107,.8);}}
+@keyframes onresBell{0%,60%,100%{transform:rotate(0);}10%{transform:rotate(16deg);}20%{transform:rotate(-14deg);}30%{transform:rotate(10deg);}40%{transform:rotate(-6deg);}50%{transform:rotate(3deg);}}
+@keyframes onresFlash{0%,100%{filter:none;}50%{filter:brightness(1.7);}}
   </style>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2108,6 +2123,7 @@
               <div class="user-greeting" id="userGreeting"></div>
               <div class="user-role" id="userRoleText"></div>
             </div>
+            <div id="onlineResAlert" style="display:none;"></div>
 
             <!-- Quick Availability Panel -->
             <div style="background:var(--surface2);border-radius:var(--radius);padding:14px;margin-bottom:16px;border:1px solid var(--surface3)">
@@ -3236,7 +3252,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-08-25c';
+    var APP_BUILD = '2026-08-25d';
     var _bfPromoRowCount = 0;
     var CONFIG_KEYS = ['hotelInfo', 'hotelTerms', 'dailyRoutine', 'msgTemplates', 'emergencyContacts', 'breakfastPromo', 'guestGuide'];
 
@@ -7155,6 +7171,7 @@
         document.getElementById('dashboardBookingCard').innerHTML = bkCard;
       }
 
+      try { if (typeof _renderOnlineResAlert === 'function') _renderOnlineResAlert(); } catch (e) {}
       // Init availability panel
       initDashAvail();
     }
@@ -16765,6 +16782,59 @@
         else await sheets.multi([{ type: 'append', sheet: '⚙️ Config', values: ['breakfastPromo', jsonVal] }]);
         try { if (typeof _sheetConfigCache !== 'undefined') _sheetConfigCache['breakfastPromo'] = jsonVal; } catch (e) {}
       } catch (e) {}
+    }
+
+    // ============ ALERTA DE RESERVAS ONLINE SIN CONFIRMAR ============
+    function _onlineResPending() {
+      return (S.reservas || []).filter(function (r) { return String(r.creadoPor) === 'Web' && r.estado === 'Reservada'; })
+        .sort(function (a, b) { return String(b.id).localeCompare(String(a.id)); });
+    }
+    function _renderOnlineResAlert() {
+      var el = document.getElementById('onlineResAlert');
+      if (!el) return;
+      if (!S.user || (S.user.rol !== 'admin' && S.user.rol !== 'recepcion')) { el.innerHTML = ''; el.style.display = 'none'; return; }
+      var list = _onlineResPending();
+      if (!list.length) { el.innerHTML = ''; el.style.display = 'none'; return; }
+      var rows = list.map(function (r) {
+        var fechas = r.fechaEntrada ? (formatDate(r.fechaEntrada) + ' → ' + formatDate(r.fechaSalida)) : '';
+        var monto = 0; try { monto = _fmt(r.tarifaTotal || 0); } catch (e) { monto = r.tarifaTotal || 0; }
+        return '<div class="onres-item">'
+          + '<div class="onres-info"><div class="onres-name">👤 ' + _wbEsc(r.huesped || '') + '</div>'
+          + '<div class="onres-meta">Hab. ' + _wbEsc(r.habitacionNum || '') + ' · ' + _wbEsc(fechas) + ' · $' + monto + '</div></div>'
+          + '<button class="onres-btn" onclick="openReservaModal(\'' + r.id + '\')">Ver / Confirmar</button>'
+          + '</div>';
+      }).join('');
+      var head = '<div class="onres-head"><span class="onres-bell">🔔</span> <span>' + list.length + ' reserva' + (list.length > 1 ? 's' : '') + ' online sin confirmar</span></div>';
+      el.innerHTML = '<div class="onres-alert">' + head + rows + '</div>';
+      el.style.display = '';
+      // Detectar NUEVAS (no vistas antes) para sonar/vibrar una sola vez
+      try {
+        var seen = []; try { seen = JSON.parse(localStorage.getItem('_seenOnlineRes') || '[]'); } catch (e) {}
+        var ids = list.map(function (r) { return r.id; });
+        var hasNew = ids.some(function (id) { return seen.indexOf(id) === -1; });
+        localStorage.setItem('_seenOnlineRes', JSON.stringify(ids));
+        if (hasNew) _pingOnlineRes(el);
+      } catch (e) {}
+    }
+    function _pingOnlineRes(el) {
+      try { if (navigator.vibrate) navigator.vibrate([130, 60, 130]); } catch (e) {}
+      try {
+        var Ctx = window.AudioContext || window.webkitAudioContext;
+        if (Ctx) {
+          var ctx = new Ctx();
+          [0, 0.2].forEach(function (t) {
+            var o = ctx.createOscillator(), g = ctx.createGain();
+            o.type = 'sine'; o.frequency.value = 880;
+            o.connect(g); g.connect(ctx.destination);
+            g.gain.setValueAtTime(0.0001, ctx.currentTime + t);
+            g.gain.exponentialRampToValueAtTime(0.28, ctx.currentTime + t + 0.02);
+            g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + t + 0.18);
+            o.start(ctx.currentTime + t); o.stop(ctx.currentTime + t + 0.2);
+          });
+          setTimeout(function () { try { ctx.close(); } catch (e) {} }, 700);
+        }
+      } catch (e) {}
+      try { var a = el && el.querySelector('.onres-alert'); if (a) { a.classList.add('onres-flash'); setTimeout(function () { a.classList.remove('onres-flash'); }, 1600); } } catch (e) {}
     }
 
     // ============ FACTURA POR HUÉSPED (mensaje/enlace guardado en la reserva) ============
