@@ -3252,7 +3252,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-08-25d';
+    var APP_BUILD = '2026-08-25e';
     var _bfPromoRowCount = 0;
     var CONFIG_KEYS = ['hotelInfo', 'hotelTerms', 'dailyRoutine', 'msgTemplates', 'emergencyContacts', 'breakfastPromo', 'guestGuide'];
 
@@ -13312,6 +13312,9 @@
         toast('El monto ($' + monto.toFixed(2) + ') excede el saldo pendiente ($' + currentBalance.toFixed(2) + ')', true);
         return;
       }
+      if (window._cobroBusy) return;
+      window._cobroBusy = true;
+      try { var _spBtn = document.querySelector('#paymentModal [type="submit"], #paymentModal .form-button'); if (_spBtn) { _spBtn.disabled = true; _spBtn.style.opacity = '0.6'; } } catch (e) {}
       await busy(async () => {
         var id = nextId('PAY', S.cobros);
         var n = now();
@@ -13331,6 +13334,7 @@
         closeModal();
         render();
       }, 'Registrando pago...');
+      window._cobroBusy = false;
     }
 
     // ============ NEW RESERVA MODAL ============
@@ -18431,15 +18435,20 @@
         newCobros.push({ id: payId, reservaId: r.id, fecha: fecha, hora: hora, monto: aplica, metodoPago: metodo, concepto: concepto, notas: 'Grupo ' + groupId, responsable: (S.user && S.user.usuario) || '' });
       }
       if (!newCobros.length) { toast('No hay saldos por cobrar', false); return; }
+      if (window._cobroBusy) return;   // evita doble registro por doble toque
+      window._cobroBusy = true;
+      try { var _gpBtn = document.querySelector('#taskDetailActions .form-button'); if (_gpBtn) { _gpBtn.disabled = true; _gpBtn.style.opacity = '0.6'; } } catch (e) {}
       ops.push({ type: 'append', sheet: '📜 Bitácora', values: [fecha, hora, (S.user && S.user.usuario) || '', 'Pago de grupo', '$' + _fmt(monto) + ' ' + metodo + ' (' + groupId + ')', 'info'] });
-      await busy(async function () {
-        await sheets.multi(ops);
-        S.cobros = S.cobros.concat(newCobros);
-        toast('✅ Pago de grupo registrado: $' + _fmt(monto));
-        closeModal();
-        render();
-        setTimeout(function () { openGroupSummary(groupId); }, 250);
-      }, 'Registrando pago de grupo…');
+      try {
+        await busy(async function () {
+          await sheets.multi(ops);
+          S.cobros = S.cobros.concat(newCobros);
+          toast('✅ Pago de grupo registrado: $' + _fmt(monto));
+          closeModal();
+          render();
+          setTimeout(function () { openGroupSummary(groupId); }, 250);
+        }, 'Registrando pago de grupo…');
+      } finally { window._cobroBusy = false; }
     }
     function _resGroupBannerHTML(res) {
       var gid = _resGroupId(res);
