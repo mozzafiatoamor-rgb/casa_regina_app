@@ -3256,7 +3256,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-08-25g';
+    var APP_BUILD = '2026-08-25h';
     var _bfPromoRowCount = 0;
     var CONFIG_KEYS = ['hotelInfo', 'hotelTerms', 'dailyRoutine', 'msgTemplates', 'emergencyContacts', 'breakfastPromo', 'guestGuide'];
 
@@ -3906,6 +3906,7 @@
       facturaNotas: { es: '', en: '', fr: '', it: '', de: '' },
       accesoInstr:  { es: 'Tu código personal de acceso aparece abajo. Ingrésalo en el teclado de la cerradura principal seguido de la tecla de confirmación.', en: 'Your personal access code is shown below. Enter it on the main lock keypad followed by the confirm key.', fr: '', it: '', de: '' },
       introMsg:     { es: 'Esta es tu guía digital: todo lo que necesitas para tu estancia en un solo lugar. Aquí tienes tu código de acceso, la red WiFi, tu desayuno, recomendaciones de la zona y los horarios de recepción. Toca cualquier sección para ver los detalles. ¡Disfruta tu estancia!', en: "This is your digital guide: everything you need for your stay in one place. Here you'll find your access code, the WiFi network, your breakfast, local recommendations and reception hours. Tap any section to see the details. Enjoy your stay!", fr: '', it: '', de: '' },
+      bookMsg:      '¡Hola {nombre}! 🏨\n\nAquí tienes tu guía digital de *{hotel}* con todo lo que necesitas para tu estancia: acceso, WiFi, desayuno, recomendaciones locales y contactos.\n\n{link}\n\n¡Te esperamos! 🌟',
       heroPhoto:    'https://raw.githubusercontent.com/mozzafiatoamor-rgb/casa_regina_app/main/assets/portada.jpg',
       photos:       { welcome: 'https://raw.githubusercontent.com/mozzafiatoamor-rgb/casa_regina_app/main/assets/bienvenida.jpg', ubicacion: '', servicios: 'https://raw.githubusercontent.com/mozzafiatoamor-rgb/casa_regina_app/main/assets/servicios.jpg', pagos: 'https://raw.githubusercontent.com/mozzafiatoamor-rgb/casa_regina_app/main/assets/transferencias.jpg' },
       roomPhotos:   { 'Doble Matrimonial': 'https://raw.githubusercontent.com/mozzafiatoamor-rgb/casa_regina_app/main/assets/habitacion-doble-matrimonial.jpg', 'Queen Size': 'https://raw.githubusercontent.com/mozzafiatoamor-rgb/casa_regina_app/main/assets/habitacion-queen-size.jpg' },
@@ -5107,13 +5108,22 @@
       if (ph.length === 10) ph = '52' + ph;
       return ph;
     }
+    // Plantilla editable del mensaje del book ({nombre}, {hotel}, {link})
+    function _wbBookMsg(nombre, link) {
+      var g = getGuestGuide();
+      var hi = getHotelInfo();
+      var tpl = (g && g.bookMsg && String(g.bookMsg).trim()) ? g.bookMsg : DEFAULT_GUEST_GUIDE.bookMsg;
+      var t = String(tpl).replace(/\{nombre\}/g, nombre || '').replace(/\{hotel\}/g, hi.nombre || HOTEL_NAME);
+      if (t.indexOf('{link}') !== -1) t = t.replace(/\{link\}/g, link || '');
+      else t = t + '\n\n' + (link || '');
+      return t;
+    }
     function sendGuestBookWhatsApp(resId, regId) {
       var res = (S.reservas || []).find(function(r) { return r.id === resId; }); if (!res) return;
       var reg = (S.registros || []).find(function(x) { return x.regId === regId; });
       var nombre = (reg && reg.nombre) ? reg.nombre : res.huesped;
       var link = getGuestBookLink(resId, regId);
-      var hi = getHotelInfo();
-      var text = '¡Hola ' + nombre + '! 🏨\n\nAquí tienes tu guía digital personal de *' + (hi.nombre || HOTEL_NAME) + '*: acceso, WiFi, desayuno, recomendaciones y contactos.\n\n' + link + '\n\n¡Te esperamos! 🌟';
+      var text = _wbBookMsg(nombre, link);
       var phone = _guestPhoneDigits(reg, res);
       if (!phone) { toast('Este huésped no tiene celular registrado', true); return; }
       window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(text), '_blank');
@@ -5127,8 +5137,7 @@
       var res = (S.reservas || []).find(function(r) { return r.id === resId; });
       if (!res) return;
       var link = getWelcomeBookLink(resId);
-      var hi = getHotelInfo();
-      var text = '¡Hola ' + res.huesped + '! 🏨\n\nAquí tienes tu guía digital de *' + (hi.nombre || HOTEL_NAME) + '* con todo lo que necesitas para tu estancia: acceso, WiFi, desayuno, recomendaciones locales y contactos.\n\n' + link + '\n\n¡Te esperamos! 🌟';
+      var text = _wbBookMsg(res.huesped, link);
       var phone = (typeof getGuestPhone === 'function' ? getGuestPhone(res) : (res.telefono || '')).replace(/[^0-9]/g, '');
       if (phone.length === 10) phone = '52' + phone;
       window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(text), '_blank');
@@ -5300,6 +5309,13 @@
 
       // mapLink (no depende de idioma)
       h += _wbCfgField('mapLink', 'Enlace de Google Maps', 'https://maps.google.com/…', (g.mapLink || ''), false);
+
+      // Mensaje de WhatsApp del book (editable, con variables)
+      h += '<div style="margin-bottom:16px;background:rgba(139,170,106,.08);border:1px solid var(--accent);border-radius:var(--radius);padding:12px;">';
+      h += '<div style="font-size:13px;font-weight:700;margin-bottom:4px;">💬 Mensaje del book (WhatsApp)</div>';
+      h += '<div style="font-size:11px;color:var(--text2);margin-bottom:8px;">El texto que se envía al huésped con su enlace. Variables: <b>{nombre}</b>, <b>{hotel}</b>, <b>{link}</b> (si no pones {link}, el enlace se agrega al final).</div>';
+      h += '<textarea onchange="wbCfgSetPlain(\'bookMsg\',this.value)" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--surface3);border-radius:6px;padding:8px;font-size:12px;color:var(--text);min-height:110px;resize:vertical;font-family:inherit;">' + _wbEsc(g.bookMsg || DEFAULT_GUEST_GUIDE.bookMsg) + '</textarea>';
+      h += '</div>';
 
       // Campos de texto por idioma
       WB_TEXT_FIELDS.forEach(function(f) {
