@@ -2170,6 +2170,10 @@
                 <div class="action-btn-icon">📨</div>
                 <div>Mensajes</div>
               </button>
+              <button class="action-btn" onclick="openPreciosModal()">
+                <div class="action-btn-icon">💲</div>
+                <div>Precios</div>
+              </button>
             </div>
 
             <div id="receptionTasksSection"></div>
@@ -2448,7 +2452,7 @@
           <div style="display:flex;align-items:center;gap:10px;padding:12px;background:var(--surface2);border-radius:var(--radius);margin-bottom:10px;">
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;flex:1;">
               <input type="checkbox" id="newResFactura" onchange="toggleNewResIVA()" style="accent-color:var(--accent);width:18px;height:18px;" />
-              <div><div style="font-size:13px;font-weight:600;">🧾 ¿Requiere factura?</div><div style="font-size:11px;color:var(--text2);">Agrega IVA 16% + ISH 3% al total</div></div>
+              <div><div style="font-size:13px;font-weight:600;">🧾 ¿Requiere factura?</div><div style="font-size:11px;color:var(--text2);">Agrega IVA 16% + ISH 5% al total</div></div>
             </label>
           </div>
           <div id="newResFacturaFields" style="display:none;">
@@ -2655,7 +2659,7 @@
         <div id="payFacturaRow" style="display:flex;align-items:center;gap:10px;margin:10px 0 14px;padding:12px;background:var(--surface2);border-radius:var(--radius);">
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;flex:1;">
             <input type="checkbox" id="payFactura" onchange="togglePayIVA()" style="accent-color:var(--accent);width:18px;height:18px;" />
-            <div><div style="font-size:13px;font-weight:600;">¿Requiere factura?</div><div style="font-size:11px;color:var(--text2);">Agrega IVA 16% + ISH 3% al monto</div></div>
+            <div><div style="font-size:13px;font-weight:600;">¿Requiere factura?</div><div style="font-size:11px;color:var(--text2);">Agrega IVA 16% + ISH 5% al monto</div></div>
           </label>
           <div id="payIVAInfo" style="font-size:12px;font-weight:700;color:var(--accent);display:none;"></div>
         </div>
@@ -3252,7 +3256,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-08-25e';
+    var APP_BUILD = '2026-08-25f';
     var _bfPromoRowCount = 0;
     var CONFIG_KEYS = ['hotelInfo', 'hotelTerms', 'dailyRoutine', 'msgTemplates', 'emergencyContacts', 'breakfastPromo', 'guestGuide'];
 
@@ -5852,15 +5856,7 @@
         '<h2 style="text-align:center;margin-bottom:4px;">🍳 Validar Desayuno</h2>' +
         (promoName ? '<p style="text-align:center;color:var(--text-secondary);margin-bottom:8px;font-size:14px;">' + promoName + '</p>' : '') +
         (promoDesc ? '<div style="text-align:center;margin-bottom:20px;padding:8px 12px;background:rgba(46,125,50,0.08);border-radius:8px;border-left:3px solid #2e7d32;font-size:13px;color:#2e7d32;line-height:1.4;">🍽️ ' + promoDesc + '</div>' : '') +
-        '<div id="validarForm">' +
-          '<label style="display:block;margin-bottom:6px;font-weight:600;">Código de desayuno</label>' +
-          '<input type="text" id="validarCode" placeholder="DES-XXXX" maxlength="8" ' +
-            'style="width:100%;padding:14px;font-size:20px;text-align:center;text-transform:uppercase;border:2px solid var(--border);border-radius:12px;font-family:monospace;letter-spacing:4px;" ' +
-            'oninput="this.value=this.value.toUpperCase()">' +
-          '<button onclick="validarDesayunoCode()" ' +
-            'style="width:100%;margin-top:16px;padding:14px;background:var(--primary);color:white;border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;">' +
-            'Validar Código</button>' +
-        '</div>' +
+        '<div style="text-align:center;color:#6c757d;font-size:13px;margin-bottom:8px;">Marca a cada huésped cuando llegue a desayunar. La lista de autorizados aparece abajo.</div>' +
         '<div id="validarResult" style="margin-top:20px;"></div>' +
         '<div id="validarRoster" style="margin-top:24px;"></div>' +
         '<div id="validarHistory" style="margin-top:30px;"></div>';
@@ -5869,17 +5865,7 @@
       try { _renderValidarRoster(); } catch (e) {}
       // Auto-fill from QR code link (?validar&code=DES-XXXX)
       var urlCode = new URLSearchParams(window.location.search).get('code');
-      if (urlCode) {
-        document.getElementById('validarCode').value = urlCode.toUpperCase();
-        setTimeout(function() { validarDesayunoCode(); }, 300);
-      } else {
-        setTimeout(function() { document.getElementById('validarCode').focus(); }, 100);
-      }
-
-      // Enter key support
-      document.getElementById('validarCode').addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') validarDesayunoCode();
-      });
+      if (urlCode) { setTimeout(function() { try { validarDesayunoCode(urlCode.toUpperCase()); } catch (e) {} }, 300); }
     }
 
     function _isRestaurantPinAuthed() {
@@ -5893,8 +5879,9 @@
       localStorage.setItem('_bfPinAuth', JSON.stringify({ ts: Date.now() }));
     }
 
-    async function validarDesayunoCode() {
-      var code = (document.getElementById('validarCode').value || '').trim().toUpperCase();
+    async function validarDesayunoCode(codeArg) {
+      var _vcEl = document.getElementById('validarCode');
+      var code = (codeArg || (_vcEl ? _vcEl.value : '') || '').trim().toUpperCase();
       var resultDiv = document.getElementById('validarResult');
       if (!code) { resultDiv.innerHTML = '<p style="color:#dc3545;text-align:center;">Ingresa un código</p>'; return; }
 
@@ -6137,8 +6124,7 @@
         resultDiv.innerHTML = '<p style="color:#dc3545;text-align:center;">Error: ' + err.message + '</p>';
       }
 
-      document.getElementById('validarCode').value = '';
-      document.getElementById('validarCode').focus();
+      if (_vcEl) { _vcEl.value = ''; }
     }
 
     // Store PIN temporarily and re-validate the same code
@@ -7822,7 +7808,9 @@
     var _cotizacionData = null;
     var _cotizacionCounter = parseInt(localStorage.getItem('cotizacionCounter') || '0');
     var _facturaCounter = parseInt(localStorage.getItem('facturaCounter') || '0');
-    var ISH_RATE = 0.03; // Impuesto Sobre Hospedaje 3%
+    var ISH_RATE = 0.05; // Impuesto Sobre Hospedaje 5%
+    var PAY_EPS = 0.99; // saldos menores a $1 se consideran liquidados (evita deuda de centavos)
+    function _snapBal(b){ b = Math.round((parseFloat(b)||0)*100)/100; return Math.abs(b) < PAY_EPS ? 0 : b; }
     var IVA_RATE = 0.16;
 
     function nextFacturaFolio() {
@@ -8113,7 +8101,7 @@
       h += '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface3);border-radius:var(--radius);">';
       h += '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;flex:1;">';
       h += '<input type="checkbox" id="cotIVA" onchange="calcCotizacion()" ' + (_cotizacionData && _cotizacionData.conIVA ? 'checked' : '') + ' style="accent-color:var(--accent);width:18px;height:18px;" />';
-      h += '<div><div style="font-size:13px;font-weight:600;">Incluir IVA 16% + ISH 3%</div><div style="font-size:11px;color:var(--text2);">Marcar si requiere factura</div></div>';
+      h += '<div><div style="font-size:13px;font-weight:600;">Incluir IVA 16% + ISH 5%</div><div style="font-size:11px;color:var(--text2);">Marcar si requiere factura</div></div>';
       h += '</label></div>';
 
       h += '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface3);border-radius:var(--radius);">';
@@ -8254,7 +8242,7 @@
       });
       if (conIVA) {
         p += '<div style="display:flex;justify-content:space-between;margin-bottom:4px;color:var(--text2);"><span>IVA (16%):</span><span>$' + _fmt(iva) + '</span></div>';
-        p += '<div style="display:flex;justify-content:space-between;margin-bottom:4px;color:var(--text2);"><span>ISH (3%):</span><span>$' + _fmt(ish) + '</span></div>';
+        p += '<div style="display:flex;justify-content:space-between;margin-bottom:4px;color:var(--text2);"><span>ISH (5%):</span><span>$' + _fmt(ish) + '</span></div>';
       }
       p += '<div style="display:flex;justify-content:space-between;font-weight:700;font-size:16px;margin-top:8px;padding-top:8px;border-top:2px solid var(--accent);">';
       p += '<span>TOTAL:</span><span style="color:var(--accent);">$' + _fmt(total) + '</span></div>';
@@ -8489,7 +8477,7 @@
       });
       if (d.conIVA) {
         addPricingRow('IVA (16%)', d.iva, false);
-        addPricingRow('ISH (3%)', d.ish, false);
+        addPricingRow('ISH (5%)', d.ish, false);
       }
 
       // Total
@@ -8668,7 +8656,7 @@
             msg += '  _+ ' + rl.personasExtra + ' pers. extra/hab. = $' + _fmt(rl.subtotalPE) + '_\n';
           }
         });
-        if (d.conIVA) msg += '\n🧾 IVA (16%): $' + _fmt(d.iva) + '\n🧾 ISH (3%): $' + _fmt(d.ish) + '\n';
+        if (d.conIVA) msg += '\n🧾 IVA (16%): $' + _fmt(d.iva) + '\n🧾 ISH (5%): $' + _fmt(d.ish) + '\n';
         msg += '\n✅ *Total: $' + _fmt(d.total) + ' MXN*\n';
         if (d.anticipo_pct > 0) msg += '\n💳 Anticipo (' + d.anticipo_pct + '%): *$' + _fmt(d.anticipoMonto) + '*\n';
         if (d.incluyeDesayuno && d.bfAhorroTotal > 0) {
@@ -9959,7 +9947,7 @@
         var _ishRec = _ivaRec.ish || 0;
         h+='<div class="receipt-row"><span class="receipt-label">Subtotal hospedaje</span><span class="receipt-value">$'+_ivaRec.subtotal.toLocaleString('es-MX')+'</span></div>';
         h+='<div class="receipt-row"><span class="receipt-label">IVA (16%)</span><span class="receipt-value">$'+_ivaRec.iva.toLocaleString('es-MX',{minimumFractionDigits:2})+'</span></div>';
-        h+='<div class="receipt-row"><span class="receipt-label">ISH (3%)</span><span class="receipt-value">$'+_ishRec.toLocaleString('es-MX',{minimumFractionDigits:2})+'</span></div>';
+        h+='<div class="receipt-row"><span class="receipt-label">ISH (5%)</span><span class="receipt-value">$'+_ishRec.toLocaleString('es-MX',{minimumFractionDigits:2})+'</span></div>';
         h+='<div class="receipt-row"><span class="receipt-label" style="font-weight:700">Total c/impuestos</span><span class="receipt-value" style="font-weight:700">$'+res.tarifaTotal.toLocaleString('es-MX',{minimumFractionDigits:2})+'</span></div>';
         h+='<div class="receipt-div"></div>';
         if(_ivaRec.folio) h+='<div class="receipt-row"><span class="receipt-label">Folio Factura</span><span class="receipt-value" style="font-weight:700">'+_ivaRec.folio+'</span></div>';
@@ -10022,7 +10010,7 @@
         var _ishRecWA = _ivaRecWA.ish || 0;
         text += '*Subtotal:* $' + _ivaRecWA.subtotal.toLocaleString('es-MX') + '\n';
         text += '*IVA (16%):* $' + _ivaRecWA.iva.toLocaleString('es-MX',{minimumFractionDigits:2}) + '\n';
-        text += '*ISH (3%):* $' + _ishRecWA.toLocaleString('es-MX',{minimumFractionDigits:2}) + '\n';
+        text += '*ISH (5%):* $' + _ishRecWA.toLocaleString('es-MX',{minimumFractionDigits:2}) + '\n';
         text += '*Total c/impuestos:* $' + res.tarifaTotal.toLocaleString('es-MX',{minimumFractionDigits:2}) + '\n';
         if (_ivaRecWA.folio) text += '🧾 Folio: ' + _ivaRecWA.folio + '\n';
         text += '🧾 RFC: ' + _ivaRecWA.rfc + (_ivaRecWA.razonSocial ? ' — ' + _ivaRecWA.razonSocial : '') + '\n';
@@ -10112,7 +10100,7 @@
           var _ishRecPdf = _ivaRecPdf.ish || 0;
           row('Subtotal hospedaje','$'+_ivaRecPdf.subtotal.toLocaleString('es-MX'));
           row('IVA (16%)','$'+_ivaRecPdf.iva.toLocaleString('es-MX',{minimumFractionDigits:2}));
-          row('ISH (3%)','$'+_ishRecPdf.toLocaleString('es-MX',{minimumFractionDigits:2}));
+          row('ISH (5%)','$'+_ishRecPdf.toLocaleString('es-MX',{minimumFractionDigits:2}));
           row('Total c/impuestos','$'+res.tarifaTotal.toLocaleString('es-MX',{minimumFractionDigits:2}),17,17,17,true);
           dash();
           if(_ivaRecPdf.folio) row('Folio factura',_ivaRecPdf.folio,100,140,80,true);
@@ -10248,7 +10236,7 @@
         var _ishConf = _ivaConf.ish || 0;
         h += '<div class="receipt-row"><span class="receipt-label">Subtotal (' + nights + ' noches)</span><span class="receipt-value">$' + _ivaConf.subtotal.toLocaleString('es-MX') + '</span></div>';
         h += '<div class="receipt-row"><span class="receipt-label">IVA (16%)</span><span class="receipt-value">$' + _ivaConf.iva.toLocaleString('es-MX',{minimumFractionDigits:2}) + '</span></div>';
-        h += '<div class="receipt-row"><span class="receipt-label">ISH (3%)</span><span class="receipt-value">$' + _ishConf.toLocaleString('es-MX',{minimumFractionDigits:2}) + '</span></div>';
+        h += '<div class="receipt-row"><span class="receipt-label">ISH (5%)</span><span class="receipt-value">$' + _ishConf.toLocaleString('es-MX',{minimumFractionDigits:2}) + '</span></div>';
         h += '<div class="receipt-row"><span class="receipt-label" style="font-weight:700">Total c/impuestos</span><span class="receipt-value" style="font-weight:700;font-size:15px">$' + res.tarifaTotal.toLocaleString('es-MX',{minimumFractionDigits:2}) + '</span></div>';
         h += '<div class="receipt-div"></div>';
         if (_ivaConf.folio) h += '<div class="receipt-row"><span class="receipt-label">Folio Factura</span><span class="receipt-value" style="font-weight:700">' + _ivaConf.folio + '</span></div>';
@@ -10342,7 +10330,7 @@
         var _ishWA = _ivaWA.ish || 0;
         t += '*Subtotal:* $' + _ivaWA.subtotal.toLocaleString('es-MX') + '\n';
         t += '*IVA (16%):* $' + _ivaWA.iva.toLocaleString('es-MX',{minimumFractionDigits:2}) + '\n';
-        t += '*ISH (3%):* $' + _ishWA.toLocaleString('es-MX',{minimumFractionDigits:2}) + '\n';
+        t += '*ISH (5%):* $' + _ishWA.toLocaleString('es-MX',{minimumFractionDigits:2}) + '\n';
         t += '*Total c/impuestos:* $' + res.tarifaTotal.toLocaleString('es-MX',{minimumFractionDigits:2}) + '\n';
         if (_ivaWA.folio) t += '🧾 Folio: ' + _ivaWA.folio + '\n';
         t += '🧾 RFC: ' + _ivaWA.rfc + (_ivaWA.razonSocial ? ' — ' + _ivaWA.razonSocial : '') + '\n';
@@ -10459,7 +10447,7 @@
           var _ishPdf = _ivaPdf.ish || 0;
           row('Subtotal ('+nights+' noches)','$'+_ivaPdf.subtotal.toLocaleString('es-MX'));
           row('IVA (16%)','$'+_ivaPdf.iva.toLocaleString('es-MX',{minimumFractionDigits:2}));
-          row('ISH (3%)','$'+_ishPdf.toLocaleString('es-MX',{minimumFractionDigits:2}));
+          row('ISH (5%)','$'+_ishPdf.toLocaleString('es-MX',{minimumFractionDigits:2}));
           row('Total c/impuestos','$'+res.tarifaTotal.toLocaleString('es-MX',{minimumFractionDigits:2}),17,17,17,true);
           dash();
           if(_ivaPdf.folio) row('Folio factura',_ivaPdf.folio,100,140,80,true);
@@ -12602,7 +12590,7 @@
                 var _ishVal = _iva.ish || 0;
                 return '<div style="font-size:11px;color:var(--text2);margin-bottom:2px">Subtotal: $' + _iva.subtotal.toLocaleString('es-MX') + '</div>' +
                   '<div style="font-size:11px;color:var(--text2);margin-bottom:2px">IVA (16%): $' + _iva.iva.toLocaleString('es-MX',{minimumFractionDigits:2}) + '</div>' +
-                  '<div style="font-size:11px;color:var(--text2);margin-bottom:2px">ISH (3%): $' + _ishVal.toLocaleString('es-MX',{minimumFractionDigits:2}) + '</div>' +
+                  '<div style="font-size:11px;color:var(--text2);margin-bottom:2px">ISH (5%): $' + _ishVal.toLocaleString('es-MX',{minimumFractionDigits:2}) + '</div>' +
                   '<div style="font-size:20px;font-weight:700;font-family:Space Mono,monospace;color:var(--accent)">$' + res.tarifaTotal.toLocaleString('es-MX',{minimumFractionDigits:2}) + '</div>' +
                   '<div style="font-size:11px;color:var(--text2);margin-top:4px">$' + res.tarifa + ' × ' + daysUntil(res.fechaEntrada, res.fechaSalida) + ' noches + impuestos</div>' +
                   '<div style="margin-top:6px;padding:6px 8px;background:rgba(139,170,106,0.1);border:1px solid var(--accent);border-radius:6px;font-size:11px">' +
@@ -13167,7 +13155,7 @@
       var res = S.reservas.find(r => r.id === resId);
       var payments = S.cobros.filter(c => c.reservaId === resId);
       var totalPaid = payments.reduce((s, c) => s + c.monto, 0);
-      var balance = res.tarifaTotal - totalPaid;
+      var balance = _snapBal(res.tarifaTotal - totalPaid);
 
       if (balance <= 0) {
         toast('Esta reserva ya está pagada completa', false);
@@ -13208,7 +13196,7 @@
         var _dsg = '<div style="background:var(--surface2);border-radius:var(--radius);padding:12px;margin-bottom:14px;border:1px solid var(--accent);">'
           + '<div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:8px;">\ud83e\uddfe FACTURA (folio ' + (_fd.folio || '') + ') — ya incluida en el total</div>'
           + '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;"><span style="color:var(--text2)">Subtotal</span><span style="font-family:Space Mono">$' + _fmt(_fd.subtotal||0) + '</span></div>'
-          + '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;"><span style="color:var(--text2)">ISH (3%)</span><span style="font-family:Space Mono">$' + _fmt(_fd.ish||0) + '</span></div>'
+          + '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;"><span style="color:var(--text2)">ISH (5%)</span><span style="font-family:Space Mono">$' + _fmt(_fd.ish||0) + '</span></div>'
           + '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;"><span style="color:var(--text2)">IVA (16%)</span><span style="font-family:Space Mono">$' + _fmt(_fd.iva||0) + '</span></div>'
           + '<div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;border-top:1px solid var(--surface3);padding-top:6px;margin-top:4px;"><span>Total</span><span style="font-family:Space Mono;color:var(--accent)">$' + _fmt(res.tarifaTotal) + '</span></div>'
           + '</div>';
@@ -13302,7 +13290,7 @@
 
       var res = S.reservas.find(r => r.id === resId);
       var existingPaid = S.cobros.filter(function(c){return c.reservaId===resId}).reduce(function(s,c){return s+c.monto},0);
-      var currentBalance = res.tarifaTotal - existingPaid;
+      var currentBalance = _snapBal(res.tarifaTotal - existingPaid);
       if (currentBalance <= 0) {
         toast('Esta reserva ya está pagada', false);
         closeModal();
@@ -13390,7 +13378,7 @@
       var iva = _tbI.iva;
       var ish = _tbI.ish;
       var total = _tbI.total;
-      infoEl.innerHTML = '🧾 Subtotal: <strong>$' + _fmt(subtotal) + '</strong><br>IVA (16%): <strong>$' + _fmt(iva) + '</strong> · ISH (3%): <strong>$' + _fmt(ish) + '</strong><br>Total: <strong>$' + _fmt(total) + '</strong>';
+      infoEl.innerHTML = '🧾 Subtotal: <strong>$' + _fmt(subtotal) + '</strong><br>IVA (16%): <strong>$' + _fmt(iva) + '</strong> · ISH (5%): <strong>$' + _fmt(ish) + '</strong><br>Total: <strong>$' + _fmt(total) + '</strong>';
     }
 
     function toggleNewResPayment() {
@@ -15490,7 +15478,7 @@
       if (res) {
         var payments = S.cobros.filter(c => c.reservaId === res.id);
         var totalPaid = payments.reduce((s, c) => s + c.monto, 0);
-        var balance = res.tarifaTotal - totalPaid;
+        var balance = _snapBal(res.tarifaTotal - totalPaid);
         if (balance > 0) {
           showCheckoutBlocked(res, balance, totalPaid, roomNum);
           return;
@@ -16708,7 +16696,7 @@
       }
     }
 
-    // Impuestos: primero ISH 3% sobre el subtotal, luego IVA 16% sobre (subtotal + ISH)
+    // Impuestos: primero ISH 5% sobre el subtotal, luego IVA 16% sobre (subtotal + ISH)
     function _taxBreak(subtotal, aplica) {
       subtotal = parseFloat(subtotal) || 0;
       if (!aplica) return { ish: 0, iva: 0, total: subtotal };
@@ -16786,6 +16774,38 @@
         else await sheets.multi([{ type: 'append', sheet: '⚙️ Config', values: ['breakfastPromo', jsonVal] }]);
         try { if (typeof _sheetConfigCache !== 'undefined') _sheetConfigCache['breakfastPromo'] = jsonVal; } catch (e) {}
       } catch (e) {}
+    }
+
+    // ============ PRECIOS ACTUALES (con y sin impuestos) — para recepción ============
+    function openPreciosModal() {
+      var seen = {}, rows = [];
+      (S.rooms || []).forEach(function (r) {
+        var key = r.tipo + '|' + r.tarifa;
+        if (seen[key]) return; seen[key] = 1;
+        rows.push({ tipo: r.tipo, tarifa: parseFloat(r.tarifa) || 0 });
+      });
+      rows.sort(function (a, b) { return a.tarifa - b.tarifa; });
+      var ishPct = Math.round((typeof ISH_RATE !== 'undefined' ? ISH_RATE : 0.05) * 100);
+      var ivaPct = Math.round((typeof IVA_RATE !== 'undefined' ? IVA_RATE : 0.16) * 100);
+      var h = '<div style="font-size:12px;color:var(--text2);margin-bottom:12px;">Precio por noche. El precio con impuestos aplica solo si el huésped pide factura (ISH ' + ishPct + '% + IVA ' + ivaPct + '% compuesto).</div>';
+      if (!rows.length) {
+        h += '<div style="color:var(--text2);text-align:center;padding:20px;">No hay habitaciones cargadas.</div>';
+      } else {
+        rows.forEach(function (r) {
+          var tb = _taxBreak(r.tarifa, true);
+          h += '<div style="background:var(--surface2);border-radius:12px;padding:12px 14px;margin-bottom:10px;">';
+          h += '<div style="font-weight:700;font-size:14px;margin-bottom:8px;">' + _wbEsc(r.tipo) + '</div>';
+          h += '<div style="display:flex;justify-content:space-between;font-size:14px;margin-bottom:6px;"><span>Sin impuestos</span><b style="font-family:Space Mono,monospace;">$' + _fmt(r.tarifa) + '</b></div>';
+          h += '<div style="display:flex;justify-content:space-between;font-size:11.5px;color:var(--text2);"><span>ISH (' + ishPct + '%)</span><span style="font-family:Space Mono,monospace;">$' + _fmt(tb.ish) + '</span></div>';
+          h += '<div style="display:flex;justify-content:space-between;font-size:11.5px;color:var(--text2);margin-bottom:6px;"><span>IVA (' + ivaPct + '%)</span><span style="font-family:Space Mono,monospace;">$' + _fmt(tb.iva) + '</span></div>';
+          h += '<div style="display:flex;justify-content:space-between;font-size:14px;font-weight:800;border-top:1px solid var(--surface3);padding-top:7px;"><span>Con impuestos</span><b style="font-family:Space Mono,monospace;color:var(--accent);">$' + _fmt(tb.total) + '</b></div>';
+          h += '</div>';
+        });
+      }
+      document.getElementById('taskDetailContent').innerHTML = h;
+      document.getElementById('taskDetailModal').querySelector('.modal-title').textContent = '💲 Precios actuales';
+      document.getElementById('taskDetailActions').innerHTML = '';
+      openModal('taskDetailModal');
     }
 
     // ============ ALERTA DE RESERVAS ONLINE SIN CONFIRMAR ============
@@ -18144,13 +18164,18 @@
     }
     function _resBalance(resId, tarifaTotal) {
       var paid = (S.cobros || []).filter(function (c) { return c.reservaId === resId; }).reduce(function (s, c) { return s + (parseFloat(c.monto) || 0); }, 0);
-      return { paid: paid, balance: (parseFloat(tarifaTotal) || 0) - paid };
+      paid = Math.round(paid * 100) / 100;
+      var bal = (parseFloat(tarifaTotal) || 0) - paid;
+      bal = (typeof _snapBal === 'function') ? _snapBal(bal) : Math.round(bal * 100) / 100;
+      return { paid: paid, balance: bal };
     }
     function _groupTotals(groupId) {
       var rs = _groupReservas(groupId);
       var total = 0, paid = 0;
       rs.forEach(function (r) { total += (parseFloat(r.tarifaTotal) || 0); paid += _resBalance(r.id, r.tarifaTotal).paid; });
-      return { total: total, paid: paid, balance: total - paid, count: rs.length, reservas: rs };
+      total = Math.round(total * 100) / 100; paid = Math.round(paid * 100) / 100;
+      var bal = (typeof _snapBal === 'function') ? _snapBal(total - paid) : Math.round((total - paid) * 100) / 100;
+      return { total: total, paid: paid, balance: bal, count: rs.length, reservas: rs };
     }
     // Desglose de impuestos combinado del grupo (suma de subtotales/ISH/IVA de las que llevan factura)
     function _groupTaxTotals(groupId) {
@@ -18169,7 +18194,7 @@
       var h = '<div style="background:var(--surface2);border-radius:8px;padding:10px;border:1px solid var(--accent);margin:8px 0;">';
       h += '<div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:6px;">🧾 Desglose de factura' + (folio ? ' · ' + folio : '') + '</div>';
       h += '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px;"><span style="color:var(--text2)">Subtotal</span><span style="font-family:Space Mono,monospace;">$' + _fmt(sub) + '</span></div>';
-      h += '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px;"><span style="color:var(--text2)">ISH (3%)</span><span style="font-family:Space Mono,monospace;">$' + _fmt(ish) + '</span></div>';
+      h += '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px;"><span style="color:var(--text2)">ISH (5%)</span><span style="font-family:Space Mono,monospace;">$' + _fmt(ish) + '</span></div>';
       h += '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px;"><span style="color:var(--text2)">IVA (16%)</span><span style="font-family:Space Mono,monospace;">$' + _fmt(iva) + '</span></div>';
       h += '<div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;border-top:1px solid var(--surface3);padding-top:5px;margin-top:4px;"><span>Total</span><span style="font-family:Space Mono,monospace;color:var(--accent)">$' + _fmt(total) + '</span></div>';
       h += '</div>';
@@ -18225,7 +18250,7 @@
       h += '</div>';
       h += '<div style="font-size:12px;font-weight:700;margin-bottom:6px;">Habitaciones</div>';
       h += '<div id="groupRoomsList"></div>';
-      // Factura por habitación: marca 🧾 en cada habitación que la requiera (ISH 3% + IVA 16% compuesto)
+      // Factura por habitación: marca 🧾 en cada habitación que la requiera (ISH 5% + IVA 16% compuesto)
       h += '<div style="font-size:11px;color:var(--text2);margin:10px 0 4px;">🧾 Marca la casilla de factura en cada habitación que la requiera.</div>';
       h += '<div id="grp_facturaFields" style="display:none;margin-bottom:6px;">';
       h += '<input id="grp_rfc" class="login-input" placeholder="RFC (para las que llevan factura)" style="text-transform:uppercase;margin-bottom:6px;">';
@@ -18538,7 +18563,7 @@
     function openAddFacturaModal(resId) {
       var res = S.reservas.find(function (r) { return r.id === resId; }); if (!res) return;
       var iva = (typeof parseIVAData === 'function') ? parseIVAData(res.notas) : null; var has = !!iva;
-      var h = '<div style="font-size:12px;color:var(--text2);margin-bottom:10px;">Impuestos combinados: ISH 3% y luego IVA 16% sobre (subtotal+ISH).</div>';
+      var h = '<div style="font-size:12px;color:var(--text2);margin-bottom:10px;">Impuestos combinados: ISH 5% y luego IVA 16% sobre (subtotal+ISH).</div>';
       h += '<div style="font-size:12px;margin-bottom:8px;">Subtotal: <b>$' + _fmt(_resSubtotal(res)) + '</b></div>';
       h += '<input id="af_rfc" class="login-input" placeholder="RFC" value="' + _wbEsc(has ? (iva.rfc || '') : '') + '" style="text-transform:uppercase;margin-bottom:8px;">';
       h += '<input id="af_razon" class="login-input" placeholder="Razón social" value="' + _wbEsc(has ? (iva.razonSocial || '') : '') + '">';
@@ -18596,7 +18621,7 @@
       window._grpFacturaPool = t.reservas;
       var anyIva = null;
       t.reservas.forEach(function (r) { var v = parseIVAData(r.notas); if (v && !anyIva) anyIva = v; });
-      var h = '<div style="font-size:12px;color:var(--text2);margin-bottom:10px;">Marca las habitaciones que llevan factura (ISH 3% + IVA 16% compuesto).</div>';
+      var h = '<div style="font-size:12px;color:var(--text2);margin-bottom:10px;">Marca las habitaciones que llevan factura (ISH 5% + IVA 16% compuesto).</div>';
       t.reservas.forEach(function (r, i) {
         var has = !!parseIVAData(r.notas);
         h += '<label style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--surface2);border-radius:8px;margin-bottom:6px;cursor:pointer;">';
