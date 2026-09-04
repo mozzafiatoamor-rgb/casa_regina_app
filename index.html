@@ -3256,7 +3256,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-08-25f';
+    var APP_BUILD = '2026-08-25g';
     var _bfPromoRowCount = 0;
     var CONFIG_KEYS = ['hotelInfo', 'hotelTerms', 'dailyRoutine', 'msgTemplates', 'emergencyContacts', 'breakfastPromo', 'guestGuide'];
 
@@ -3383,7 +3383,7 @@
       var totalPaid = payments.reduce(function(s, c) { return s + c.monto; }, 0);
       var balance = res.tarifaTotal - totalPaid;
       var aPct = getAnticipoPct();
-      var anticipoMin = Math.ceil(res.tarifaTotal * getAnticipoFraction());
+      var anticipoMin = Math.round(res.tarifaTotal * getAnticipoFraction() * 100) / 100;
 
       var infoPago = '';
       if (totalPaid > 0) {
@@ -6728,7 +6728,7 @@
       var _taskAPct = getAnticipoPct();
       S.reservas.filter(function(r){ return (r.estado === 'Confirmada' || r.estado === 'Reservada') && r.fechaEntrada >= today; }).forEach(function(r){
         var paid = S.cobros.filter(function(c){return c.reservaId===r.id}).reduce(function(s,c){return s+c.monto},0);
-        var minReq = Math.ceil(r.tarifaTotal * getAnticipoFraction());
+        var minReq = Math.round(r.tarifaTotal * getAnticipoFraction() * 100) / 100;
         if (paid < minReq) {
           var falta = minReq - paid;
           var isToday = r.fechaEntrada === today;
@@ -6974,7 +6974,7 @@
         var noDeposit = S.reservas.filter(function(r) { return r.fechaEntrada === today && (r.estado === 'Confirmada' || r.estado === 'Reservada'); });
         noDeposit.forEach(function(r) {
           var paid = S.cobros.filter(function(c){return c.reservaId===r.id}).reduce(function(s,c){return s+c.monto},0);
-          var minReq = Math.ceil(r.tarifaTotal * getAnticipoFraction());
+          var minReq = Math.round(r.tarifaTotal * getAnticipoFraction() * 100) / 100;
           if (paid < minReq) {
             var falta = minReq - paid;
             alertItems.push('<div class="item" style="border-left-color:var(--yellow);cursor:pointer" onclick="switchTab(\'cobros\')">' +
@@ -8198,7 +8198,7 @@
       var ish = _tbC.ish;
       var total = subtotal + iva + ish;
       var anticipo_pct = getAnticipoPct();
-      var anticipoMonto = anticipo_pct > 0 ? Math.ceil(total * getAnticipoFraction()) : 0;
+      var anticipoMonto = anticipo_pct > 0 ? Math.round(total * getAnticipoFraction() * 100) / 100 : 0;
 
       _cotizacionData = {
         nombre: nombre,
@@ -8815,7 +8815,7 @@
         nights: nights, totalHabs: totalHabs, roomLines: roomLines,
         peRate: peRate, grandSubtotalHab: grandSubtotalHab, grandSubtotalPE: grandSubtotalPE,
         subtotal: subtotal, conIVA: conIVA, iva: iva, ish: ish, total: total,
-        anticipo_pct: anticipo_pct, anticipoMonto: anticipo_pct > 0 ? Math.ceil(total * getAnticipoFraction()) : 0,
+        anticipo_pct: anticipo_pct, anticipoMonto: anticipo_pct > 0 ? Math.round(total * getAnticipoFraction() * 100) / 100 : 0,
         mostrarHorarios: cot.opciones.mostrarHorarios || false,
         incluyeDesayuno: cot.opciones.incluyeDesayuno || false,
         bfPartner: promo.partner, bfDescripcion: promo.descripcion || '', bfPrecio: bfPrecio, bfAhorroTotal: bfAhorroTotal,
@@ -10201,7 +10201,7 @@
       var payments = S.cobros.filter(function(c){return c.reservaId===resId});
       var totalPaid = payments.reduce(function(s,c){return s+c.monto},0);
       var _aPct = getAnticipoPct();
-      var anticipoMin = Math.ceil(res.tarifaTotal * getAnticipoFraction());
+      var anticipoMin = Math.round(res.tarifaTotal * getAnticipoFraction() * 100) / 100;
       var balance = res.tarifaTotal - totalPaid;
       var hi = getHotelInfo();
 
@@ -10311,7 +10311,7 @@
       var totalPaid = payments.reduce(function(s,c){return s+c.monto},0);
       var balance = res.tarifaTotal - totalPaid;
       var _aPct = getAnticipoPct();
-      var anticipoMin = Math.ceil(res.tarifaTotal * getAnticipoFraction());
+      var anticipoMin = Math.round(res.tarifaTotal * getAnticipoFraction() * 100) / 100;
       var hi = getHotelInfo();
 
       var t = '🏨 *' + hi.nombre + '*\n';
@@ -10377,7 +10377,7 @@
       var totalPaid = payments.reduce(function(s,c){return s+c.monto},0);
       var balance = res.tarifaTotal - totalPaid;
       var _aPct = getAnticipoPct();
-      var anticipoMin = Math.ceil(res.tarifaTotal * getAnticipoFraction());
+      var anticipoMin = Math.round(res.tarifaTotal * getAnticipoFraction() * 100) / 100;
 
       var pageW = 164;
       var { jsPDF } = window.jspdf;
@@ -13610,8 +13610,8 @@
         if (_aPctNew === 0) {
           _initEstado = 'Confirmada'; // No anticipo required → auto-confirm
         } else if (wantsPay && payMonto > 0) {
-          var _minReqNew = Math.ceil(total * getAnticipoFraction());
-          if (payMonto >= _minReqNew) _initEstado = 'Confirmada';
+          var _minReqNew = Math.round(total * getAnticipoFraction() * 100) / 100;
+          if (payMonto >= _minReqNew - PAY_EPS) _initEstado = 'Confirmada';
         }
         const row = [id, roomNum, huesped, tel, email, checkin, checkout, adultos, niños, tarifa, total, _initEstado, notas, S.user.usuario, n];
         const logRow = [fecha, hora, S.user.usuario, 'Nueva Reserva', huesped + ' en Hab. ' + roomNum + (wantsFactura ? ' (Factura)' : ''), 'info'];
@@ -13674,7 +13674,7 @@
     function showPostReservaConfirm(resId, huesped, roomNum, isToday) {
       var res = S.reservas.find(function(r){return r.id===resId});
       var _aPct = getAnticipoPct();
-      var anticipoMin = Math.ceil(res.tarifaTotal * getAnticipoFraction());
+      var anticipoMin = Math.round(res.tarifaTotal * getAnticipoFraction() * 100) / 100;
       var pmts = S.cobros.filter(function(c){return c.reservaId===resId});
       var totalPaid = pmts.reduce(function(s,c){return s + c.monto},0);
       var pctPaid = res.tarifaTotal > 0 ? Math.round((totalPaid / res.tarifaTotal) * 100) : 0;
@@ -14055,7 +14055,7 @@
         var pmts = S.cobros.filter(c => c.reservaId === res.id);
         var paid = pmts.reduce((s, c) => s + c.monto, 0);
         var _aPctCI = getAnticipoPct();
-        var minReq = _aPctCI > 0 ? Math.ceil(res.tarifaTotal * getAnticipoFraction()) : 0;
+        var minReq = _aPctCI > 0 ? Math.round(res.tarifaTotal * getAnticipoFraction() * 100) / 100 : 0;
         var pctPaid = res.tarifaTotal > 0 ? Math.round((paid / res.tarifaTotal) * 100) : 0;
         var payOk = _aPctCI > 0 ? paid >= minReq : true;
         const preview = `
@@ -14089,8 +14089,8 @@
       var payments = S.cobros.filter(c => c.reservaId === res.id);
       var totalPaid = payments.reduce((s, c) => s + c.monto, 0);
       if (_aPctExec > 0) {
-        var minRequired = Math.ceil(res.tarifaTotal * getAnticipoFraction());
-        if (totalPaid < minRequired) {
+        var minRequired = Math.round(res.tarifaTotal * getAnticipoFraction() * 100) / 100;
+        if (_snapBal(minRequired - totalPaid) > 0) {
           showCheckinBlocked(res, totalPaid, minRequired);
           return;
         }
@@ -14151,8 +14151,8 @@
         var _aPctCL = getAnticipoPct();
         if (_aPctCL > 0) {
           var _paidCL = S.cobros.filter(function(c){return c.reservaId===res.id}).reduce(function(s,c){return s+c.monto},0);
-          var _minCL = Math.ceil(res.tarifaTotal * getAnticipoFraction());
-          if (_paidCL >= _minCL) autoChecked[2] = true;
+          var _minCL = Math.round(res.tarifaTotal * getAnticipoFraction() * 100) / 100;
+          if (_paidCL >= _minCL - PAY_EPS) autoChecked[2] = true;
         } else {
           autoChecked[2] = true; // No anticipo required
         }
@@ -17898,8 +17898,9 @@
       var payments = (S.cobros || []).filter(function(c) { return c.reservaId === res.id; });
       var totalPaid = payments.reduce(function(s, c) { return s + c.monto; }, 0);
       if (aPct > 0) {
-        var minRequired = Math.ceil(res.tarifaTotal * getAnticipoFraction());
-        if (totalPaid < minRequired) { showCheckinBlocked(res, totalPaid, minRequired); return; }
+        var minRequired = Math.round(res.tarifaTotal * getAnticipoFraction() * 100) / 100;
+        var _defCI = (typeof _snapBal === 'function') ? _snapBal(minRequired - totalPaid) : (minRequired - totalPaid);
+        if (_defCI > 0) { showCheckinBlocked(res, totalPaid, minRequired); return; }
       }
       showProcessChecklist('checkin', res, room);
     }
