@@ -3256,7 +3256,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-08-25h';
+    var APP_BUILD = '2026-08-25i';
     var _bfPromoRowCount = 0;
     var CONFIG_KEYS = ['hotelInfo', 'hotelTerms', 'dailyRoutine', 'msgTemplates', 'emergencyContacts', 'breakfastPromo', 'guestGuide'];
 
@@ -12686,6 +12686,8 @@
         var _facTxt = (typeof _resFacturaMsg === 'function') ? _resFacturaMsg(res) : '';
         var facSec = '<div style="background:var(--surface3);padding:12px;border-radius:var(--radius);margin-bottom:12px;">';
         facSec += '<div style="font-size:12px;color:var(--text2);margin-bottom:6px;">\uD83E\uDDFE FACTURA (para el book de este hu\u00e9sped)</div>';
+        facSec += '<a href="https://mozzafiatoamor-rgb.github.io/facturacionReact_app/" target="_blank" rel="noopener" style="display:block;text-align:center;background:#5b9bd5;color:#fff;border-radius:8px;padding:9px;font-size:12px;font-weight:700;text-decoration:none;margin-bottom:8px;">\uD83E\uDDFE Generar link de factura</a>';
+        facSec += '<div style="font-size:10px;color:var(--text2);margin-bottom:6px;">Abre la app de facturaci\u00f3n, genera el enlace del hu\u00e9sped y p\u00e9galo aqu\u00ed abajo.</div>';
         facSec += '<textarea id="facInput_' + resId + '" placeholder="Pega el mensaje y el enlace para que ESTE hu\u00e9sped solicite su factura. Si lo dejas vac\u00edo, no aparece en su book." style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--surface3);border-radius:8px;padding:10px;font-size:12px;color:var(--text);min-height:70px;resize:vertical;margin-bottom:8px;font-family:inherit;">' + _wbEsc(_facTxt) + '</textarea>';
         facSec += '<button onclick="saveResFactura(\'' + resId + '\')" style="width:100%;background:var(--accent);color:var(--bg);border:none;border-radius:8px;padding:9px;font-size:12px;font-weight:700;cursor:pointer;">\uD83D\uDCBE Guardar factura del hu\u00e9sped</button>';
         facSec += '</div>';
