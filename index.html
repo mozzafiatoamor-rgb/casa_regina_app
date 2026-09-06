@@ -3256,7 +3256,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-08-25i';
+    var APP_BUILD = '2026-08-25j';
     var _bfPromoRowCount = 0;
     var CONFIG_KEYS = ['hotelInfo', 'hotelTerms', 'dailyRoutine', 'msgTemplates', 'emergencyContacts', 'breakfastPromo', 'guestGuide'];
 
@@ -4037,6 +4037,8 @@
       sub_desayuno: { es:'Tu desayuno de cortesía', en:'Your complimentary breakfast', fr:'Votre petit-déjeuner offert', it:'La tua colazione omaggio', de:'Ihr kostenloses Frühstück' },
       sub_recepcion:{ es:'Horarios y contacto', en:'Hours and contact', fr:'Horaires et contact', it:'Orari e contatto', de:'Zeiten und Kontakt' },
       sub_factura:  { es:'Aquí está el link e instrucciones para solicitar tu factura', en:'Here is the link and steps to request your invoice', fr:'Voici le lien et les étapes pour demander votre facture', it:'Qui trovi il link e le istruzioni per la fattura', de:'Hier finden Sie den Link und die Schritte für Ihre Rechnung' },
+      breakfastShowINE: { es:'Para desayunar en Mozzafiato solo muestra tu INE o identificación oficial con fotografía. El mesero te ubicará en la lista de huéspedes. ¡No necesitas ningún código!', en:'To have breakfast at Mozzafiato just show your official photo ID. The waiter will find you on the guest list. No code needed!', fr:'Pour le petit-déjeuner chez Mozzafiato, montrez simplement votre pièce d\'identité officielle avec photo. Le serveur vous trouvera sur la liste. Aucun code nécessaire !', it:'Per la colazione da Mozzafiato mostra solo un documento d\'identità ufficiale con foto. Il cameriere ti troverà nella lista. Nessun codice necessario!', de:'Zum Frühstück bei Mozzafiato zeigen Sie einfach Ihren amtlichen Lichtbildausweis. Der Kellner findet Sie auf der Gästeliste. Kein Code nötig!' },
+      breakfastDays: { es:'Días con desayuno incluido', en:'Days with breakfast included', fr:'Jours avec petit-déjeuner inclus', it:'Giorni con colazione inclusa', de:'Tage mit inklusivem Frühstück' },
       pagos:        { es:'Pagos', en:'Payments', fr:'Paiements', it:'Pagamenti', de:'Zahlungen' },
       copyClabe:    { es:'Copiar CLABE', en:'Copy CLABE', fr:'Copier la CLABE', it:'Copia CLABE', de:'CLABE kopieren' },
       copyAccount:  { es:'Copiar cuenta', en:'Copy account', fr:'Copier le compte', it:'Copia conto', de:'Konto kopieren' },
@@ -4367,6 +4369,7 @@
         if (s.partner) cont += '<div class="wbt-partner">☕ ' + _wbEsc(s.partner) + '</div>';
         if (s.body) cont += '<div class="wbt-body">' + _wbNl2br(s.body) + '</div>';
         if (s.count > 0) cont += '<div class="wbt-badge">🍳 ' + s.count + ' ' + _wbEsc(_wbLabel('desayuno')) + '</div>';
+        cont += '<div class="wbt-body" style="margin-top:14px;font-weight:600;">🪪 ' + _wbEsc(_wbLabel('breakfastShowINE')) + '</div>';
       } else if (s.factura) {
         cont += '<div class="wbt-body" style="text-align:left;">🧾 ' + _wbLinkify(s.factura) + '</div>';
         var _fu = _wbFirstUrl(s.factura);
@@ -4765,24 +4768,23 @@
         }
       }
 
-      // Códigos personales del huésped (QR → página real de validación)
+      // Cómo usar tu desayuno: solo mostrar INE (ya NO se usa código QR)
       if (_wbBreakfast.length) {
-        out += _wbCard('<div class="wb-body">🍳 ' + _wbEsc(_wbLabel('breakfastShow')) + '</div>');
-        var order = { 'Pendiente': 0, 'Pending': 0 };
-        var list = _wbBreakfast.slice().sort(function(a, b) { return (order[a.estado] != null ? 0 : 1) - (order[b.estado] != null ? 0 : 1); });
-        out += list.map(function(b) {
+        out += _wbCard('<div style="text-align:center;padding:4px 2px;">'
+          + '<div style="font-size:34px;margin-bottom:6px;">🪪</div>'
+          + '<div class="wb-body" style="font-weight:600;color:#5a4a33;">' + _wbEsc(_wbLabel('breakfastShowINE')) + '</div></div>');
+        // Días con desayuno incluido (sin QR)
+        var list = _wbBreakfast.slice().sort(function(a, b) { return String(a.fecha).localeCompare(String(b.fecha)); });
+        var rows = list.map(function(b) {
           var used = /consum|used|usa/i.test(b.estado);
-          var qr = 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' + encodeURIComponent(_wbValidarUrl(b.codigo));
-          var h = '<div class="wb-bf' + (used ? ' wb-bf-used' : '') + '">';
-          h += '<img class="wb-bf-qr" src="' + qr + '" alt="QR">';
-          h += '<div class="wb-bf-code">' + _wbEsc(b.codigo) + '</div>';
           var meta = [];
           if (b.fecha) meta.push(_wbEsc(b.fecha));
           if (b.personas) meta.push(_wbEsc(b.personas) + ' ' + _wbEsc(_wbLabel('pax')));
-          meta.push('<b>' + _wbEsc(used ? _wbLabel('used') : _wbLabel('pending')) + '</b>');
-          h += '<div class="wb-bf-meta">' + meta.join(' · ') + '</div></div>';
-          return _wbCard(h);
+          return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(0,0,0,.06);' + (used ? 'opacity:.5;' : '') + '">'
+            + '<span style="font-size:13px;color:#5a4a33;">🍳 ' + meta.join(' · ') + '</span>'
+            + '<b style="font-size:11px;color:' + (used ? '#b0a488' : '#2e7d32') + ';">' + _wbEsc(used ? _wbLabel('used') : _wbLabel('pending')) + '</b></div>';
         }).join('');
+        out += _wbCard('<div style="font-size:12px;color:#7a6a4f;font-weight:700;margin-bottom:2px;">' + _wbEsc(_wbLabel('breakfastDays')) + '</div>' + rows);
       }
 
       // Restricciones de la promoción
@@ -12697,7 +12699,7 @@
       // Desayunos en la ficha: solo avisar al restaurante (gestión en Huéspedes, pestaña Desayunos y book)
       var resBf = (S.desayunos || []).filter(function(d) { return d.reservaId === resId; });
       if (resBf.length > 0 && res.estado !== 'Cancelada') {
-        var _bfMini = '<button onclick="sendCodesToRestaurant(\'' + resId + '\')" style="width:100%;margin-bottom:12px;background:var(--surface2);border:1px solid #2e7d32;border-radius:var(--radius);padding:10px;font-size:12px;cursor:pointer;color:#2e7d32;font-weight:600">\uD83C\uDF7D\uFE0F Avisar códigos de desayuno al restaurante</button>';
+        var _bfMini = '<button onclick="sendCodesToRestaurant(\'' + resId + '\')" style="width:100%;margin-bottom:12px;background:var(--surface2);border:1px solid #2e7d32;border-radius:var(--radius);padding:10px;font-size:12px;cursor:pointer;color:#2e7d32;font-weight:600">\uD83C\uDF7D\uFE0F Avisar al restaurante (huéspedes con desayuno)</button>';
         document.getElementById('reservaModalContent').insertAdjacentHTML('beforeend', _bfMini);
       }
 
@@ -17554,8 +17556,8 @@
 
       var h = '';
       h += '<div style="border-top:1px solid #e5ddcf;padding-top:16px;">';
-      h += '<div style="font-weight:800;font-size:16px;color:#3d3324;margin-bottom:4px;">📋 Llegadas de desayuno</div>';
-      h += '<div style="font-size:12px;color:#8a7a5f;margin-bottom:10px;">Toca “Llegó / Consumido” cuando el huésped se presente.</div>';
+      h += '<div style="font-weight:800;font-size:16px;color:#3d3324;margin-bottom:4px;">📋 Huéspedes con desayuno</div>';
+      h += '<div style="font-size:12px;color:#8a7a5f;margin-bottom:10px;">🪪 Pide el INE o identificación oficial, verifícalo en esta lista y toca “Llegó” cuando se presente.</div>';
       // Selector de fecha (chips)
       if (dates.length > 1) {
         h += '<div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin-bottom:10px;">';
@@ -17584,7 +17586,7 @@
         h += '<div style="display:flex;align-items:center;gap:10px;padding:12px;border-radius:12px;margin-bottom:8px;background:' + (done ? '#eef5ec' : cancel ? '#f6eeee' : '#fff') + ';border:1px solid ' + (done ? '#bcdcae' : '#e5ddcf') + ';' + (done || cancel ? 'opacity:.75;' : '') + '">';
         h += '<div style="flex:1;min-width:0;">';
         h += '<div style="font-size:15px;font-weight:700;color:#3d3324;">' + (c.huesped || '') + '</div>';
-        h += '<div style="font-size:12px;color:#8a7a5f;">Hab. ' + (c.habitacion || '') + ' · ' + c.personas + ' pers · <span style="font-family:monospace;">' + c.codigo + '</span></div>';
+        h += '<div style="font-size:12px;color:#8a7a5f;">Hab. ' + (c.habitacion || '') + ' · ' + c.personas + ' pers</div>';
         h += '</div>';
         if (done) {
           h += '<div style="color:#2e7d32;font-weight:700;font-size:13px;white-space:nowrap;">✅ Llegó</div>';
@@ -17672,11 +17674,12 @@
       var totalPers = codes.reduce(function(s, c) { return s + (parseInt(c.personas) || 0); }, 0);
 
       var msg = '☀️ *' + hotelName + '*\n';
-      msg += 'Huéspedes que llegan a desayunar 🍽️\n';
+      msg += 'Huéspedes con desayuno incluido 🍽️\n';
+      msg += '_Cada huésped presenta su INE / identificación. Verifícalo en esta lista._\n';
       dates.forEach(function(dt) {
         msg += '\n📅 *' + _bfDateLabel(dt) + '*\n';
         byDate[dt].sort(function(a, b) { return String(a.huesped).localeCompare(String(b.huesped)); }).forEach(function(c) {
-          msg += '• *' + (c.huesped || '') + '* — Hab. ' + (c.habitacion || '') + ' · ' + c.personas + ' pers · código *' + c.codigo + '*\n';
+          msg += '• *' + (c.huesped || '') + '* — Hab. ' + (c.habitacion || '') + ' · ' + c.personas + ' pers\n';
         });
       });
       msg += '\n🕐 Horario: ' + (promo.horario || '8:00 AM a 4:00 PM') + '\n';
