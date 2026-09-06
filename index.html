@@ -3256,7 +3256,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-08-25n';
+    var APP_BUILD = '2026-08-25o';
     var _bfPromoRowCount = 0;
     var CONFIG_KEYS = ['hotelInfo', 'hotelTerms', 'dailyRoutine', 'msgTemplates', 'emergencyContacts', 'breakfastPromo', 'guestGuide'];
 
@@ -16932,13 +16932,14 @@
       var perNight = 0;
       dates.forEach(function (ds) { var c = codes.filter(function (x) { return x.fecha === ds; }).length; if (c > perNight) perNight = c; });
       var suggested = Math.max(perNight, parseInt(res.adultos) || 1);
-      var ans = prompt('¿Cuántas personas deben tener desayuno POR NOCHE en esta reserva?\n\nAhora hay ' + perNight + ' por noche (' + nights + ' noche(s)).', String(suggested));
+      var ans = prompt('¿Cuántas personas deben tener desayuno POR NOCHE en esta reserva?\n\nAhora hay ' + perNight + ' por noche (' + nights + ' noche(s)).\n\nSi pones MENOS, se quitan los acompañantes de más (nunca al titular ni los ya consumidos).', String(suggested));
       if (ans === null) return;
       var target = parseInt(ans);
-      if (isNaN(target) || target < 1) { toast('Número inválido', true); return; }
-      if (target <= perNight) { toast('Ya hay ' + perNight + ' por noche; nada que agregar', false); return; }
+      if (isNaN(target) || target < 1) { toast('Número inválido (mínimo 1)', true); return; }
+      if (target === perNight) { toast('Sin cambios: ya hay ' + perNight + ' por noche', false); return; }
       await busy(async function () {
-        var ops = [], added = [], n = now();
+        var ops = [], added = [], removed = [], n = now();
+        // 1) AGREGAR faltantes por noche (append vía multi)
         dates.forEach(function (ds) {
           var have = codes.filter(function (x) { return x.fecha === ds; }).length;
           for (var k = have; k < target; k++) {
@@ -16948,18 +16949,36 @@
             added.push({ codigo: code, reservaId: res.id, huesped: nombre, habitacion: res.habitacionNum, fecha: ds, personas: 1, estado: 'Pendiente', validadoPor: '', horaValidacion: '', regId: '' });
           }
         });
-        if (!added.length) { toast('Nada que agregar', false); return; }
-        var newAdultos = Math.max(parseInt(res.adultos) || 0, target);
+        // 2) QUITAR sobrantes por noche: solo Pendientes, acompañantes primero, nunca al titular
+        dates.forEach(function (ds) {
+          var dcodes = codes.filter(function (x) { return x.fecha === ds; });
+          var over = dcodes.length - target;
+          if (over <= 0) return;
+          var rem = dcodes.filter(function (x) { return /pend/i.test(x.estado); });
+          rem.sort(function (a, b) {
+            var aAcc = (String(a.huesped) !== String(res.huesped)) ? 0 : 1;
+            var bAcc = (String(b.huesped) !== String(res.huesped)) ? 0 : 1;
+            if (aAcc !== bAcc) return aAcc - bAcc;             // acompañantes primero
+            return String(b.codigo).localeCompare(String(a.codigo)); // los más nuevos primero
+          });
+          for (var r2 = 0; r2 < over && r2 < rem.length; r2++) removed.push(rem[r2].codigo);
+        });
+        if (!added.length && !removed.length) { toast('No hay cambios aplicables (revisa consumidos)', false); return; }
+        // Borrados individuales (el backend no borra dentro de multi)
+        for (var i = 0; i < removed.length; i++) { try { await sheets.deleteById('🍳 Desayunos', removed[i]); } catch (e) {} }
+        var newAdultos = target;
         var resRow = [res.id, res.habitacionNum, res.huesped, res.telefono, res.email, res.fechaEntrada, res.fechaSalida, newAdultos, res.niños, res.tarifa, res.tarifaTotal, res.estado, res.notas, res.creadoPor, res.fechaCreacion];
         ops.push({ type: 'updateById', sheet: '📋 Reservas', id: res.id, values: resRow });
-        ops.push({ type: 'append', sheet: '📜 Bitácora', values: [normDate(new Date()), n.split(' ')[1], (S.user && S.user.usuario) || '', 'Desayunos Ajustados', 'Hab.' + res.habitacionNum + ' +' + added.length + ' código(s) (' + target + '/noche)', 'info'] });
+        var _detalle = 'Hab.' + res.habitacionNum + (added.length ? ' +' + added.length : '') + (removed.length ? ' -' + removed.length : '') + ' código(s) (' + target + '/noche)';
+        ops.push({ type: 'append', sheet: '📜 Bitácora', values: [normDate(new Date()), n.split(' ')[1], (S.user && S.user.usuario) || '', 'Desayunos Ajustados', _detalle, 'info'] });
         await sheets.multi(ops);
-        S.desayunos = (S.desayunos || []).concat(added);
+        if (added.length) S.desayunos = (S.desayunos || []).concat(added);
+        if (removed.length) { var del = {}; removed.forEach(function (c) { del[c] = 1; }); S.desayunos = (S.desayunos || []).filter(function (d) { return !del[d.codigo]; }); }
         res.adultos = newAdultos;
         try { await _ensureBreakfastTextPublished(); } catch (e) {}
-        toast('🍳 ' + added.length + ' desayuno(s) agregado(s)');
+        toast('🍳 Desayunos actualizados' + (added.length ? ' · +' + added.length : '') + (removed.length ? ' · -' + removed.length : ''));
         closeModal(); openReservaModal(resId);
-      }, 'Agregando desayunos…');
+      }, 'Ajustando desayunos…');
     }
     async function generarDesayunosReserva(resId) {
       var res = S.reservas.find(function(r) { return r.id === resId; });
