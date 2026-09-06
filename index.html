@@ -3256,7 +3256,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-08-25k';
+    var APP_BUILD = '2026-08-25l';
     var _bfPromoRowCount = 0;
     var CONFIG_KEYS = ['hotelInfo', 'hotelTerms', 'dailyRoutine', 'msgTemplates', 'emergencyContacts', 'breakfastPromo', 'guestGuide'];
 
@@ -3398,7 +3398,7 @@
       if (parseInt(res.niños) > 0) huespedes += ', ' + res.niños + ' niño(s)';
 
       var text = tpl.texto;
-      text = text.replace(/\{huesped\}/g, res.huesped || '');
+      text = text.replace(/\{huesped\}/g, (typeof _firstName === 'function' ? _firstName(res.huesped) : (res.huesped || '')));
       text = text.replace(/\{reservaId\}/g, res.id || '');
       text = text.replace(/\{habitacion\}/g, res.habitacionNum || '');
       text = text.replace(/\{tipoHab\}/g, room ? room.tipo : '');
@@ -4139,6 +4139,8 @@
     }
     function _wbEsc(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
     function _wbNl2br(s) { return _wbEsc(s).replace(/\n/g, '<br>'); }
+    // Solo el primer nombre (más fresco y amable), sin apellidos.
+    function _firstName(name) { var s = String(name == null ? '' : name).trim(); return s ? s.split(/\s+/)[0] : ''; }
     function _wbPhoto(url, cls) {
       if (!url || !String(url).trim()) return '';
       return '<img class="wb-photo' + (cls ? ' ' + cls : '') + '" src="' + _wbEsc(url) + '" alt="" loading="lazy" onerror="this.style.display=\'none\'">';
@@ -4292,7 +4294,7 @@
       var g = getGuestGuide();
       var logo = (typeof LOGO_V_DARK !== 'undefined' && LOGO_V_DARK) ? LOGO_V_DARK : '';
       var intro = _wbT(g.introMsg, g) || '';
-      var hello = _wbRes ? (_wbLabel('hello') + ', ' + _wbEsc(_wbRes.huesped) + ' 👋') : '';
+      var hello = _wbRes ? (_wbLabel('hello') + ', ' + _wbEsc(_firstName(_wbRes.huesped)) + ' 👋') : '';
       var chips = _wbIntroInsideItems().map(function (k) {
         return '<div style="display:flex;align-items:center;gap:8px;padding:9px 10px;background:rgba(244,236,221,.06);border:1px solid rgba(194,162,94,.28);border-radius:12px;">'
           + '<span style="width:20px;height:20px;flex:0 0 20px;color:#e8cd8c;display:inline-flex;">' + (WB_ICONS[k] || '') + '</span>'
@@ -4681,7 +4683,7 @@
       if (_wbRes) {
         var meta = _wbLabel('room') + ' ' + _wbEsc(_wbRes.habitacionNum);
         if (_wbRes.fechaEntrada) meta += ' · ' + _wbEsc(_wbRes.fechaEntrada) + ' → ' + _wbEsc(_wbRes.fechaSalida);
-        guestBanner = '<div class="wb-guest"><div class="wb-guest-hi">' + _wbEsc(_wbLabel('hello')) + ', ' + _wbEsc(_wbRes.huesped) + ' 👋</div><div class="wb-guest-meta">' + meta + '</div></div>';
+        guestBanner = '<div class="wb-guest"><div class="wb-guest-hi">' + _wbEsc(_wbLabel('hello')) + ', ' + _wbEsc(_firstName(_wbRes.huesped)) + ' 👋</div><div class="wb-guest-meta">' + meta + '</div></div>';
       }
 
       var body;
@@ -4805,7 +4807,7 @@
     function _wbSection(key, g, hi) {
       if (key === 'welcome') {
         var hw0 = _wbPhoto(g.photos && g.photos.welcome, 'wb-sec-photo');
-        if (_wbRes) hw0 += _wbCard('<div class="wb-body"><b>' + _wbEsc(_wbLabel('hello')) + ', ' + _wbEsc(_wbRes.huesped) + '!</b></div>');
+        if (_wbRes) hw0 += _wbCard('<div class="wb-body"><b>' + _wbEsc(_wbLabel('hello')) + ', ' + _wbEsc(_firstName(_wbRes.huesped)) + '!</b></div>');
         return hw0 + _wbText(g.welcome, g);
       }
       if (key === 'reglas') {
@@ -5115,7 +5117,7 @@
       var g = getGuestGuide();
       var hi = getHotelInfo();
       var tpl = (g && g.bookMsg && String(g.bookMsg).trim()) ? g.bookMsg : DEFAULT_GUEST_GUIDE.bookMsg;
-      var t = String(tpl).replace(/\{nombre\}/g, nombre || '').replace(/\{hotel\}/g, hi.nombre || HOTEL_NAME);
+      var t = String(tpl).replace(/\{nombre\}/g, _firstName(nombre) || '').replace(/\{hotel\}/g, hi.nombre || HOTEL_NAME);
       if (t.indexOf('{link}') !== -1) t = t.replace(/\{link\}/g, link || '');
       else t = t + '\n\n' + (link || '');
       return t;
@@ -13604,6 +13606,9 @@
         return;
       }
 
+      if (window._resBusy) return;
+      window._resBusy = true;
+      try { var _srBtn = document.querySelector('#newReservaModal [type="submit"], #newReservaModal .form-button'); if (_srBtn) { _srBtn.disabled = true; _srBtn.style.opacity = '0.6'; } } catch (e) {}
       await busy(async () => {
         const id = nextId('R', S.reservas);
         const days = daysUntil(checkin, checkout);
@@ -13690,6 +13695,7 @@
           setTimeout(function() { showPostReservaConfirm(id, huesped, roomNum, _isToday); }, 400);
         }
       }, 'Guardando reserva...');
+      window._resBusy = false;
     }
 
     function showPostReservaConfirm(resId, huesped, roomNum, isToday) {
