@@ -3256,7 +3256,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-08-25j';
+    var APP_BUILD = '2026-08-25k';
     var _bfPromoRowCount = 0;
     var CONFIG_KEYS = ['hotelInfo', 'hotelTerms', 'dailyRoutine', 'msgTemplates', 'emergencyContacts', 'breakfastPromo', 'guestGuide'];
 
@@ -4037,7 +4037,7 @@
       sub_desayuno: { es:'Tu desayuno de cortesía', en:'Your complimentary breakfast', fr:'Votre petit-déjeuner offert', it:'La tua colazione omaggio', de:'Ihr kostenloses Frühstück' },
       sub_recepcion:{ es:'Horarios y contacto', en:'Hours and contact', fr:'Horaires et contact', it:'Orari e contatto', de:'Zeiten und Kontakt' },
       sub_factura:  { es:'Aquí está el link e instrucciones para solicitar tu factura', en:'Here is the link and steps to request your invoice', fr:'Voici le lien et les étapes pour demander votre facture', it:'Qui trovi il link e le istruzioni per la fattura', de:'Hier finden Sie den Link und die Schritte für Ihre Rechnung' },
-      breakfastShowINE: { es:'Para desayunar en Mozzafiato solo muestra tu INE o identificación oficial con fotografía. El mesero te ubicará en la lista de huéspedes. ¡No necesitas ningún código!', en:'To have breakfast at Mozzafiato just show your official photo ID. The waiter will find you on the guest list. No code needed!', fr:'Pour le petit-déjeuner chez Mozzafiato, montrez simplement votre pièce d\'identité officielle avec photo. Le serveur vous trouvera sur la liste. Aucun code nécessaire !', it:'Per la colazione da Mozzafiato mostra solo un documento d\'identità ufficiale con foto. Il cameriere ti troverà nella lista. Nessun codice necessario!', de:'Zum Frühstück bei Mozzafiato zeigen Sie einfach Ihren amtlichen Lichtbildausweis. Der Kellner findet Sie auf der Gästeliste. Kein Code nötig!' },
+      breakfastShowINE: { es:'Para desayunar en Mozzafiato solo muestra tu INE o identificación oficial con fotografía. El mesero te ubicará en la lista de huéspedes.', en:'To have breakfast at Mozzafiato just show your official photo ID. The waiter will find you on the guest list.', fr:'Pour le petit-déjeuner chez Mozzafiato, montrez simplement votre pièce d\'identité officielle avec photo. Le serveur vous trouvera sur la liste.', it:'Per la colazione da Mozzafiato mostra solo un documento d\'identità ufficiale con foto. Il cameriere ti troverà nella lista.', de:'Zum Frühstück bei Mozzafiato zeigen Sie einfach Ihren amtlichen Lichtbildausweis. Der Kellner findet Sie auf der Gästeliste.' },
       breakfastDays: { es:'Días con desayuno incluido', en:'Days with breakfast included', fr:'Jours avec petit-déjeuner inclus', it:'Giorni con colazione inclusa', de:'Tage mit inklusivem Frühstück' },
       pagos:        { es:'Pagos', en:'Payments', fr:'Paiements', it:'Pagamenti', de:'Zahlungen' },
       copyClabe:    { es:'Copiar CLABE', en:'Copy CLABE', fr:'Copier la CLABE', it:'Copia CLABE', de:'CLABE kopieren' },
@@ -12699,7 +12699,8 @@
       // Desayunos en la ficha: solo avisar al restaurante (gestión en Huéspedes, pestaña Desayunos y book)
       var resBf = (S.desayunos || []).filter(function(d) { return d.reservaId === resId; });
       if (resBf.length > 0 && res.estado !== 'Cancelada') {
-        var _bfMini = '<button onclick="sendCodesToRestaurant(\'' + resId + '\')" style="width:100%;margin-bottom:12px;background:var(--surface2);border:1px solid #2e7d32;border-radius:var(--radius);padding:10px;font-size:12px;cursor:pointer;color:#2e7d32;font-weight:600">\uD83C\uDF7D\uFE0F Avisar al restaurante (huéspedes con desayuno)</button>';
+        var _bfMini = '<button onclick="sendCodesToRestaurant(\'' + resId + '\')" style="width:100%;margin-bottom:8px;background:var(--surface2);border:1px solid #2e7d32;border-radius:var(--radius);padding:10px;font-size:12px;cursor:pointer;color:#2e7d32;font-weight:600">\uD83C\uDF7D\uFE0F Avisar al restaurante (huéspedes con desayuno)</button>';
+        _bfMini += '<button onclick="completarDesayunos(\'' + resId + '\')" style="width:100%;margin-bottom:12px;background:var(--surface2);border:1px dashed #2e7d32;border-radius:var(--radius);padding:10px;font-size:12px;cursor:pointer;color:#2e7d32;font-weight:600">\uD83D\uDC65 Corregir # de personas / agregar desayunos</button>';
         document.getElementById('reservaModalContent').insertAdjacentHTML('beforeend', _bfMini);
       }
 
@@ -16907,6 +16908,47 @@
         res.notas = newNotas;
         toast(txt ? '🧾 Factura guardada para ' + res.huesped : 'Factura eliminada');
       }, 'Guardando factura...');
+    }
+    // Corregir el número de personas con desayuno (ej. pusiste 1 y eran 2) SIN cancelar el check-in:
+    // agrega solo los desayunos que faltan por noche, sin duplicar los ya generados.
+    async function completarDesayunos(resId) {
+      var res = S.reservas.find(function (r) { return r.id === resId; });
+      if (!res) { toast('Reserva no encontrada', true); return; }
+      var nights = Math.max(daysUntil(res.fechaEntrada, res.fechaSalida), 1);
+      var dates = [];
+      for (var di = 0; di < nights; di++) { var d = new Date(res.fechaEntrada + 'T12:00:00'); d.setDate(d.getDate() + di + 1); dates.push(normDate(d)); }
+      var codes = (S.desayunos || []).filter(function (c) { return c.reservaId === resId; });
+      var perNight = 0;
+      dates.forEach(function (ds) { var c = codes.filter(function (x) { return x.fecha === ds; }).length; if (c > perNight) perNight = c; });
+      var suggested = Math.max(perNight, parseInt(res.adultos) || 1);
+      var ans = prompt('¿Cuántas personas deben tener desayuno POR NOCHE en esta reserva?\n\nAhora hay ' + perNight + ' por noche (' + nights + ' noche(s)).', String(suggested));
+      if (ans === null) return;
+      var target = parseInt(ans);
+      if (isNaN(target) || target < 1) { toast('Número inválido', true); return; }
+      if (target <= perNight) { toast('Ya hay ' + perNight + ' por noche; nada que agregar', false); return; }
+      await busy(async function () {
+        var ops = [], added = [], n = now();
+        dates.forEach(function (ds) {
+          var have = codes.filter(function (x) { return x.fecha === ds; }).length;
+          for (var k = have; k < target; k++) {
+            var nombre = (k === 0) ? res.huesped : (res.huesped + ' — huésped ' + (k + 1));
+            var code = generateBreakfastCode();
+            ops.push({ type: 'append', sheet: '🍳 Desayunos', values: [code, res.id, nombre, res.habitacionNum, ds, 1, 'Pendiente', '', '', ''] });
+            added.push({ codigo: code, reservaId: res.id, huesped: nombre, habitacion: res.habitacionNum, fecha: ds, personas: 1, estado: 'Pendiente', validadoPor: '', horaValidacion: '', regId: '' });
+          }
+        });
+        if (!added.length) { toast('Nada que agregar', false); return; }
+        var newAdultos = Math.max(parseInt(res.adultos) || 0, target);
+        var resRow = [res.id, res.habitacionNum, res.huesped, res.telefono, res.email, res.fechaEntrada, res.fechaSalida, newAdultos, res.niños, res.tarifa, res.tarifaTotal, res.estado, res.notas, res.creadoPor, res.fechaCreacion];
+        ops.push({ type: 'updateById', sheet: '📋 Reservas', id: res.id, values: resRow });
+        ops.push({ type: 'append', sheet: '📜 Bitácora', values: [normDate(new Date()), n.split(' ')[1], (S.user && S.user.usuario) || '', 'Desayunos Ajustados', 'Hab.' + res.habitacionNum + ' +' + added.length + ' código(s) (' + target + '/noche)', 'info'] });
+        await sheets.multi(ops);
+        S.desayunos = (S.desayunos || []).concat(added);
+        res.adultos = newAdultos;
+        try { await _ensureBreakfastTextPublished(); } catch (e) {}
+        toast('🍳 ' + added.length + ' desayuno(s) agregado(s)');
+        closeModal(); openReservaModal(resId);
+      }, 'Agregando desayunos…');
     }
     async function generarDesayunosReserva(resId) {
       var res = S.reservas.find(function(r) { return r.id === resId; });
