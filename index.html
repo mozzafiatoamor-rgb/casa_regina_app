@@ -3256,7 +3256,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-08-25m';
+    var APP_BUILD = '2026-08-25n';
     var _bfPromoRowCount = 0;
     var CONFIG_KEYS = ['hotelInfo', 'hotelTerms', 'dailyRoutine', 'msgTemplates', 'emergencyContacts', 'breakfastPromo', 'guestGuide'];
 
@@ -16753,7 +16753,7 @@
       if (reg && reg.length) return reg.map(function (g) { return { nombre: g.nombre, regId: g.regId }; });
       var num = parseInt(res.adultos) || 1;
       var arr = [];
-      for (var i = 0; i < num; i++) arr.push({ nombre: (i === 0 ? res.huesped : (res.huesped + ' — huésped ' + (i + 1))), regId: '' });
+      for (var i = 0; i < num; i++) arr.push({ nombre: (i === 0 ? res.huesped : ('Acompañante' + (i > 1 ? (' ' + i) : '') + ' de ' + (typeof _firstName === 'function' ? _firstName(res.huesped) : res.huesped))), regId: '' });
       return arr;
     }
     // Un código por huésped por noche (personas=1, cada código guarda el regId del huésped).
@@ -16942,7 +16942,7 @@
         dates.forEach(function (ds) {
           var have = codes.filter(function (x) { return x.fecha === ds; }).length;
           for (var k = have; k < target; k++) {
-            var nombre = (k === 0) ? res.huesped : (res.huesped + ' — huésped ' + (k + 1));
+            var nombre = (k === 0) ? res.huesped : ('Acompañante' + (k > 1 ? (' ' + k) : '') + ' de ' + (typeof _firstName === 'function' ? _firstName(res.huesped) : res.huesped));
             var code = generateBreakfastCode();
             ops.push({ type: 'append', sheet: '🍳 Desayunos', values: [code, res.id, nombre, res.habitacionNum, ds, 1, 'Pendiente', '', '', ''] });
             added.push({ codigo: code, reservaId: res.id, huesped: nombre, habitacion: res.habitacionNum, fecha: ds, personas: 1, estado: 'Pendiente', validadoPor: '', horaValidacion: '', regId: '' });
