@@ -3256,7 +3256,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-08-25o';
+    var APP_BUILD = '2026-08-25p';
     var _bfPromoRowCount = 0;
     var CONFIG_KEYS = ['hotelInfo', 'hotelTerms', 'dailyRoutine', 'msgTemplates', 'emergencyContacts', 'breakfastPromo', 'guestGuide'];
 
@@ -18105,9 +18105,13 @@
       var tipoId = document.getElementById('ge_tipoId').value;
       var numId = (document.getElementById('ge_numId').value || '').trim();
       if (!nombre) { toast('Escribe el nombre', true); return; }
+      if (window._regBusy) return;   // evita duplicar por doble toque
+      window._regBusy = true;
+      try { var _geBtn = document.querySelector('#taskDetailActions .form-button'); if (_geBtn) { _geBtn.disabled = true; _geBtn.style.opacity = '0.6'; } } catch (e) {}
       var res = S.reservas.find(function (r) { return r.id === resId; });
       var hab = res ? res.habitacionNum : '';
       var _f = normDate(new Date()), _ts = now();
+      try {
       await busy(async function () {
         if (regId) {
           var g = _resGuests(resId).find(function (x) { return x.regId === regId; }) || {};
@@ -18126,6 +18130,7 @@
         closeModal();
         openReservaModal(resId);
       }, 'Guardando huésped…');
+      } finally { window._regBusy = false; }
     }
     async function removeResGuest(resId, regId) {
       if (!confirm('¿Quitar este huésped del registro?')) return;
