@@ -3256,7 +3256,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-08-25q';
+    var APP_BUILD = '2026-08-25s';
     var _bfPromoRowCount = 0;
     var CONFIG_KEYS = ['hotelInfo', 'hotelTerms', 'dailyRoutine', 'msgTemplates', 'emergencyContacts', 'breakfastPromo', 'guestGuide'];
 
@@ -4141,6 +4141,15 @@
     function _wbNl2br(s) { return _wbEsc(s).replace(/\n/g, '<br>'); }
     // Solo el primer nombre (más fresco y amable), sin apellidos.
     function _firstName(name) { var s = String(name == null ? '' : name).trim(); return s ? s.split(/\s+/)[0] : ''; }
+    // Normaliza un teléfono a formato WhatsApp de México (52 + 10 dígitos) cubriendo los casos comunes.
+    function _waNormMX(raw) {
+      var d = String(raw == null ? '' : raw).replace(/[^0-9]/g, '');
+      if (!d) return '';
+      if (d.length === 10) return '52' + d;                                 // celular MX (10 dígitos)
+      if (d.length === 12 && d.slice(0, 2) === '52') return d;              // ya trae 52 + 10
+      if (d.length === 13 && d.slice(0, 3) === '521') return '52' + d.slice(3); // formato viejo/WhatsApp 521 + 10
+      return d;                                                            // otro (extranjero con lada): dejar como está
+    }
     function _wbPhoto(url, cls) {
       if (!url || !String(url).trim()) return '';
       return '<img class="wb-photo' + (cls ? ' ' + cls : '') + '" src="' + _wbEsc(url) + '" alt="" loading="lazy" onerror="this.style.display=\'none\'">';
@@ -5113,9 +5122,7 @@
     }
     function _guestPhoneDigits(reg, res) {
       var ph = (reg && reg.telefono) ? reg.telefono : ((res && res.telefono) || '');
-      ph = String(ph).replace(/[^0-9]/g, '');
-      if (ph.length === 10) ph = '52' + ph;
-      return ph;
+      return _waNormMX(ph);
     }
     // Plantilla editable del mensaje del book ({nombre}, {hotel}, {link})
     function _wbBookMsg(nombre, link) {
@@ -5147,8 +5154,8 @@
       if (!res) return;
       var link = getWelcomeBookLink(resId);
       var text = _wbBookMsg(res.huesped, link);
-      var phone = (typeof getGuestPhone === 'function' ? getGuestPhone(res) : (res.telefono || '')).replace(/[^0-9]/g, '');
-      if (phone.length === 10) phone = '52' + phone;
+      var phone = _waNormMX(typeof getGuestPhone === 'function' ? getGuestPhone(res) : (res.telefono || ''));
+      if (!phone) { toast('Esta reserva no tiene celular registrado', true); return; }
       window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(text), '_blank');
     }
     function showWelcomeBookQR(resId) {
