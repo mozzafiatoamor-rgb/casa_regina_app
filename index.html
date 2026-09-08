@@ -3256,7 +3256,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-08-25u';
+    var APP_BUILD = '2026-08-25v';
     var _bfPromoRowCount = 0;
     var CONFIG_KEYS = ['hotelInfo', 'hotelTerms', 'dailyRoutine', 'msgTemplates', 'emergencyContacts', 'breakfastPromo', 'guestGuide'];
 
@@ -4038,7 +4038,8 @@
       sub_recepcion:{ es:'Horarios y contacto', en:'Hours and contact', fr:'Horaires et contact', it:'Orari e contatto', de:'Zeiten und Kontakt' },
       sub_factura:  { es:'Aquí está el link e instrucciones para solicitar tu factura', en:'Here is the link and steps to request your invoice', fr:'Voici le lien et les étapes pour demander votre facture', it:'Qui trovi il link e le istruzioni per la fattura', de:'Hier finden Sie den Link und die Schritte für Ihre Rechnung' },
       breakfastShowINE: { es:'Para desayunar en Mozzafiato solo muestra tu INE o identificación oficial con fotografía. El mesero te ubicará en la lista de huéspedes.', en:'To have breakfast at Mozzafiato just show your official photo ID. The waiter will find you on the guest list.', fr:'Pour le petit-déjeuner chez Mozzafiato, montrez simplement votre pièce d\'identité officielle avec photo. Le serveur vous trouvera sur la liste.', it:'Per la colazione da Mozzafiato mostra solo un documento d\'identità ufficiale con foto. Il cameriere ti troverà nella lista.', de:'Zum Frühstück bei Mozzafiato zeigen Sie einfach Ihren amtlichen Lichtbildausweis. Der Kellner findet Sie auf der Gästeliste.' },
-      breakfastDays: { es:'Días con desayuno incluido', en:'Days with breakfast included', fr:'Jours avec petit-déjeuner inclus', it:'Giorni con colazione inclusa', de:'Tage mit inklusivem Frühstück' },
+      breakfastDays: { es:'Desayunos incluidos', en:'Breakfasts included', fr:'Petits-déjeuners inclus', it:'Colazioni incluse', de:'Inklusive Frühstücke' },
+      companion:     { es:'Acompañante', en:'Companion', fr:'Accompagnant', it:'Accompagnatore', de:'Begleitung' },
       pagos:        { es:'Pagos', en:'Payments', fr:'Paiements', it:'Pagamenti', de:'Zahlungen' },
       copyClabe:    { es:'Copiar CLABE', en:'Copy CLABE', fr:'Copier la CLABE', it:'Copia CLABE', de:'CLABE kopieren' },
       copyAccount:  { es:'Copiar cuenta', en:'Copy account', fr:'Copier le compte', it:'Copia conto', de:'Konto kopieren' },
@@ -4141,6 +4142,21 @@
     function _wbNl2br(s) { return _wbEsc(s).replace(/\n/g, '<br>'); }
     // Solo el primer nombre (más fresco y amable), sin apellidos.
     function _firstName(name) { var s = String(name == null ? '' : name).trim(); return s ? s.split(/\s+/)[0] : ''; }
+    // Fecha corta "YYYY-MM-DD" -> "28 ago" (mes según idioma del book).
+    var _WB_MESES = {
+      es: ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'],
+      en: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+      fr: ['janv','févr','mars','avr','mai','juin','juil','août','sept','oct','nov','déc'],
+      it: ['gen','feb','mar','apr','mag','giu','lug','ago','set','ott','nov','dic'],
+      de: ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez']
+    };
+    function _wbFechaCorta(f) {
+      var m = String(f == null ? '' : f).match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (!m) return String(f || '');
+      var meses = _WB_MESES[_wbLang] || _WB_MESES.es;
+      var mi = parseInt(m[2], 10) - 1;
+      return parseInt(m[3], 10) + ' ' + (meses[mi] || m[2]);
+    }
     // Normaliza un teléfono a formato WhatsApp de México (52 + 10 dígitos) cubriendo los casos comunes.
     function _waNormMX(raw) {
       var d = String(raw == null ? '' : raw).replace(/[^0-9]/g, '');
@@ -4241,7 +4257,7 @@
               // (titular + acompañantes). Ya no se filtra por huésped: el mesero valida con INE.
               return true;
             }).map(function(d) {
-              return { codigo: String(d[0] || ''), fecha: String(d[4] || ''), personas: d[5] || '', estado: String(d[6] || 'Pendiente') };
+              return { codigo: String(d[0] || ''), huesped: String(d[2] || ''), fecha: String(d[4] || ''), personas: d[5] || '', estado: String(d[6] || 'Pendiente') };
             });
             for (var j = 0; j < acc.length; j++) {
               if (String(acc[j][0]) === String(resId)) { _wbAccess = String(acc[j][1] || ''); break; }
@@ -4784,16 +4800,20 @@
         out += _wbCard('<div style="text-align:center;padding:4px 2px;">'
           + '<div style="font-size:34px;margin-bottom:6px;">🪪</div>'
           + '<div class="wb-body" style="font-weight:600;color:#5a4a33;">' + _wbEsc(_wbLabel('breakfastShowINE')) + '</div></div>');
-        // Días con desayuno incluido (sin QR)
-        var list = _wbBreakfast.slice().sort(function(a, b) { return String(a.fecha).localeCompare(String(b.fecha)); });
-        var rows = list.map(function(b) {
-          var used = /consum|used|usa/i.test(b.estado);
-          var meta = [];
-          if (b.fecha) meta.push(_wbEsc(b.fecha));
-          if (b.personas) meta.push(_wbEsc(b.personas) + ' ' + _wbEsc(_wbLabel('pax')));
-          return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(0,0,0,.06);' + (used ? 'opacity:.5;' : '') + '">'
-            + '<span style="font-size:13px;color:#5a4a33;">🍳 ' + meta.join(' · ') + '</span>'
-            + '<b style="font-size:11px;color:' + (used ? '#b0a488' : '#2e7d32') + ';">' + _wbEsc(used ? _wbLabel('used') : _wbLabel('pending')) + '</b></div>';
+        // Desayunos incluidos, agrupados POR PERSONA (nombre), con sus días
+        var byGuest = [];
+        var idx = {};
+        _wbBreakfast.forEach(function (b) {
+          var nm = (b.huesped && String(b.huesped).trim()) ? String(b.huesped).trim() : _wbLabel('companion');
+          if (idx[nm] == null) { idx[nm] = byGuest.length; byGuest.push({ nombre: nm, dias: [] }); }
+          byGuest[idx[nm]].dias.push(b.fecha);
+        });
+        var rows = byGuest.map(function (p) {
+          var dias = p.dias.slice().sort().map(function (f) { return _wbFechaCorta(f); }).filter(Boolean).join(' · ');
+          return '<div style="padding:9px 0;border-bottom:1px solid rgba(0,0,0,.06);">'
+            + '<div style="font-size:14px;font-weight:700;color:#5a4a33;">🍳 ' + _wbEsc(p.nombre) + '</div>'
+            + (dias ? '<div style="font-size:12px;color:#7a6a4f;margin-top:2px;">' + dias + '</div>' : '')
+            + '</div>';
         }).join('');
         out += _wbCard('<div style="font-size:12px;color:#7a6a4f;font-weight:700;margin-bottom:2px;">' + _wbEsc(_wbLabel('breakfastDays')) + '</div>' + rows);
       }
