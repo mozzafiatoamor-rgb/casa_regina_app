@@ -3256,7 +3256,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-08-25t';
+    var APP_BUILD = '2026-08-25u';
     var _bfPromoRowCount = 0;
     var CONFIG_KEYS = ['hotelInfo', 'hotelTerms', 'dailyRoutine', 'msgTemplates', 'emergencyContacts', 'breakfastPromo', 'guestGuide'];
 
@@ -4237,8 +4237,8 @@
             _wbBreakfast = des.filter(function(d) {
               var est = String(d[6] || 'Pendiente');
               if (String(d[1]) !== String(resId) || est === 'Cancelado' || est === 'Expirado') return false;
-              // Si el libro es de un huésped específico, solo sus códigos (por regId).
-              if (_wbGuestRegId) return String(d[9] || '') === String(_wbGuestRegId);
+              // El book (uno por reserva) muestra TODOS los desayunos de la habitación
+              // (titular + acompañantes). Ya no se filtra por huésped: el mesero valida con INE.
               return true;
             }).map(function(d) {
               return { codigo: String(d[0] || ''), fecha: String(d[4] || ''), personas: d[5] || '', estado: String(d[6] || 'Pendiente') };
@@ -18080,7 +18080,6 @@
           h += '</div>';
           h += '</div>';
         });
-        h += '<button onclick="generarDesayunosPorHuesped(\'' + res.id + '\')" style="width:100%;margin-top:8px;background:var(--surface2);border:1px dashed #2e7d32;color:#2e7d32;border-radius:8px;padding:7px;font-size:11px;cursor:pointer;font-weight:600;">🍳 Generar códigos para todos los huéspedes</button>';
         if ((S.desayunos || []).some(function (d) { return d.reservaId === res.id; })) {
           h += '<button onclick="openDeleteCodesSelector(\'' + res.id + '\')" style="width:100%;margin-top:6px;background:none;border:none;color:var(--red);font-size:11px;cursor:pointer;text-decoration:underline;">🗑️ Borrar códigos (elegir cuáles)</button>';
         }
