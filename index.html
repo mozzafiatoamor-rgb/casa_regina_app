@@ -3256,7 +3256,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-08-25v';
+    var APP_BUILD = '2026-09-08a';
     var _bfPromoRowCount = 0;
     var CONFIG_KEYS = ['hotelInfo', 'hotelTerms', 'dailyRoutine', 'msgTemplates', 'emergencyContacts', 'breakfastPromo', 'guestGuide'];
 
@@ -4260,7 +4260,7 @@
               return { codigo: String(d[0] || ''), huesped: String(d[2] || ''), fecha: String(d[4] || ''), personas: d[5] || '', estado: String(d[6] || 'Pendiente') };
             });
             for (var j = 0; j < acc.length; j++) {
-              if (String(acc[j][0]) === String(resId)) { _wbAccess = String(acc[j][1] || ''); break; }
+              if (String(acc[j][0]) === String(resId)) { _wbAccess = String(acc[j][1] || '').replace(/^'/, ''); break; }
             }
           }
         } catch (e) { console.warn('WelcomeBook load error:', e.message); }
@@ -5206,14 +5206,17 @@
       code = (code || '').trim();
       if (!S.accesos) S.accesos = [];
       var existing = S.accesos.find(function(x) { return String(x.reservaId) === String(resId); });
+      // Forzar guardado como TEXTO (apóstrofo) para NO perder los ceros a la izquierda.
+      // El apóstrofo no forma parte del valor al leerlo de la hoja.
+      var codeCell = code ? ("'" + code) : '';
       try {
         var res;
         if (existing) {
           existing.codigo = code;
-          res = await sheets.multi([{ type: 'updateById', sheet: '🔑 Accesos', id: resId, values: [resId, code, existing.notas || ''] }]);
+          res = await sheets.multi([{ type: 'updateById', sheet: '🔑 Accesos', id: resId, values: [resId, codeCell, existing.notas || ''] }]);
         } else {
           S.accesos.push({ reservaId: String(resId), codigo: code, notas: '' });
-          res = await sheets.multi([{ type: 'append', sheet: '🔑 Accesos', values: [resId, code, ''] }]);
+          res = await sheets.multi([{ type: 'append', sheet: '🔑 Accesos', values: [resId, codeCell, ''] }]);
         }
         var ok = res && res.results && res.results[0] && res.results[0].success;
         if (ok) { toast('🔑 Código de acceso guardado'); }
@@ -6592,7 +6595,7 @@
         }));
 
         S.accesos = (accesosData || []).map(function(r) {
-          return { reservaId: String(r[0]), codigo: r[1] || '', notas: r[2] || '' };
+          return { reservaId: String(r[0]), codigo: String(r[1] == null ? '' : r[1]).replace(/^'/, ''), notas: r[2] || '' };
         });
 
         S.housekeeping = housekeepingData.map(h => ({
