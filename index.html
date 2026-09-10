@@ -2202,6 +2202,10 @@
                 <div class="action-btn-icon">💲</div>
                 <div>Precios</div>
               </button>
+              <button class="action-btn" onclick="openReservasOnlineModal()">
+                <div class="action-btn-icon">🌐</div>
+                <div>Reservas Online</div>
+              </button>
             </div>
 
             <div id="receptionTasksSection"></div>
@@ -2214,16 +2218,6 @@
             <div>
               <div class="section-title">Salidas Hoy</div>
               <div class="items-list" id="departurestoday"></div>
-            </div>
-
-            <div>
-              <div class="section-title">Rutina del Día</div>
-              <div id="dailyRoutine"></div>
-            </div>
-
-            <div>
-              <div class="section-title" style="display:flex;align-items:center;gap:8px">Alertas <span id="alertsBadge" style="background:var(--red);color:#fff;font-size:10px;font-weight:700;border-radius:10px;padding:1px 7px;display:none"></span></div>
-              <div class="items-list" id="alerts"></div>
             </div>
 
             <div id="dashboardBookingCard"></div>
@@ -3284,7 +3278,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-09-10c';
+    var APP_BUILD = '2026-09-10d';
     var _bfPromoRowCount = 0;
     var CONFIG_KEYS = ['hotelInfo', 'hotelTerms', 'dailyRoutine', 'msgTemplates', 'emergencyContacts', 'breakfastPromo', 'guestGuide'];
 
@@ -7022,7 +7016,7 @@
         routineHtml += '</div>';
       });
       routineHtml += '</div>';
-      document.getElementById('dailyRoutine').innerHTML = routineHtml;
+      var _drEl = document.getElementById('dailyRoutine'); if (_drEl) _drEl.innerHTML = routineHtml;
 
       // Alerts
       var alertItems = [];
@@ -7119,17 +7113,15 @@
       // Badge count (only warnings/critical, not informational)
       var criticalCount = alertItems.filter(function(a){return a.indexOf('var(--red)')!==-1 || a.indexOf('💰')!==-1}).length;
       var badge = document.getElementById('alertsBadge');
-      if (criticalCount > 0) {
-        badge.textContent = criticalCount;
-        badge.style.display = 'inline';
-      } else {
-        badge.style.display = 'none';
+      if (badge) {
+        if (criticalCount > 0) { badge.textContent = criticalCount; badge.style.display = 'inline'; }
+        else { badge.style.display = 'none'; }
       }
 
       var alertsHtml = alertItems.length > 0
         ? alertItems.join('')
         : '<div style="text-align:center;padding:20px;color:var(--text2)">✅ Sin alertas — Todo en orden</div>';
-      document.getElementById('alerts').innerHTML = alertsHtml;
+      var _alEl = document.getElementById('alerts'); if (_alEl) _alEl.innerHTML = alertsHtml;
 
       // Pending online reservations alert
       var pendientes = S.reservas.filter(function(r) { return r.estado === 'Reservada'; });
@@ -7138,7 +7130,7 @@
         var pendHtml = '<div class="item" style="border-left-color:var(--accent);cursor:pointer" onclick="switchTab(\'reservas\')">' +
           '<div class="item-title">🌐 ' + pendientes.length + ' reserva(s) online por confirmar</div>' +
           '<div class="item-meta">' + pendientes.map(function(r){return r.huesped}).join(', ') + '</div></div>';
-        document.getElementById('alerts').insertAdjacentHTML('afterbegin', pendHtml);
+        var _alEl2 = document.getElementById('alerts'); if (_alEl2) _alEl2.insertAdjacentHTML('afterbegin', pendHtml);
       }
 
       // Reception Tasks Checklist
@@ -7239,7 +7231,7 @@
         bkCard += '<button class="form-button" onclick="shareBookingLinkWhatsApp()" style="background:#25D366;color:white;font-size:12px;padding:10px;">📲 WhatsApp</button>';
         bkCard += '</div>';
         bkCard += '</div></div>';
-        document.getElementById('dashboardBookingCard').innerHTML = bkCard;
+        var _bkCardEl = document.getElementById('dashboardBookingCard'); if (_bkCardEl) _bkCardEl.innerHTML = '';
       }
 
       try { if (typeof _renderOnlineResAlert === 'function') _renderOnlineResAlert(); } catch (e) {}
@@ -16908,8 +16900,41 @@
           h += '</div>';
         });
       }
+      // Cargo por persona extra (por noche, c/u)
+      var _peR = 0; try { _peR = parseFloat(getHotelInfo().persona_extra) || 0; } catch (e) { _peR = 0; }
+      if (_peR > 0) {
+        var _peTb = _taxBreak(_peR, true);
+        h += '<div style="background:var(--surface2);border-radius:12px;padding:12px 14px;margin-bottom:10px;border:1px dashed var(--accent);">';
+        h += '<div style="font-weight:700;font-size:14px;margin-bottom:8px;">👥 Persona extra <span style="font-size:11px;color:var(--text2);font-weight:500;">(por noche, c/u)</span></div>';
+        h += '<div style="display:flex;justify-content:space-between;font-size:14px;margin-bottom:6px;"><span>Sin impuestos</span><b style="font-family:Space Mono,monospace;">$' + _fmt(_peR) + '</b></div>';
+        h += '<div style="display:flex;justify-content:space-between;font-size:11.5px;color:var(--text2);"><span>ISH (' + ishPct + '%)</span><span style="font-family:Space Mono,monospace;">$' + _fmt(_peTb.ish) + '</span></div>';
+        h += '<div style="display:flex;justify-content:space-between;font-size:11.5px;color:var(--text2);margin-bottom:6px;"><span>IVA (' + ivaPct + '%)</span><span style="font-family:Space Mono,monospace;">$' + _fmt(_peTb.iva) + '</span></div>';
+        h += '<div style="display:flex;justify-content:space-between;font-size:14px;font-weight:800;border-top:1px solid var(--surface3);padding-top:7px;"><span>Con impuestos</span><b style="font-family:Space Mono,monospace;color:var(--accent);">$' + _fmt(_peTb.total) + '</b></div>';
+        h += '</div>';
+      }
       document.getElementById('taskDetailContent').innerHTML = h;
       document.getElementById('taskDetailModal').querySelector('.modal-title').textContent = '💲 Precios actuales';
+      document.getElementById('taskDetailActions').innerHTML = '';
+      openModal('taskDetailModal');
+    }
+
+    // ============ MODAL: RESERVAS ONLINE (link, vista previa, QR, WhatsApp) ============
+    function openReservasOnlineModal() {
+      var link = '';
+      try { link = getBookingLink(); } catch (e) { link = ''; }
+      var h = '';
+      h += '<div style="font-size:12px;color:var(--text2);margin-bottom:14px;">Comparte este link para que los huéspedes reserven directo.</div>';
+      h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">';
+      h += '<button class="form-button" onclick="copyBookingLink()" style="font-size:13px;padding:12px;">📋 Copiar Link</button>';
+      h += '<button class="form-button secondary" onclick="previewBookingLink()" style="font-size:13px;padding:12px;">👁️ Vista previa</button>';
+      h += '</div>';
+      h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">';
+      h += '<button class="form-button secondary" onclick="showBookingQR()" style="font-size:13px;padding:12px;">📱 Ver QR</button>';
+      h += '<button class="form-button" onclick="shareBookingLinkWhatsApp()" style="background:#25D366;color:#fff;font-size:13px;padding:12px;">📲 WhatsApp</button>';
+      h += '</div>';
+      if (link) h += '<div style="font-size:10px;color:var(--text2);word-break:break-all;background:var(--surface2);border-radius:8px;padding:10px;">' + _wbEsc(link) + '</div>';
+      document.getElementById('taskDetailContent').innerHTML = h;
+      document.getElementById('taskDetailModal').querySelector('.modal-title').textContent = '🌐 Reservas Online';
       document.getElementById('taskDetailActions').innerHTML = '';
       openModal('taskDetailModal');
     }
