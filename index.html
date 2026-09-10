@@ -2024,6 +2024,23 @@
 @keyframes onresPulse{0%,100%{box-shadow:0 6px 22px rgba(184,134,43,.4);}50%{box-shadow:0 8px 34px rgba(255,211,107,.8);}}
 @keyframes onresBell{0%,60%,100%{transform:rotate(0);}10%{transform:rotate(16deg);}20%{transform:rotate(-14deg);}30%{transform:rotate(10deg);}40%{transform:rotate(-6deg);}50%{transform:rotate(3deg);}}
 @keyframes onresFlash{0%,100%{filter:none;}50%{filter:brightness(1.7);}}
+
+/* --- Alerta de Llegadas próximas (hoy / mañana) --- */
+.arr-alert{background:linear-gradient(135deg,#3b2e6e,#1e2a63);border:2px solid #8b7df0;border-radius:14px;padding:12px 14px;margin-bottom:16px;box-shadow:0 6px 22px rgba(80,60,180,.45);animation:arrPulse 2s ease-in-out infinite;}
+.arr-head{display:flex;align-items:center;gap:8px;color:#fff;font-size:14px;font-weight:800;margin-bottom:10px;text-shadow:0 1px 2px rgba(0,0,0,.35);}
+.arr-ic{display:inline-block;font-size:19px;animation:arrRing 1.6s ease-in-out infinite;transform-origin:50% 12%;}
+.arr-sub{font-size:11px;font-weight:800;letter-spacing:.6px;margin:9px 0 6px;padding:3px 9px;border-radius:20px;display:inline-block;}
+.arr-hoy{background:linear-gradient(135deg,#ef4444,#f59e0b);color:#fff;box-shadow:0 2px 10px rgba(239,68,68,.5);animation:arrHoyGlow 1.4s ease-in-out infinite;}
+.arr-man{background:rgba(255,255,255,.16);color:#e6e2ff;}
+.arr-item{display:flex;align-items:center;justify-content:space-between;gap:10px;background:rgba(255,255,255,.13);border-radius:10px;padding:9px 11px;margin-bottom:7px;}
+.arr-item:last-child{margin-bottom:0;}
+.arr-name{color:#fff;font-size:13.5px;font-weight:700;}
+.arr-meta{color:rgba(255,255,255,.85);font-size:11.5px;margin-top:2px;}
+.arr-btn{flex:0 0 auto;background:#fff;color:#3b2e6e;border:none;border-radius:20px;padding:8px 14px;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap;}
+.arr-btn:active{transform:scale(.96);}
+@keyframes arrPulse{0%,100%{box-shadow:0 6px 22px rgba(80,60,180,.4);}50%{box-shadow:0 8px 34px rgba(139,125,240,.75);}}
+@keyframes arrRing{0%,60%,100%{transform:rotate(0);}10%{transform:rotate(15deg);}20%{transform:rotate(-13deg);}30%{transform:rotate(9deg);}40%{transform:rotate(-5deg);}50%{transform:rotate(2deg);}}
+@keyframes arrHoyGlow{0%,100%{box-shadow:0 2px 10px rgba(239,68,68,.4);}50%{box-shadow:0 3px 18px rgba(245,158,11,.85);}}
   </style>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2133,6 +2150,7 @@
               <div class="user-greeting" id="userGreeting"></div>
               <div class="user-role" id="userRoleText"></div>
             </div>
+            <div id="arrivalsAlert" style="display:none;"></div>
             <div id="onlineResAlert" style="display:none;"></div>
 
             <!-- Quick Availability Panel -->
@@ -3266,7 +3284,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-09-10a';
+    var APP_BUILD = '2026-09-10b';
     var _bfPromoRowCount = 0;
     var CONFIG_KEYS = ['hotelInfo', 'hotelTerms', 'dailyRoutine', 'msgTemplates', 'emergencyContacts', 'breakfastPromo', 'guestGuide'];
 
@@ -7223,6 +7241,7 @@
       }
 
       try { if (typeof _renderOnlineResAlert === 'function') _renderOnlineResAlert(); } catch (e) {}
+      try { if (typeof _renderArrivalsAlert === 'function') _renderArrivalsAlert(); } catch (e) {}
       // Init availability panel
       initDashAvail();
     }
@@ -16931,6 +16950,52 @@
         }
       } catch (e) {}
       try { var a = el && el.querySelector('.onres-alert'); if (a) { a.classList.add('onres-flash'); setTimeout(function () { a.classList.remove('onres-flash'); }, 1600); } } catch (e) {}
+    }
+
+    // ============ ALERTA DE LLEGADAS PRÓXIMAS (hoy y mañana) ============
+    function _renderArrivalsAlert() {
+      var el = document.getElementById('arrivalsAlert');
+      if (!el) return;
+      if (!S.user || (S.user.rol !== 'admin' && S.user.rol !== 'recepcion')) { el.innerHTML = ''; el.style.display = 'none'; return; }
+      var today = normDate(new Date());
+      var manana = normDate(new Date(Date.now() + 86400000));
+      // Reservas que aún NO han hecho check-in y llegan hoy o mañana
+      var list = (S.reservas || []).filter(function (r) {
+        if (r.estado !== 'Confirmada' && r.estado !== 'Reservada') return false;
+        var fe = String(r.fechaEntrada || '').substring(0, 10);
+        return fe === today || fe === manana;
+      });
+      if (!list.length) { el.innerHTML = ''; el.style.display = 'none'; return; }
+      // Orden: primero las de hoy, luego mañana; por habitación
+      list.sort(function (a, b) {
+        var fa = String(a.fechaEntrada).substring(0, 10), fb = String(b.fechaEntrada).substring(0, 10);
+        if (fa !== fb) return fa.localeCompare(fb);
+        return String(a.habitacionNum).localeCompare(String(b.habitacionNum));
+      });
+      function row(r, hoy) {
+        var pax = (parseInt(r.adultos) || 0) + (parseInt(r.niños != null ? r.niños : r.ninos) || 0);
+        var sinConf = (r.estado === 'Reservada') ? ' · <span style="color:#fde68a;">sin confirmar</span>' : '';
+        return '<div class="arr-item">'
+          + '<div class="arr-info"><div class="arr-name">' + (hoy ? '🛎️ ' : '📅 ') + _wbEsc(r.huesped || '') + '</div>'
+          + '<div class="arr-meta">Hab. ' + _wbEsc(r.habitacionNum || '') + ' · ' + (pax || 1) + ' huésped(es)' + sinConf + '</div></div>'
+          + '<button class="arr-btn" onclick="openReservaModal(\'' + r.id + '\')">Preparar</button>'
+          + '</div>';
+      }
+      var hoyList = list.filter(function (r) { return String(r.fechaEntrada).substring(0, 10) === today; });
+      var manList = list.filter(function (r) { return String(r.fechaEntrada).substring(0, 10) === manana; });
+      var html = '<div class="arr-alert">';
+      html += '<div class="arr-head"><span class="arr-ic">🛎️</span> <span>Llegadas próximas</span></div>';
+      if (hoyList.length) {
+        html += '<div class="arr-sub arr-hoy">HOY (' + hoyList.length + ') — ten todo listo</div>';
+        html += hoyList.map(function (r) { return row(r, true); }).join('');
+      }
+      if (manList.length) {
+        html += '<div class="arr-sub arr-man">MAÑANA (' + manList.length + ')</div>';
+        html += manList.map(function (r) { return row(r, false); }).join('');
+      }
+      html += '</div>';
+      el.innerHTML = html;
+      el.style.display = '';
     }
 
     // ============ FACTURA POR HUÉSPED (mensaje/enlace guardado en la reserva) ============
