@@ -3284,7 +3284,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-09-10b';
+    var APP_BUILD = '2026-09-10c';
     var _bfPromoRowCount = 0;
     var CONFIG_KEYS = ['hotelInfo', 'hotelTerms', 'dailyRoutine', 'msgTemplates', 'emergencyContacts', 'breakfastPromo', 'guestGuide'];
 
@@ -6783,8 +6783,10 @@
           text:'Enviar instrucciones de llegada a '+r.huesped+' (Hab.'+r.habitacionNum+')',
           action:'previewTemplate(\'instrucciones\',\''+r.id+'\')', actionLabel:'Enviar', actionIcon:'📱' });
       });
-      // Reservas sin confirmar
-      S.reservas.filter(function(r){ return r.estado === 'Reservada'; }).forEach(function(r){
+      // Solo tareas próximas: reservas que llegan dentro de los próximos días
+      var _dashProxWindow = normDate(new Date(Date.now() + 3*86400000));
+      // Reservas sin confirmar (próximas)
+      S.reservas.filter(function(r){ return r.estado === 'Reservada' && r.fechaEntrada <= _dashProxWindow; }).forEach(function(r){
         tasks.push({ id:'msg_confirmar_'+r.id, cat:'msg', icon:'🌐', priority:0,
           text:'Confirmar reserva online de '+r.huesped+' ('+formatDate(r.fechaEntrada)+', Hab.'+r.habitacionNum+')',
           action:'confirmarReserva(\''+r.id+'\')', actionLabel:'Confirmar', actionIcon:'✅' });
@@ -6809,7 +6811,7 @@
       });
       // Reservas confirmadas sin anticipo mínimo
       var _taskAPct = getAnticipoPct();
-      S.reservas.filter(function(r){ return (r.estado === 'Confirmada' || r.estado === 'Reservada') && r.fechaEntrada >= today; }).forEach(function(r){
+      S.reservas.filter(function(r){ return (r.estado === 'Confirmada' || r.estado === 'Reservada') && r.fechaEntrada >= today && r.fechaEntrada <= _dashProxWindow; }).forEach(function(r){
         var paid = S.cobros.filter(function(c){return c.reservaId===r.id}).reduce(function(s,c){return s+c.monto},0);
         var minReq = Math.round(r.tarifaTotal * getAnticipoFraction() * 100) / 100;
         if (paid < minReq) {
@@ -7477,6 +7479,19 @@
         'Check-out': allFiltered.filter(r => r.estado === 'Check-out'),
         'Cancelada': allFiltered.filter(r => r.estado === 'Cancelada')
       };
+      // Ordenar: los más próximos a llegar arriba (por fecha de entrada ascendente).
+      // Historial (check-out/cancelada): del más reciente al más antiguo.
+      function _resEntKey(r){ return String(r.fechaEntrada||'').substring(0,10); }
+      ['Check-in','Confirmada','Reservada'].forEach(function(g){
+        groups[g].sort(function(a,b){ return _resEntKey(a).localeCompare(_resEntKey(b)); });
+      });
+      ['Check-out','Cancelada'].forEach(function(g){
+        groups[g].sort(function(a,b){
+          var ka=String(a.fechaSalida||a.fechaEntrada||'').substring(0,10);
+          var kb=String(b.fechaSalida||b.fechaEntrada||'').substring(0,10);
+          return kb.localeCompare(ka);
+        });
+      });
 
       const statusIcons = {
         'Check-in': '🔵',
