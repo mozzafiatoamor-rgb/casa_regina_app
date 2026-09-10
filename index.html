@@ -22,18 +22,18 @@
     }
 
     :root, [data-theme="dark"] {
-      --bg: #0f1410;
-      --surface: #182018;
-      --surface2: #1f2b1f;
-      --surface3: #2a3a2a;
-      --accent: #8baa6a;
-      --green: #6bbf7b;
-      --red: #cf6b6b;
-      --yellow: #c4a84d;
-      --blue: #6ba5cf;
-      --text: #e4e8e0;
-      --text2: #8a9a80;
-      --radius: 14px;
+      --bg: #0c0a17;
+      --surface: #17132b;
+      --surface2: #1f1a3a;
+      --surface3: #2c2652;
+      --accent: #a78bfa;
+      --green: #34d399;
+      --red: #fb7185;
+      --yellow: #fbbf24;
+      --blue: #60a5fa;
+      --text: #eef0fb;
+      --text2: #aba6d4;
+      --radius: 16px;
     }
 
     [data-theme="light"] {
@@ -53,9 +53,18 @@
     html, body {
       width: 100%;
       height: 100%;
-      background: var(--bg);
+      background:
+        radial-gradient(1100px 780px at 12% -8%, rgba(167,139,250,.22), transparent 60%),
+        radial-gradient(1000px 720px at 116% 10%, rgba(96,165,250,.18), transparent 60%),
+        radial-gradient(1000px 900px at 50% 120%, rgba(52,211,153,.15), transparent 62%),
+        var(--bg);
+      background-attachment: fixed;
       color: var(--text);
-      font-family: 'DM Sans', sans-serif;
+      font-family: 'Inter', 'DM Sans', system-ui, -apple-system, sans-serif;
+      font-size: 15px;
+      line-height: 1.5;
+      letter-spacing: .1px;
+      -webkit-font-smoothing: antialiased;
       overflow: hidden;
     }
 
@@ -280,13 +289,13 @@
     }
 
     .user-greeting {
-      font-size: 18px;
+      font-size: 22px;
       font-weight: 700;
       margin-bottom: 4px;
     }
 
     .user-role {
-      font-size: 12px;
+      font-size: 13px;
       color: var(--text2);
     }
 
@@ -305,7 +314,7 @@
     }
 
     .stat-label {
-      font-size: 12px;
+      font-size: 13px;
       color: var(--text2);
       margin-bottom: 8px;
     }
@@ -341,7 +350,7 @@
       padding: 16px;
       border-radius: var(--radius);
       cursor: pointer;
-      font-size: 13px;
+      font-size: 15px;
       font-weight: 600;
       transition: all 0.2s;
       display: flex;
@@ -356,11 +365,11 @@
     }
 
     .action-btn-icon {
-      font-size: 20px;
+      font-size: 24px;
     }
 
     .section-title {
-      font-size: 14px;
+      font-size: 15px;
       font-weight: 700;
       color: var(--text2);
       margin-bottom: 12px;
@@ -379,11 +388,12 @@
       padding: 12px;
       border-radius: var(--radius);
       border-left: 4px solid var(--accent);
-      font-size: 13px;
-      line-height: 1.5;
+      font-size: 15px;
+      line-height: 1.55;
     }
 
     .item-title {
+      font-size: 16px;
       font-weight: 600;
       color: var(--text);
       margin-bottom: 4px;
@@ -391,7 +401,7 @@
 
     .item-meta {
       color: var(--text2);
-      font-size: 11px;
+      font-size: 13px;
     }
 
     /* Rooms Grid */
@@ -926,7 +936,7 @@
     }
 
     .form-label {
-      font-size: 12px;
+      font-size: 13px;
       font-weight: 600;
       margin-bottom: 6px;
       color: var(--text2);
@@ -940,10 +950,10 @@
       background: var(--surface2);
       border: 1px solid var(--surface3);
       color: var(--text);
-      padding: 12px;
+      padding: 13px;
       border-radius: var(--radius);
       font-family: inherit;
-      font-size: 13px;
+      font-size: 15px;
       outline: none;
       transition: all 0.2s;
     }
@@ -968,10 +978,10 @@
       background: var(--accent);
       color: var(--bg);
       border: none;
-      padding: 14px;
+      padding: 15px;
       border-radius: var(--radius);
       font-weight: 700;
-      font-size: 14px;
+      font-size: 15px;
       cursor: pointer;
       transition: all 0.2s;
       margin-top: 10px;
@@ -1113,10 +1123,10 @@
       background: var(--surface2);
       border: 1px solid var(--surface3);
       color: var(--text);
-      padding: 12px;
+      padding: 13px;
       border-radius: var(--radius);
       font-family: inherit;
-      font-size: 13px;
+      font-size: 15px;
       outline: none;
     }
 
@@ -1544,11 +1554,11 @@
     @media (max-width: 380px) {
       .stats-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
       .stat-box { padding: 12px 10px; }
-      .stat-value { font-size: 18px; }
-      .stat-label { font-size: 10px; }
+      .stat-value { font-size: 22px; }
+      .stat-label { font-size: 12px; }
       .actions-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
-      .action-btn { padding: 12px 8px; font-size: 11px; }
-      .action-btn-icon { font-size: 18px; }
+      .action-btn { padding: 14px 8px; font-size: 14px; }
+      .action-btn-icon { font-size: 22px; }
       .rooms-grid { grid-template-columns: 1fr; }
       .form-row { grid-template-columns: 1fr; }
       .pill { padding: 6px 10px; font-size: 11px; }
@@ -1560,7 +1570,7 @@
       .report-chart-bar { height: 110px; }
       .report-bar-value { font-size: 8px; }
       .report-bar-label { font-size: 8px; }
-      .section-title { font-size: 13px; }
+      .section-title { font-size: 15px; }
       .modal-title { font-size: 15px; }
     }
 
@@ -3256,7 +3266,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-09-08a';
+    var APP_BUILD = '2026-09-10a';
     var _bfPromoRowCount = 0;
     var CONFIG_KEYS = ['hotelInfo', 'hotelTerms', 'dailyRoutine', 'msgTemplates', 'emergencyContacts', 'breakfastPromo', 'guestGuide'];
 
