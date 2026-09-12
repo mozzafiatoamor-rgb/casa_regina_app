@@ -3278,7 +3278,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-09-10d';
+    var APP_BUILD = '2026-09-12a';
     var _bfPromoRowCount = 0;
     var CONFIG_KEYS = ['hotelInfo', 'hotelTerms', 'dailyRoutine', 'msgTemplates', 'emergencyContacts', 'breakfastPromo', 'guestGuide'];
 
@@ -12794,6 +12794,7 @@
       }
       if (res.estado === 'Confirmada' || res.estado === 'Reservada') {
         buttons += '<button class="form-button" onclick="checkinReservaDirect(\'' + resId + '\')" style="background:var(--blue);color:#fff;">\uD83D\uDD11 Hacer Check-in</button>';
+        buttons += '<button class="form-button secondary" onclick="closeModal();setTimeout(function(){openCambioHabitacionModal(\'' + resId + '\')},120)" style="border-color:var(--blue);color:var(--blue)">🔀 Cambiar de habitación</button>';
         buttons += '<button class="form-button secondary" onclick="cancelReserva(\'' + resId + '\')">Cancelar Reserva</button>';
         if (balance > 0) {
           buttons += '<button class="form-button" onclick="closeModal();openPaymentModal(\'' + resId + '\')">💰 Cobrar ($' + balance + ' pendiente)</button>';
@@ -12802,6 +12803,7 @@
         }
       } else if (res.estado === 'Check-in') {
         buttons += '<button class="form-button" onclick="closeModal();openExtraChargeModal(\'' + resId + '\')" style="background:var(--yellow);color:var(--bg)">➕ Agregar Cargo Extra</button>';
+        buttons += '<button class="form-button secondary" onclick="closeModal();setTimeout(function(){openCambioHabitacionModal(\'' + resId + '\')},120)" style="border-color:var(--blue);color:var(--blue)">🔀 Cambiar de habitación</button>';
         if (balance > 0) {
           buttons += '<button class="form-button" onclick="closeModal();openPaymentModal(\'' + resId + '\')">💰 Cobrar ($' + balance + ' pendiente)</button>';
         } else {
@@ -16937,6 +16939,159 @@
       document.getElementById('taskDetailModal').querySelector('.modal-title').textContent = '🌐 Reservas Online';
       document.getElementById('taskDetailActions').innerHTML = '';
       openModal('taskDetailModal');
+    }
+
+    // ============ CAMBIO DE HABITACIÓN ============
+    // Mueve una reserva a otra habitación (p. ej. falla del A/C tras el check-in),
+    // conservando huésped, fechas, tarifa, cobros, desayunos y factura.
+    function openCambioHabitacionModal(resId) {
+      var res = (S.reservas || []).find(function (r) { return r.id === resId; });
+      if (!res) { toast('Reserva no encontrada', true); return; }
+      var isCheckedIn = res.estado === 'Check-in';
+      // Habitaciones candidatas: sin mantenimiento/fuera de servicio, distintas a la actual, sin traslape de fechas
+      var opciones = (S.rooms || []).filter(function (rm) {
+        if (String(rm.numero) === String(res.habitacionNum)) return false;
+        if (rm.estado === 'Mantenimiento' || rm.estado === 'Fuera de servicio') return false;
+        if (hasOverlap(rm.numero, res.fechaEntrada, res.fechaSalida, res.id)) return false;
+        return true;
+      }).sort(function (a, b) {
+        var order = { 'Disponible': 0, 'Limpieza': 1, 'Reservada': 2, 'Ocupada': 3 };
+        var oa = order[a.estado] != null ? order[a.estado] : 5, ob = order[b.estado] != null ? order[b.estado] : 5;
+        if (oa !== ob) return oa - ob;
+        return String(a.numero).localeCompare(String(b.numero), undefined, { numeric: true });
+      });
+
+      var h = '';
+      h += '<div style="background:var(--surface2);border-radius:10px;padding:11px 13px;margin-bottom:14px;">';
+      h += '<div style="font-size:12px;color:var(--text2);margin-bottom:3px;">Huésped</div>';
+      h += '<div style="font-weight:700;font-size:14px;margin-bottom:6px;">' + _wbEsc(res.huesped || '') + '</div>';
+      h += '<div style="font-size:12px;color:var(--text2);">Habitación actual: <b style="color:var(--text);">' + _wbEsc(res.habitacionNum || '') + '</b> · ' + _wbEsc(formatDate(res.fechaEntrada)) + ' → ' + _wbEsc(formatDate(res.fechaSalida)) + '</div>';
+      h += '</div>';
+
+      if (!opciones.length) {
+        h += '<div style="text-align:center;padding:22px;color:var(--text2);">No hay otras habitaciones disponibles para estas fechas.</div>';
+        document.getElementById('taskDetailContent').innerHTML = h;
+        document.getElementById('taskDetailModal').querySelector('.modal-title').textContent = '🔀 Cambiar de habitación';
+        document.getElementById('taskDetailActions').innerHTML = '';
+        openModal('taskDetailModal');
+        return;
+      }
+
+      h += '<label style="display:block;font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;">Nueva habitación</label>';
+      h += '<select id="cambioNewRoom" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--surface3);border-radius:8px;padding:11px;font-size:14px;color:var(--text);margin-bottom:14px;">';
+      opciones.forEach(function (rm) {
+        var estadoTxt = rm.estado === 'Disponible' ? '' : ' · ' + rm.estado;
+        h += '<option value="' + _wbEsc(rm.numero) + '">Hab. ' + _wbEsc(rm.numero) + ' — ' + _wbEsc(rm.tipo || '') + ' ($' + _fmt(parseFloat(rm.tarifa) || 0) + ')' + estadoTxt + '</option>';
+      });
+      h += '</select>';
+
+      h += '<label style="display:block;font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;">Motivo del cambio</label>';
+      h += '<select id="cambioMotivo" onchange="var o=document.getElementById(\'cambioMotivoOtro\');if(o){o.style.display=this.value===\'Otro\'?\'block\':\'none\';}" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--surface3);border-radius:8px;padding:11px;font-size:14px;color:var(--text);margin-bottom:8px;">';
+      ['Aire acondicionado no funciona', 'Falla de plomería / agua caliente', 'Ruido o molestia', 'Petición del huésped', 'Problema de limpieza', 'Otro'].forEach(function (m) {
+        h += '<option value="' + m + '">' + m + '</option>';
+      });
+      h += '</select>';
+      h += '<input type="text" id="cambioMotivoOtro" placeholder="Describe el motivo" style="display:none;width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--surface3);border-radius:8px;padding:10px;font-size:13px;color:var(--text);margin-bottom:14px;">';
+
+      if (isCheckedIn) {
+        h += '<label style="display:block;font-size:12px;font-weight:700;color:var(--text2);margin:6px 0 8px;">¿Qué hago con la habitación ' + _wbEsc(res.habitacionNum) + ' (la que deja)?</label>';
+        h += '<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;">';
+        h += '<label style="display:flex;align-items:flex-start;gap:9px;background:var(--surface2);border:1px solid var(--surface3);border-radius:8px;padding:11px;cursor:pointer;"><input type="radio" name="cambioDisp" value="Mantenimiento" checked style="margin-top:2px;"><span><b style="font-size:13px;">🔧 Mantenimiento</b><br><span style="font-size:11px;color:var(--text2);">Algo falló (A/C, plomería…). Queda fuera de servicio hasta revisarla.</span></span></label>';
+        h += '<label style="display:flex;align-items:flex-start;gap:9px;background:var(--surface2);border:1px solid var(--surface3);border-radius:8px;padding:11px;cursor:pointer;"><input type="radio" name="cambioDisp" value="Limpieza" style="margin-top:2px;"><span><b style="font-size:13px;">🧹 Limpieza</b><br><span style="font-size:11px;color:var(--text2);">Sin falla; solo hay que asearla. Se crea tarea de limpieza.</span></span></label>';
+        h += '</div>';
+      }
+
+      h += '<div style="font-size:11px;color:var(--text2);background:var(--surface2);border-radius:8px;padding:9px 11px;margin-bottom:14px;">💡 La tarifa, cobros, desayunos y factura del huésped se conservan igual. Solo cambia la habitación.</div>';
+
+      h += '<button class="form-button" onclick="confirmCambioHabitacion(\'' + resId + '\')" style="width:100%;">🔀 Confirmar cambio de habitación</button>';
+
+      document.getElementById('taskDetailContent').innerHTML = h;
+      document.getElementById('taskDetailModal').querySelector('.modal-title').textContent = '🔀 Cambiar de habitación';
+      document.getElementById('taskDetailActions').innerHTML = '';
+      openModal('taskDetailModal');
+    }
+
+    async function confirmCambioHabitacion(resId) {
+      if (window._cambioBusy) return;
+      var res = (S.reservas || []).find(function (r) { return r.id === resId; });
+      if (!res) { toast('Reserva no encontrada', true); return; }
+      var sel = document.getElementById('cambioNewRoom');
+      if (!sel || !sel.value) { toast('Elige la nueva habitación', true); return; }
+      var newNum = sel.value;
+      var newRoom = (S.rooms || []).find(function (r) { return String(r.numero) === String(newNum); });
+      var oldRoom = (S.rooms || []).find(function (r) { return String(r.numero) === String(res.habitacionNum); });
+      if (!newRoom) { toast('Habitación no encontrada', true); return; }
+
+      var motivo = '';
+      var motSel = document.getElementById('cambioMotivo');
+      motivo = motSel ? motSel.value : '';
+      if (motivo === 'Otro') {
+        var otroEl = document.getElementById('cambioMotivoOtro');
+        motivo = (otroEl && otroEl.value.trim()) ? otroEl.value.trim() : 'Otro';
+      }
+      var isCheckedIn = res.estado === 'Check-in';
+      var disp = 'Limpieza';
+      if (isCheckedIn) {
+        var dEl = document.querySelector('input[name="cambioDisp"]:checked');
+        disp = dEl ? dEl.value : 'Mantenimiento';
+      }
+
+      window._cambioBusy = true;
+      var btn = document.querySelector('#taskDetailContent button.form-button');
+      if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; }
+
+      try {
+        await busy(async function () {
+          var n = now();
+          var oldNum = res.habitacionNum;
+          // Reserva: solo cambia la habitación; todo lo demás igual
+          var resRow = [res.id, newNum, res.huesped, res.telefono, res.email, res.fechaEntrada, res.fechaSalida, res.adultos, (res.niños != null ? res.niños : res.ninos), res.tarifa, res.tarifaTotal, res.estado, res.notas, res.creadoPor, res.fechaCreacion];
+          var logRow = [normDate(new Date()), n.split(' ')[1], (S.user && S.user.usuario) || '', 'Cambio de habitación', res.huesped + ': Hab. ' + oldNum + ' → Hab. ' + newNum + ' (' + motivo + ')', 'warning'];
+          var ops = [{ type: 'updateById', sheet: '📋 Reservas', id: res.id, values: resRow }];
+
+          var hkTask = null;
+          if (isCheckedIn) {
+            // Nueva habitación ocupada
+            ops.push({ type: 'updateById', sheet: '🏨 Habitaciones', id: newRoom.id, values: [newRoom.id, newRoom.numero, newRoom.tipo, newRoom.tarifa, 'Ocupada', newRoom.notas] });
+            // Habitación anterior: mantenimiento o limpieza
+            var oldNotas = oldRoom ? (oldRoom.notas || '') : '';
+            if (disp === 'Mantenimiento') {
+              var stamp = '[' + normDate(new Date()) + '] ' + motivo;
+              oldNotas = oldNotas ? (oldNotas + ' | ' + stamp) : stamp;
+            }
+            if (oldRoom) {
+              ops.push({ type: 'updateById', sheet: '🏨 Habitaciones', id: oldRoom.id, values: [oldRoom.id, oldRoom.numero, oldRoom.tipo, oldRoom.tarifa, disp, oldNotas] });
+            }
+            if (disp === 'Limpieza') {
+              var taskId = nextId('HK', S.housekeeping);
+              hkTask = { id: taskId, fecha: normDate(new Date()), habitacionNum: oldNum, tarea: 'Limpieza tras cambio de habitación', prioridad: 'Alta', estado: 'Pendiente', asignadoA: '', notas: motivo, horaInicio: '', horaFin: '', verificado: '', checklist: '' };
+              ops.push({ type: 'append', sheet: '🧹 Housekeeping', values: [taskId, hkTask.fecha, oldNum, hkTask.tarea, 'Alta', 'Pendiente', '', motivo, '', '', '', ''] });
+            }
+          }
+          ops.push({ type: 'append', sheet: '📜 Bitácora', values: logRow });
+
+          await sheets.multi(ops);
+
+          // Estado local
+          var ri = S.reservas.findIndex(function (r) { return r.id === res.id; });
+          if (ri !== -1) S.reservas[ri].habitacionNum = newNum;
+          if (isCheckedIn) {
+            var nri = S.rooms.findIndex(function (r) { return String(r.numero) === String(newNum); });
+            if (nri !== -1) S.rooms[nri].estado = 'Ocupada';
+            var ori = S.rooms.findIndex(function (r) { return String(r.numero) === String(oldNum); });
+            if (ori !== -1) { S.rooms[ori].estado = disp; if (disp === 'Mantenimiento' && oldRoom) S.rooms[ori].notas = oldNotas; }
+            if (hkTask) S.housekeeping.push(hkTask);
+          }
+
+          toast('Habitación cambiada: ' + oldNum + ' → ' + newNum);
+          closeModal();
+          render();
+          // Reabrir la ficha para enviar mensajes/código al huésped con la nueva habitación
+          setTimeout(function () { try { openReservaModal(res.id); } catch (e) {} }, 200);
+        }, 'Cambiando habitación...');
+      } finally {
+        window._cambioBusy = false;
+      }
     }
 
     // ============ ALERTA DE RESERVAS ONLINE SIN CONFIRMAR ============
