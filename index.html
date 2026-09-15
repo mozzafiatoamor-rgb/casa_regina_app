@@ -2303,6 +2303,7 @@
       <div class="tab-content" id="tabCobros">
         <div class="tab-scroll">
           <div id="cobrosStats"></div>
+          <div id="cobrosFilterSection" style="margin-bottom:12px"></div>
           <div class="tabs-pills" id="cobrosPills"></div>
           <div id="cobrosContent"></div>
         </div>
@@ -3278,7 +3279,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-09-12a';
+    var APP_BUILD = '2026-09-15a';
     var _bfPromoRowCount = 0;
     var CONFIG_KEYS = ['hotelInfo', 'hotelTerms', 'dailyRoutine', 'msgTemplates', 'emergencyContacts', 'breakfastPromo', 'guestGuide'];
 
@@ -9771,6 +9772,8 @@
         (todayPay.length > 0 ? ' <span style=\\"font-size:10px;color:var(--text2);font-weight:400\\">(' + todayPay.length + ' movimientos · $' + todayTotal + ')</span>' : '') +
         '</button>') : '');
 
+      try { renderCobrosFilterSection(); } catch(e) {}
+
       var pills=[{id:'activas',label:'Hospedados'},{id:'pendientes',label:'Con Saldo'},{id:'proximas',label:'Próximas'},{id:'historial',label:'Historial'}];
       document.getElementById('cobrosPills').innerHTML = pills.map(function(p){
         return '<div class="pill '+(S.filterCobros===p.id?'active':'')+'" onclick="filterCobrosTab(\''+p.id+'\')">'+p.label+'</div>';
@@ -9862,6 +9865,188 @@
     }
 
     function filterCobrosTab(tab){S.filterCobros=tab;renderCobros()}
+
+    // ============ HISTORIAL DE COBROS (filtro por fecha / cliente / método) ============
+    function renderCobrosFilterSection() {
+      var host = document.getElementById('cobrosFilterSection');
+      if (!host) return;
+      if (!S.cobrosHist) S.cobrosHist = { open:false, desde:'', hasta:'', cliente:'', metodo:'' };
+      var st = S.cobrosHist;
+      // Construir el armazón una sola vez para no perder foco al escribir
+      if (!document.getElementById('cobHistForm')) {
+        var metodos = ['Efectivo','Transferencia','Tarjeta','Depósito'];
+        var h = '';
+        h += '<button type="button" id="cobHistToggle" onclick="toggleCobrosHist()" style="width:100%;display:flex;align-items:center;justify-content:space-between;background:var(--surface2);border:1px solid var(--surface3);border-radius:var(--radius);padding:12px 14px;cursor:pointer;color:var(--text);font-size:13px;font-weight:700;">';
+        h += '<span>🔎 Historial de cobros — filtrar por fecha / cliente</span><span id="cobHistCaret" style="color:var(--text2);font-size:12px;">▼</span>';
+        h += '</button>';
+        h += '<div id="cobHistBody" hidden style="background:var(--surface2);border:1px solid var(--surface3);border-top:none;border-radius:0 0 var(--radius) var(--radius);padding:14px;margin-top:-6px;">';
+        h += '<div id="cobHistForm">';
+        // Presets rápidos
+        h += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">';
+        h += '<button type="button" onclick="cobrosHistPreset(\'hoy\')" style="background:var(--surface3);border:none;border-radius:20px;padding:6px 12px;font-size:11px;font-weight:700;color:var(--text);cursor:pointer;">Hoy</button>';
+        h += '<button type="button" onclick="cobrosHistPreset(\'semana\')" style="background:var(--surface3);border:none;border-radius:20px;padding:6px 12px;font-size:11px;font-weight:700;color:var(--text);cursor:pointer;">Esta semana</button>';
+        h += '<button type="button" onclick="cobrosHistPreset(\'mes\')" style="background:var(--surface3);border:none;border-radius:20px;padding:6px 12px;font-size:11px;font-weight:700;color:var(--text);cursor:pointer;">Este mes</button>';
+        h += '<button type="button" onclick="cobrosHistPreset(\'todo\')" style="background:var(--accent);border:none;border-radius:20px;padding:6px 12px;font-size:11px;font-weight:700;color:var(--bg);cursor:pointer;">Completo</button>';
+        h += '</div>';
+        // Fechas
+        h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">';
+        h += '<div><label style="font-size:10px;color:var(--text2);display:block;margin-bottom:3px;">Desde</label><input type="date" id="cobHistDesde" onchange="applyCobrosHist()" style="width:100%;box-sizing:border-box;background:var(--surface3);border:1px solid var(--surface3);border-radius:8px;padding:9px;font-size:13px;color:var(--text);"></div>';
+        h += '<div><label style="font-size:10px;color:var(--text2);display:block;margin-bottom:3px;">Hasta</label><input type="date" id="cobHistHasta" onchange="applyCobrosHist()" style="width:100%;box-sizing:border-box;background:var(--surface3);border:1px solid var(--surface3);border-radius:8px;padding:9px;font-size:13px;color:var(--text);"></div>';
+        h += '</div>';
+        // Cliente + método
+        h += '<div style="margin-bottom:8px;"><label style="font-size:10px;color:var(--text2);display:block;margin-bottom:3px;">Cliente</label><input type="text" id="cobHistCliente" placeholder="Buscar por nombre del huésped..." oninput="applyCobrosHist()" style="width:100%;box-sizing:border-box;background:var(--surface3);border:1px solid var(--surface3);border-radius:8px;padding:9px;font-size:13px;color:var(--text);"></div>';
+        h += '<div style="margin-bottom:12px;"><label style="font-size:10px;color:var(--text2);display:block;margin-bottom:3px;">Método de pago</label><select id="cobHistMetodo" onchange="applyCobrosHist()" style="width:100%;box-sizing:border-box;background:var(--surface3);border:1px solid var(--surface3);border-radius:8px;padding:9px;font-size:13px;color:var(--text);"><option value="">Todos</option>';
+        metodos.forEach(function(m){ h += '<option value="'+m+'">'+m+'</option>'; });
+        h += '</select></div>';
+        h += '<div style="display:flex;gap:8px;margin-bottom:12px;">';
+        h += '<button type="button" onclick="cobrosHistPreset(\'limpiar\')" style="flex:1;background:var(--surface3);border:none;border-radius:8px;padding:9px;font-size:12px;font-weight:600;color:var(--text2);cursor:pointer;">Limpiar filtros</button>';
+        h += '<button type="button" onclick="exportCobrosHistCSV()" style="flex:1;background:var(--surface3);border:1px solid var(--accent);border-radius:8px;padding:9px;font-size:12px;font-weight:600;color:var(--accent);cursor:pointer;">⬇️ Exportar CSV</button>';
+        h += '</div>';
+        h += '</div>'; // cobHistForm
+        h += '<div id="cobHistResults"></div>';
+        h += '</div>'; // cobHistBody
+        host.innerHTML = h;
+        // Restaurar valores previos
+        var de=document.getElementById('cobHistDesde'); if(de) de.value=st.desde||'';
+        var ha=document.getElementById('cobHistHasta'); if(ha) ha.value=st.hasta||'';
+        var cl=document.getElementById('cobHistCliente'); if(cl) cl.value=st.cliente||'';
+        var me=document.getElementById('cobHistMetodo'); if(me) me.value=st.metodo||'';
+      }
+      // Reflejar estado abierto/cerrado
+      var body=document.getElementById('cobHistBody'); if(body) body.hidden=!st.open;
+      var caret=document.getElementById('cobHistCaret'); if(caret) caret.textContent=st.open?'▲':'▼';
+      if (st.open) applyCobrosHist();
+    }
+
+    function toggleCobrosHist() {
+      if (!S.cobrosHist) S.cobrosHist = { open:false, desde:'', hasta:'', cliente:'', metodo:'' };
+      S.cobrosHist.open = !S.cobrosHist.open;
+      var body=document.getElementById('cobHistBody'); if(body) body.hidden=!S.cobrosHist.open;
+      var caret=document.getElementById('cobHistCaret'); if(caret) caret.textContent=S.cobrosHist.open?'▲':'▼';
+      if (S.cobrosHist.open) applyCobrosHist();
+    }
+
+    function cobrosHistPreset(which) {
+      if (!S.cobrosHist) S.cobrosHist = { open:true, desde:'', hasta:'', cliente:'', metodo:'' };
+      var now = new Date();
+      var de='', ha='';
+      if (which === 'hoy') { de=ha=normDate(now); }
+      else if (which === 'semana') {
+        var day=(now.getDay()+6)%7; // lunes=0
+        var lunes=new Date(now); lunes.setDate(now.getDate()-day);
+        de=normDate(lunes); ha=normDate(now);
+      }
+      else if (which === 'mes') {
+        de=normDate(new Date(now.getFullYear(), now.getMonth(), 1)); ha=normDate(now);
+      }
+      else if (which === 'todo') { de=''; ha=''; }
+      else if (which === 'limpiar') { de=''; ha=''; S.cobrosHist.cliente=''; S.cobrosHist.metodo=''; var cl=document.getElementById('cobHistCliente'); if(cl)cl.value=''; var me=document.getElementById('cobHistMetodo'); if(me)me.value=''; }
+      S.cobrosHist.desde=de; S.cobrosHist.hasta=ha;
+      var deEl=document.getElementById('cobHistDesde'); if(deEl) deEl.value=de;
+      var haEl=document.getElementById('cobHistHasta'); if(haEl) haEl.value=ha;
+      applyCobrosHist();
+    }
+
+    function _cobrosHistFiltered() {
+      var h = S.cobrosHist || {};
+      var nameById={}, roomById={};
+      (S.reservas||[]).forEach(function(r){ nameById[r.id]=r.huesped; roomById[r.id]=r.habitacionNum; });
+      var cli=(h.cliente||'').toLowerCase().trim();
+      var list=(S.cobros||[]).slice().filter(function(c){
+        var f=String(c.fecha||'').substring(0,10);
+        if(h.desde && f < h.desde) return false;
+        if(h.hasta && f > h.hasta) return false;
+        if(h.metodo && c.metodoPago!==h.metodo) return false;
+        if(cli){ var nm=String(nameById[c.reservaId]||'').toLowerCase(); if(nm.indexOf(cli)===-1) return false; }
+        return true;
+      });
+      list.sort(function(a,b){ var fa=String(a.fecha||'')+' '+String(a.hora||''),fb=String(b.fecha||'')+' '+String(b.hora||''); return fb.localeCompare(fa); });
+      return { list:list, nameById:nameById, roomById:roomById };
+    }
+
+    function applyCobrosHist() {
+      var box = document.getElementById('cobHistResults');
+      if (!box) return;
+      if (!S.cobrosHist) S.cobrosHist = { open:true, desde:'', hasta:'', cliente:'', metodo:'' };
+      var st = S.cobrosHist;
+      var deEl=document.getElementById('cobHistDesde'); if(deEl) st.desde=deEl.value;
+      var haEl=document.getElementById('cobHistHasta'); if(haEl) st.hasta=haEl.value;
+      var clEl=document.getElementById('cobHistCliente'); if(clEl) st.cliente=clEl.value;
+      var meEl=document.getElementById('cobHistMetodo'); if(meEl) st.metodo=meEl.value;
+
+      var data=_cobrosHistFiltered();
+      var list=data.list, nameById=data.nameById, roomById=data.roomById;
+      var total=list.reduce(function(s,c){return s+(c.monto||0);},0);
+      var byM={};
+      list.forEach(function(c){ var m=c.metodoPago||'Otro'; byM[m]=(byM[m]||0)+(c.monto||0); });
+      var methodIcons={'Efectivo':'💵','Tarjeta':'💳','Transferencia':'🏦','Depósito':'📥'};
+
+      var rango='';
+      if (st.desde && st.hasta) rango = (st.desde===st.hasta) ? formatDate(st.desde) : (formatDate(st.desde)+' → '+formatDate(st.hasta));
+      else if (st.desde) rango='Desde '+formatDate(st.desde);
+      else if (st.hasta) rango='Hasta '+formatDate(st.hasta);
+      else rango='Todo el historial';
+
+      var h='';
+      h+='<div style="background:var(--surface3);border-radius:var(--radius);padding:12px 14px;margin-bottom:10px;">';
+      h+='<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;"><span style="font-size:11px;color:var(--text2);">'+_wbEscC(rango)+'</span><span style="font-size:11px;color:var(--text2);">'+list.length+' movimiento(s)</span></div>';
+      h+='<div style="font-size:26px;font-weight:800;font-family:Space Mono,monospace;color:var(--green);">$'+_fmt(total)+'</div>';
+      var mk=Object.keys(byM);
+      if (mk.length){
+        h+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">';
+        mk.forEach(function(m){ h+='<span style="background:var(--surface2);border-radius:20px;padding:4px 10px;font-size:11px;color:var(--text2);">'+(methodIcons[m]||'💰')+' '+_wbEscC(m)+': <b style="color:var(--text);">$'+_fmt(byM[m])+'</b></span>'; });
+        h+='</div>';
+      }
+      h+='</div>';
+
+      if (!list.length) {
+        h+='<div style="text-align:center;padding:26px;color:var(--text2);font-size:13px;">Sin cobros para estos filtros.</div>';
+        box.innerHTML=h;
+        return;
+      }
+
+      list.forEach(function(c){
+        var nm=nameById[c.reservaId]||'(sin reserva)';
+        var rm=roomById[c.reservaId]?(' · Hab. '+roomById[c.reservaId]):'';
+        var icon=methodIcons[c.metodoPago]||'💰';
+        h+='<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;background:var(--surface3);border-radius:10px;padding:10px 12px;margin-bottom:6px;">';
+        h+='<div style="min-width:0;flex:1;">';
+        h+='<div style="font-size:13px;font-weight:700;color:var(--text);">'+_wbEscC(nm)+rm+'</div>';
+        h+='<div style="font-size:11px;color:var(--text2);margin-top:2px;">'+icon+' '+_wbEscC(c.metodoPago||'')+' · '+_wbEscC(c.concepto||'')+'</div>';
+        h+='<div style="font-size:10px;color:var(--text2);margin-top:2px;">'+_wbEscC(String(c.fecha||''))+(c.hora?(' '+_wbEscC(String(c.hora))):'')+(c.responsable?(' · '+_wbEscC(String(c.responsable))):'')+'</div>';
+        h+='</div>';
+        h+='<div style="font-family:Space Mono,monospace;font-weight:800;font-size:15px;color:var(--green);white-space:nowrap;">$'+_fmt(c.monto||0)+'</div>';
+        h+='</div>';
+      });
+      box.innerHTML=h;
+    }
+
+    function _wbEscC(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+    function exportCobrosHistCSV() {
+      var data=_cobrosHistFiltered();
+      var list=data.list, nameById=data.nameById, roomById=data.roomById;
+      if (!list.length) { toast('No hay cobros para exportar', true); return; }
+      function q(v){ v=String(v==null?'':v); return '"'+v.replace(/"/g,'""')+'"'; }
+      var rows=[['Fecha','Hora','Cliente','Habitacion','Metodo','Concepto','Monto','Responsable']];
+      list.forEach(function(c){
+        rows.push([c.fecha||'', c.hora||'', nameById[c.reservaId]||'', roomById[c.reservaId]||'', c.metodoPago||'', c.concepto||'', (c.monto||0), c.responsable||'']);
+      });
+      var total=list.reduce(function(s,c){return s+(c.monto||0);},0);
+      rows.push([]); rows.push(['','','','','','TOTAL', total, '']);
+      var csv=rows.map(function(r){ return r.map(q).join(','); }).join('\r\n');
+      try {
+        var blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8;'});
+        var url=URL.createObjectURL(blob);
+        var a=document.createElement('a');
+        var st=S.cobrosHist||{};
+        var suf=(st.desde||'inicio')+'_a_'+(st.hasta||'hoy');
+        a.href=url; a.download='cobros_'+suf+'.csv';
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        setTimeout(function(){URL.revokeObjectURL(url);},1500);
+        toast('CSV exportado ('+list.length+' cobros)');
+      } catch(e){ toast('No se pudo exportar', true); }
+    }
 
     function corteDeCaja() {
       var today = normDate(new Date());
