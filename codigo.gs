@@ -10,6 +10,20 @@
 // 6. Editar (lápiz) → Versión: Nueva versión → Implementar
 // =============================================
 
+// Hojas que se crean automáticamente (con encabezados) si aún no existen
+var SHEET_HEADERS = {
+  '💸 Gastos': ['ID', 'Fecha', 'Categoria', 'Concepto', 'Monto', 'Tipo', 'Responsable', 'Notas']
+};
+
+function getOrCreateSheet(ss, name) {
+  var sheet = ss.getSheetByName(name);
+  if (!sheet && SHEET_HEADERS[name]) {
+    sheet = ss.insertSheet(name);
+    sheet.appendRow(SHEET_HEADERS[name]);
+  }
+  return sheet;
+}
+
 function doPost(e) {
   try {
     var data = JSON.parse(e.postData.contents);
@@ -17,7 +31,7 @@ function doPost(e) {
 
     // === APPEND (agregar fila) ===
     if (!data.action || data.action === 'append') {
-      var sheet = ss.getSheetByName(data.sheet);
+      var sheet = getOrCreateSheet(ss, data.sheet);
       if (!sheet) {
         return jsonResponse({ success: false, error: 'Hoja no encontrada: ' + data.sheet });
       }
@@ -106,7 +120,7 @@ function doPost(e) {
       for (var oi = 0; oi < ops.length; oi++) {
         var op = ops[oi];
         try {
-          var opSheet = ss.getSheetByName(op.sheet);
+          var opSheet = getOrCreateSheet(ss, op.sheet);
           if (!opSheet) { results.push({ success: false, error: 'Hoja no encontrada: ' + op.sheet }); continue; }
           if (op.type === 'append') {
             opSheet.appendRow(op.values);

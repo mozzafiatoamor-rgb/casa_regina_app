@@ -2309,6 +2309,13 @@
         </div>
       </div>
 
+      <!-- Utilidades Tab -->
+      <div class="tab-content" id="tabUtilidades">
+        <div class="tab-scroll">
+          <div id="utilContent"></div>
+        </div>
+      </div>
+
       <!-- Clientes Tab -->
       <div class="tab-content" id="tabClientes">
         <div class="tab-scroll">
@@ -3279,7 +3286,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-09-15a';
+    var APP_BUILD = '2026-09-15b';
     var _bfPromoRowCount = 0;
     var CONFIG_KEYS = ['hotelInfo', 'hotelTerms', 'dailyRoutine', 'msgTemplates', 'emergencyContacts', 'breakfastPromo', 'guestGuide'];
 
@@ -6547,7 +6554,7 @@
     // ============ DATA LOADING ============
     async function loadData() {
       await busy(async () => {
-        const [roomsData, reservasData, housekeepingData, bitacoraData, usuariosData, cobrosData, clientesData, inventarioData, configData, desayunosData, cotizacionesData, accesosData] = await Promise.all([
+        const [roomsData, reservasData, housekeepingData, bitacoraData, usuariosData, cobrosData, clientesData, inventarioData, configData, desayunosData, cotizacionesData, accesosData, gastosData] = await Promise.all([
           sheets.read('🏨 Habitaciones', 'A2:F20'),
           sheets.read('📋 Reservas', 'A2:P5000'),
           sheets.read('🧹 Housekeeping', 'A2:L5000'),
@@ -6559,7 +6566,8 @@
           sheets.read('⚙️ Config', 'A2:B50').catch(function() { return []; }),
           sheets.read('🍳 Desayunos', 'A2:J5000').catch(function() { return []; }),
           sheets.read('📝 Cotizaciones', 'A2:P5000').catch(function() { return []; }),
-          sheets.read('🔑 Accesos', 'A2:C5000').catch(function() { return []; })
+          sheets.read('🔑 Accesos', 'A2:C5000').catch(function() { return []; }),
+          sheets.read('💸 Gastos', 'A2:H5000').catch(function() { return []; })
         ]);
 
         // Sync config from Sheet → localStorage (Sheet wins on load)
@@ -6651,6 +6659,14 @@
           concepto: c[6], notas: c[7] || '', responsable: c[8] || ''
         }));
 
+        S.gastos = (gastosData || []).map(function(g) {
+          return {
+            id: g[0], fecha: String(g[1] || '').substring(0,10), categoria: g[2] || 'Otros',
+            concepto: g[3] || '', monto: parseFloat(g[4]) || 0, tipo: g[5] || '',
+            responsable: g[6] || '', notas: g[7] || ''
+          };
+        });
+
         S.clientes = clientesData.map(c => ({
           id: c[0], nombre: c[1] || '', telefono: c[2] || '', email: c[3] || '',
           notas: c[4] || '', primeraVisita: c[5] || '', ultimaVisita: c[6] || '',
@@ -6714,6 +6730,7 @@
       renderCotizaciones();
       renderDesayunosTab();
       renderConfig();
+      try { renderUtilidades(); } catch(e) {}
       updateUserBadge();
     }
 
@@ -10046,6 +10063,218 @@
         setTimeout(function(){URL.revokeObjectURL(url);},1500);
         toast('CSV exportado ('+list.length+' cobros)');
       } catch(e){ toast('No se pudo exportar', true); }
+    }
+
+    // ============ UTILIDADES (ejercicio semanal: ventas − gastos) ============
+    var GASTO_CATEGORIAS = ['Nómina','Insumos / Amenidades','Servicios','Mantenimiento','Lavandería','Comisiones','Marketing','Impuestos','Otros'];
+    var GASTO_CAT_ICONS = {'Nómina':'👥','Insumos / Amenidades':'🧴','Servicios':'💡','Mantenimiento':'🔧','Lavandería':'🧺','Comisiones':'💳','Marketing':'📣','Impuestos':'🧾','Otros':'📌'};
+
+    function _weekStartMon(d) {
+      var x = new Date(d.getFullYear ? d.getTime() : d);
+      var day = (x.getDay() + 6) % 7; // lunes = 0
+      x.setDate(x.getDate() - day); x.setHours(0,0,0,0);
+      return x;
+    }
+    function _utilWeekRange() {
+      if (!S.utilWeekStart) S.utilWeekStart = _weekStartMon(new Date());
+      var start = new Date(S.utilWeekStart.getTime());
+      var end = new Date(start.getTime()); end.setDate(end.getDate() + 6);
+      return { start: start, end: end, startStr: normDate(start), endStr: normDate(end) };
+    }
+    function utilWeekNav(delta) {
+      if (!S.utilWeekStart) S.utilWeekStart = _weekStartMon(new Date());
+      var d = new Date(S.utilWeekStart.getTime());
+      d.setDate(d.getDate() + delta * 7);
+      S.utilWeekStart = d;
+      renderUtilidades();
+    }
+    function utilWeekThis() { S.utilWeekStart = _weekStartMon(new Date()); renderUtilidades(); }
+
+    function renderUtilidades() {
+      var host = document.getElementById('utilContent');
+      if (!host) return;
+      if (!(S.user && S.user.rol === 'admin')) { host.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text2)">Solo administradores pueden ver utilidades.</div>'; return; }
+      var wr = _utilWeekRange();
+      var inWeek = function(f){ f = String(f||'').substring(0,10); return f >= wr.startStr && f <= wr.endStr; };
+
+      var ventasList = (S.cobros || []).filter(function(c){ return inWeek(c.fecha); });
+      var ventas = ventasList.reduce(function(s,c){ return s + (c.monto||0); }, 0);
+      var gastosList = (S.gastos || []).filter(function(g){ return inWeek(g.fecha); });
+      var gastos = gastosList.reduce(function(s,g){ return s + (g.monto||0); }, 0);
+      var utilidad = ventas - gastos;
+      var margen = ventas > 0 ? Math.round((utilidad/ventas)*100) : 0;
+
+      // Desglose por categoría
+      var porCat = {};
+      gastosList.forEach(function(g){ var c = g.categoria || 'Otros'; porCat[c] = (porCat[c]||0) + (g.monto||0); });
+      var catKeys = Object.keys(porCat).sort(function(a,b){ return porCat[b]-porCat[a]; });
+
+      var esSemActual = wr.startStr === normDate(_weekStartMon(new Date()));
+      var h = '';
+
+      // Navegador de semana
+      h += '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:14px;">';
+      h += '<button class="cal-nav-btn" onclick="utilWeekNav(-1)" style="flex-shrink:0;">◀</button>';
+      h += '<div style="text-align:center;flex:1;"><div style="font-size:14px;font-weight:800;color:var(--text);">Semana '+formatDate(wr.startStr)+' → '+formatDate(wr.endStr)+'</div>'+(esSemActual?'<div style="font-size:10px;color:var(--accent);font-weight:700;">SEMANA ACTUAL</div>':'<div style="font-size:10px;color:var(--text2);cursor:pointer;text-decoration:underline;" onclick="utilWeekThis()">Ir a semana actual</div>')+'</div>';
+      h += '<button class="cal-nav-btn" onclick="utilWeekNav(1)" style="flex-shrink:0;">▶</button>';
+      h += '</div>';
+
+      // Tarjeta de resultado
+      var utilColor = utilidad >= 0 ? 'var(--green)' : 'var(--red)';
+      h += '<div style="background:var(--surface2);border-radius:var(--radius);padding:16px;margin-bottom:14px;">';
+      h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">';
+      h += '<div style="background:var(--surface3);border-radius:12px;padding:12px;"><div style="font-size:11px;color:var(--text2);margin-bottom:4px;">Ventas (cobros)</div><div style="font-size:20px;font-weight:800;font-family:Space Mono,monospace;color:var(--green);">$'+_fmt(ventas)+'</div><div style="font-size:10px;color:var(--text2);margin-top:2px;">'+ventasList.length+' cobro(s)</div></div>';
+      h += '<div style="background:var(--surface3);border-radius:12px;padding:12px;"><div style="font-size:11px;color:var(--text2);margin-bottom:4px;">Gastos</div><div style="font-size:20px;font-weight:800;font-family:Space Mono,monospace;color:var(--red);">$'+_fmt(gastos)+'</div><div style="font-size:10px;color:var(--text2);margin-top:2px;">'+gastosList.length+' gasto(s)</div></div>';
+      h += '</div>';
+      h += '<div style="border-top:1px solid var(--surface3);padding-top:12px;display:flex;justify-content:space-between;align-items:center;">';
+      h += '<div><div style="font-size:12px;color:var(--text2);">Utilidad de la semana</div><div style="font-size:11px;color:var(--text2);">Margen: '+margen+'%</div></div>';
+      h += '<div style="font-size:28px;font-weight:800;font-family:Space Mono,monospace;color:'+utilColor+';">$'+_fmt(utilidad)+'</div>';
+      h += '</div></div>';
+
+      // Botones de acción
+      h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">';
+      h += '<button class="form-button" onclick="openGastoModal()">➕ Registrar gasto</button>';
+      h += '<button class="form-button secondary" onclick="openGastoModal(null,\'Nómina\',\'Semanal\')">👥 Nómina semanal</button>';
+      h += '</div>';
+
+      // Desglose por categoría
+      if (catKeys.length) {
+        h += '<div class="section-title" style="font-size:14px;margin-bottom:8px;">Gastos por categoría</div>';
+        h += '<div style="background:var(--surface2);border-radius:var(--radius);padding:12px;margin-bottom:14px;">';
+        catKeys.forEach(function(c){
+          var pct = gastos>0 ? Math.round((porCat[c]/gastos)*100) : 0;
+          h += '<div style="margin-bottom:10px;">';
+          h += '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;"><span>'+(GASTO_CAT_ICONS[c]||'📌')+' '+_wbEscC(c)+'</span><b style="font-family:Space Mono,monospace;">$'+_fmt(porCat[c])+'</b></div>';
+          h += '<div style="background:var(--surface3);border-radius:4px;height:6px;overflow:hidden;"><div style="height:100%;width:'+pct+'%;background:var(--accent);border-radius:4px;"></div></div>';
+          h += '</div>';
+        });
+        h += '</div>';
+      }
+
+      // Lista de gastos de la semana
+      h += '<div class="section-title" style="font-size:14px;margin-bottom:8px;">Gastos registrados</div>';
+      if (!gastosList.length) {
+        h += '<div style="text-align:center;padding:26px;color:var(--text2);font-size:13px;">Sin gastos en esta semana. Usa “Registrar gasto”.</div>';
+      } else {
+        var sorted = gastosList.slice().sort(function(a,b){ return String(b.fecha).localeCompare(String(a.fecha)); });
+        sorted.forEach(function(g){
+          h += '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;background:var(--surface2);border-radius:10px;padding:11px 12px;margin-bottom:6px;">';
+          h += '<div style="min-width:0;flex:1;">';
+          h += '<div style="font-size:13px;font-weight:700;color:var(--text);">'+(GASTO_CAT_ICONS[g.categoria]||'📌')+' '+_wbEscC(g.categoria||'Otros')+(g.tipo?(' <span style="font-size:10px;color:var(--text2);font-weight:500;">· '+_wbEscC(g.tipo)+'</span>'):'')+'</div>';
+          if (g.concepto) h += '<div style="font-size:11px;color:var(--text2);margin-top:2px;">'+_wbEscC(g.concepto)+'</div>';
+          h += '<div style="font-size:10px;color:var(--text2);margin-top:2px;">'+_wbEscC(String(g.fecha||''))+(g.responsable?(' · '+_wbEscC(String(g.responsable))):'')+'</div>';
+          h += '</div>';
+          h += '<div style="text-align:right;white-space:nowrap;">';
+          h += '<div style="font-family:Space Mono,monospace;font-weight:800;font-size:15px;color:var(--red);">$'+_fmt(g.monto||0)+'</div>';
+          h += '<div style="margin-top:4px;display:flex;gap:6px;justify-content:flex-end;">';
+          h += '<button onclick="openGastoModal(\''+g.id+'\')" style="background:var(--surface3);border:none;border-radius:6px;padding:4px 8px;font-size:11px;color:var(--text2);cursor:pointer;">✏️</button>';
+          h += '<button onclick="deleteGasto(\''+g.id+'\')" style="background:var(--surface3);border:none;border-radius:6px;padding:4px 8px;font-size:11px;color:var(--red);cursor:pointer;">🗑️</button>';
+          h += '</div></div>';
+          h += '</div>';
+        });
+      }
+
+      host.innerHTML = h;
+    }
+
+    function openGastoModal(gastoId, preCat, preTipo) {
+      var g = gastoId ? (S.gastos || []).find(function(x){ return x.id === gastoId; }) : null;
+      var wr = _utilWeekRange();
+      var defFecha = g ? g.fecha : normDate(new Date());
+      var h = '';
+      h += '<div style="margin-bottom:10px;"><label style="font-size:11px;color:var(--text2);display:block;margin-bottom:4px;">Fecha</label>';
+      h += '<input type="date" id="gFecha" value="'+_wbEscC(defFecha)+'" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--surface3);border-radius:8px;padding:11px;font-size:14px;color:var(--text);"></div>';
+      h += '<div style="margin-bottom:10px;"><label style="font-size:11px;color:var(--text2);display:block;margin-bottom:4px;">Categoría</label>';
+      h += '<select id="gCategoria" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--surface3);border-radius:8px;padding:11px;font-size:14px;color:var(--text);">';
+      var selCat = g ? g.categoria : (preCat || 'Insumos / Amenidades');
+      GASTO_CATEGORIAS.forEach(function(c){ h += '<option value="'+_wbEscC(c)+'"'+(c===selCat?' selected':'')+'>'+(GASTO_CAT_ICONS[c]||'')+' '+_wbEscC(c)+'</option>'; });
+      h += '</select></div>';
+      h += '<div style="margin-bottom:10px;"><label style="font-size:11px;color:var(--text2);display:block;margin-bottom:4px;">Concepto</label>';
+      h += '<input type="text" id="gConcepto" value="'+_wbEscC(g?g.concepto:'')+'" placeholder="Ej. Pago de luz CFE" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--surface3);border-radius:8px;padding:11px;font-size:14px;color:var(--text);"></div>';
+      h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">';
+      h += '<div><label style="font-size:11px;color:var(--text2);display:block;margin-bottom:4px;">Monto (MXN)</label>';
+      h += '<input type="number" id="gMonto" value="'+(g?g.monto:'')+'" step="0.01" min="0" placeholder="0.00" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--surface3);border-radius:8px;padding:11px;font-size:14px;color:var(--text);"></div>';
+      h += '<div><label style="font-size:11px;color:var(--text2);display:block;margin-bottom:4px;">Tipo</label>';
+      h += '<select id="gTipo" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--surface3);border-radius:8px;padding:11px;font-size:14px;color:var(--text);">';
+      var selTipo = g ? g.tipo : (preTipo || 'Diario');
+      ['Diario','Semanal','Fijo','Único','Otro'].forEach(function(t){ h += '<option value="'+t+'"'+(t===selTipo?' selected':'')+'>'+t+'</option>'; });
+      h += '</select></div>';
+      h += '</div>';
+      h += '<div style="margin-bottom:14px;"><label style="font-size:11px;color:var(--text2);display:block;margin-bottom:4px;">Notas (opcional)</label>';
+      h += '<input type="text" id="gNotas" value="'+_wbEscC(g?g.notas:'')+'" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--surface3);border-radius:8px;padding:11px;font-size:13px;color:var(--text);"></div>';
+      h += '<button class="form-button" onclick="saveGasto('+(g?('\''+g.id+'\''):'null')+')" style="width:100%;">💾 '+(g?'Guardar cambios':'Registrar gasto')+'</button>';
+      if (g) h += '<button class="form-button secondary" onclick="deleteGasto(\''+g.id+'\')" style="width:100%;border-color:var(--red);color:var(--red);margin-top:8px;">🗑️ Eliminar gasto</button>';
+
+      document.getElementById('taskDetailContent').innerHTML = h;
+      document.getElementById('taskDetailModal').querySelector('.modal-title').textContent = g ? '✏️ Editar gasto' : '➕ Registrar gasto';
+      document.getElementById('taskDetailActions').innerHTML = '';
+      openModal('taskDetailModal');
+    }
+
+    async function saveGasto(gastoId) {
+      if (window._gastoBusy) return;
+      var fecha = (document.getElementById('gFecha')||{}).value || normDate(new Date());
+      var categoria = (document.getElementById('gCategoria')||{}).value || 'Otros';
+      var concepto = ((document.getElementById('gConcepto')||{}).value || '').trim();
+      var monto = parseFloat((document.getElementById('gMonto')||{}).value) || 0;
+      var tipo = (document.getElementById('gTipo')||{}).value || '';
+      var notas = ((document.getElementById('gNotas')||{}).value || '').trim();
+      if (monto <= 0) { toast('Escribe un monto válido', true); return; }
+
+      window._gastoBusy = true;
+      try {
+        await busy(async function() {
+          var resp = (S.user && S.user.usuario) || '';
+          var n = now();
+          if (gastoId) {
+            var row = [gastoId, fecha, categoria, concepto, monto, tipo, resp, notas];
+            await sheets.multi([
+              { type: 'updateById', sheet: '💸 Gastos', id: gastoId, values: row },
+              { type: 'append', sheet: '📜 Bitácora', values: [normDate(new Date()), n.split(' ')[1], resp, 'Editar gasto', categoria+' $'+_fmt(monto)+(concepto?(' — '+concepto):''), 'info'] }
+            ]);
+            var gi = S.gastos.findIndex(function(x){ return x.id === gastoId; });
+            if (gi !== -1) S.gastos[gi] = { id: gastoId, fecha: fecha, categoria: categoria, concepto: concepto, monto: monto, tipo: tipo, responsable: resp, notas: notas };
+            toast('Gasto actualizado');
+          } else {
+            var id = nextId('GTO', S.gastos || []);
+            var row2 = [id, fecha, categoria, concepto, monto, tipo, resp, notas];
+            await sheets.multi([
+              { type: 'append', sheet: '💸 Gastos', values: row2 },
+              { type: 'append', sheet: '📜 Bitácora', values: [normDate(new Date()), n.split(' ')[1], resp, 'Registrar gasto', categoria+' $'+_fmt(monto)+(concepto?(' — '+concepto):''), 'info'] }
+            ]);
+            if (!S.gastos) S.gastos = [];
+            S.gastos.push({ id: id, fecha: fecha, categoria: categoria, concepto: concepto, monto: monto, tipo: tipo, responsable: resp, notas: notas });
+            toast('Gasto registrado');
+          }
+          closeModal();
+          renderUtilidades();
+        }, 'Guardando gasto...');
+      } finally {
+        window._gastoBusy = false;
+      }
+    }
+
+    async function deleteGasto(gastoId) {
+      var g = (S.gastos || []).find(function(x){ return x.id === gastoId; });
+      if (!g) return;
+      if (!confirm('¿Eliminar este gasto?\n\n'+(g.categoria||'')+' — $'+_fmt(g.monto||0)+(g.concepto?('\n'+g.concepto):''))) return;
+      if (window._gastoBusy) return;
+      window._gastoBusy = true;
+      try {
+        await busy(async function() {
+          await sheets.deleteById('💸 Gastos', gastoId);
+          S.gastos = (S.gastos || []).filter(function(x){ return x.id !== gastoId; });
+          try {
+            var n = now();
+            await sheets.multi([{ type:'append', sheet:'📜 Bitácora', values:[normDate(new Date()), n.split(' ')[1], (S.user&&S.user.usuario)||'', 'Eliminar gasto', (g.categoria||'')+' $'+_fmt(g.monto||0), 'warning'] }]);
+          } catch(e) {}
+          toast('Gasto eliminado');
+          closeModal();
+          renderUtilidades();
+        }, 'Eliminando...');
+      } finally {
+        window._gastoBusy = false;
+      }
     }
 
     function corteDeCaja() {
@@ -16231,7 +16460,8 @@
       { id: 'inventario', icon: '📦', label: 'Inventario' },
       { id: 'cotizaciones', icon: '📝', label: 'Cotización' },
       { id: 'desayunos', icon: '🍳', label: 'Desayunos' },
-      { id: 'reports', icon: '📊', label: 'Reportes' }
+      { id: 'reports', icon: '📊', label: 'Reportes' },
+      { id: 'utilidades', icon: '💵', label: 'Utilidades' }
     ];
 
     var NAV_TABS = NAV_TABS_BASE;
@@ -16241,7 +16471,11 @@
       document.getElementById('navCurrentIcon').textContent = current.icon;
       document.getElementById('navCurrentLabel').textContent = current.label;
 
-      var navHtml = NAV_TABS.map(function(t) {
+      var _isAdmin = S.user && S.user.rol === 'admin';
+      var navHtml = NAV_TABS.filter(function(t) {
+        if (t.id === 'utilidades' && !_isAdmin) return false;
+        return true;
+      }).map(function(t) {
         var isActive = t.id === S.currentTab;
         return '<div class="nav-item ' + (isActive ? 'active' : '') + '" onclick="switchTab(\'' + t.id + '\')">' +
           '<div class="nav-item-icon">' + t.icon + '</div>' +
@@ -16271,6 +16505,7 @@
 
     function switchTab(tabName) {
       if (tabName === 'reports' && !(S.user && S.user.rol === 'admin')) { tabName = 'dashboard'; }
+      if (tabName === 'utilidades' && !(S.user && S.user.rol === 'admin')) { tabName = 'dashboard'; }
       document.querySelectorAll('.tab-content').forEach(function(t) { t.classList.remove('active'); });
       var tabEl = document.getElementById('tab' + tabName.charAt(0).toUpperCase() + tabName.slice(1));
       if (tabEl) tabEl.classList.add('active');
