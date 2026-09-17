@@ -3286,7 +3286,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-09-15b';
+    var APP_BUILD = '2026-09-17a';
     var _bfPromoRowCount = 0;
     var CONFIG_KEYS = ['hotelInfo', 'hotelTerms', 'dailyRoutine', 'msgTemplates', 'emergencyContacts', 'breakfastPromo', 'guestGuide'];
 
@@ -10174,7 +10174,299 @@
         });
       }
 
+      // ---- Panel de reporte por fechas (PDF / imagen UHD / WhatsApp) ----
+      if (!S.repDesde) S.repDesde = wr.startStr;
+      if (!S.repHasta) S.repHasta = wr.endStr;
+      if (!S.repTipo) S.repTipo = 'completo';
+      var _inputCss = 'width:100%;box-sizing:border-box;background:var(--surface3);border:1px solid var(--surface3);border-radius:8px;padding:10px;font-size:13px;color:var(--text);';
+      h += '<div class="section-title" style="font-size:14px;margin:20px 0 8px;">📄 Reporte por fechas</div>';
+      h += '<div style="background:var(--surface2);border-radius:var(--radius);padding:14px;">';
+      h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">';
+      h += '<div><label style="font-size:10px;color:var(--text2);display:block;margin-bottom:3px;">Desde</label><input type="date" id="repDesde" value="'+_wbEscC(S.repDesde)+'" onchange="S.repDesde=this.value" style="'+_inputCss+'"></div>';
+      h += '<div><label style="font-size:10px;color:var(--text2);display:block;margin-bottom:3px;">Hasta</label><input type="date" id="repHasta" value="'+_wbEscC(S.repHasta)+'" onchange="S.repHasta=this.value" style="'+_inputCss+'"></div>';
+      h += '</div>';
+      h += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">';
+      h += '<button type="button" onclick="repPreset(\'semana\')" style="background:var(--surface3);border:none;border-radius:20px;padding:6px 12px;font-size:11px;font-weight:700;color:var(--text);cursor:pointer;">Esta semana</button>';
+      h += '<button type="button" onclick="repPreset(\'mes\')" style="background:var(--surface3);border:none;border-radius:20px;padding:6px 12px;font-size:11px;font-weight:700;color:var(--text);cursor:pointer;">Este mes</button>';
+      h += '<button type="button" onclick="repPreset(\'mespasado\')" style="background:var(--surface3);border:none;border-radius:20px;padding:6px 12px;font-size:11px;font-weight:700;color:var(--text);cursor:pointer;">Mes pasado</button>';
+      h += '</div>';
+      h += '<label style="font-size:10px;color:var(--text2);display:block;margin-bottom:3px;">Tipo de reporte</label>';
+      h += '<select id="repTipo" onchange="S.repTipo=this.value" style="'+_inputCss+'margin-bottom:12px;">';
+      [['completo','Completo (ventas, gastos y utilidad)'],['gastos','Solo gastos (todas las categorías)'],['nomina','Solo nómina']].forEach(function(o){
+        h += '<option value="'+o[0]+'"'+(S.repTipo===o[0]?' selected':'')+'>'+o[1]+'</option>';
+      });
+      h += '</select>';
+      h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">';
+      h += '<button class="form-button" onclick="generateReporteUtilPDF()">📄 PDF</button>';
+      h += '<button class="form-button secondary" onclick="generateReporteUtilImg()">🖼️ Imagen UHD</button>';
+      h += '</div>';
+      h += '<button class="form-button" onclick="sendReporteWhatsApp()" style="width:100%;margin-top:8px;background:#25D366;color:#fff;">📲 Enviar por WhatsApp</button>';
+      h += '<div style="font-size:10px;color:var(--text2);margin-top:6px;text-align:center;">La imagen se envía al 983 207 9693</div>';
+      h += '</div>';
+
       host.innerHTML = h;
+    }
+
+    function repPreset(which) {
+      var now = new Date(), de, ha;
+      if (which === 'semana') { var m=_weekStartMon(now); var e=new Date(m.getTime()); e.setDate(e.getDate()+6); de=normDate(m); ha=normDate(e); }
+      else if (which === 'mes') { de=normDate(new Date(now.getFullYear(), now.getMonth(), 1)); ha=normDate(new Date(now.getFullYear(), now.getMonth()+1, 0)); }
+      else if (which === 'mespasado') { de=normDate(new Date(now.getFullYear(), now.getMonth()-1, 1)); ha=normDate(new Date(now.getFullYear(), now.getMonth(), 0)); }
+      S.repDesde=de; S.repHasta=ha;
+      var d=document.getElementById('repDesde'); if(d) d.value=de;
+      var hh=document.getElementById('repHasta'); if(hh) hh.value=ha;
+    }
+
+    function _repData() {
+      var desde = S.repDesde, hasta = S.repHasta, tipo = S.repTipo || 'completo';
+      var inR = function(f){ f=String(f||'').substring(0,10); return (!desde || f>=desde) && (!hasta || f<=hasta); };
+      var ventasList = (S.cobros||[]).filter(function(c){ return inR(c.fecha); });
+      var ventas = ventasList.reduce(function(s,c){ return s+(c.monto||0); }, 0);
+      var ventasByM = {}; ventasList.forEach(function(c){ var m=c.metodoPago||'Otro'; ventasByM[m]=(ventasByM[m]||0)+(c.monto||0); });
+      var allGastos = (S.gastos||[]).filter(function(g){ return inR(g.fecha); });
+      var allGastosTotal = allGastos.reduce(function(s,g){ return s+(g.monto||0); }, 0);
+      var gastosList = (tipo==='nomina') ? allGastos.filter(function(g){ return g.categoria==='Nómina'; }) : allGastos;
+      gastosList = gastosList.slice().sort(function(a,b){ return String(a.fecha).localeCompare(String(b.fecha)); });
+      var gastosTotal = gastosList.reduce(function(s,g){ return s+(g.monto||0); }, 0);
+      var porCat = {}; gastosList.forEach(function(g){ var c=g.categoria||'Otros'; porCat[c]=(porCat[c]||0)+(g.monto||0); });
+      return { desde:desde, hasta:hasta, tipo:tipo, ventasList:ventasList, ventas:ventas, ventasByM:ventasByM,
+               gastosList:gastosList, gastosTotal:gastosTotal, porCat:porCat, allGastosTotal:allGastosTotal, utilidad: ventas-allGastosTotal };
+    }
+    function _repTipoLabel(tipo) { tipo = tipo || S.repTipo; return tipo==='nomina'?'Nómina':tipo==='gastos'?'Gastos':'Utilidad'; }
+    function _repRangoLabel() { return formatDate(S.repDesde) + ' al ' + formatDate(S.repHasta); }
+    function _repFileName(ext) {
+      var nm = (typeof HOTEL_NAME!=='undefined'?HOTEL_NAME:'CasaRegina').replace(/\s+/g,'_');
+      return nm + '_' + _repTipoLabel().replace(/\s+/g,'') + '_' + (S.repDesde||'') + '_a_' + (S.repHasta||'') + '.' + ext;
+    }
+
+    function generateReporteUtilPDF() {
+      if (!(window.jspdf && window.jspdf.jsPDF)) { toast('No se pudo cargar el generador de PDF', true); return; }
+      var d = _repData();
+      var jsPDF = window.jspdf.jsPDF;
+      var doc = new jsPDF({ unit: 'mm', format: 'a4' });
+      var pageW = 210, pageH = 297, margin = 15, contentW = pageW - margin*2, right = pageW - margin;
+      var y = 15;
+      // Logo
+      var logoW = 62, logoH = Math.round(logoW / LOGO_H_RATIO);
+      try { doc.addImage(LOGO_H_DARK_B64||LOGO_H_DARK, 'PNG', (pageW-logoW)/2, y, logoW, logoH); } catch(e) {}
+      y += logoH + 5;
+      doc.setFont('helvetica','bold'); doc.setFontSize(15);
+      doc.text('Reporte de ' + _repTipoLabel(d.tipo), pageW/2, y, { align:'center' }); y += 6;
+      doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(90);
+      doc.text('Periodo: ' + _repRangoLabel(), pageW/2, y, { align:'center' }); y += 4.5;
+      doc.text('Generado: ' + now(), pageW/2, y, { align:'center' }); y += 6;
+      doc.setTextColor(0);
+      doc.setDrawColor(210); doc.line(margin, y, right, y); y += 8;
+
+      function ensureSpace(nMm){ if (y + nMm > pageH - 15) { doc.addPage(); y = 18; } }
+
+      // Resumen
+      if (d.tipo === 'completo') {
+        doc.setFillColor(244,242,251); doc.roundedRect(margin, y, contentW, 34, 3, 3, 'F');
+        var col = contentW/3;
+        doc.setFontSize(9); doc.setTextColor(110);
+        doc.text('VENTAS (cobros)', margin+col*0.5, y+8, {align:'center'});
+        doc.text('GASTOS', margin+col*1.5, y+8, {align:'center'});
+        doc.text('UTILIDAD', margin+col*2.5, y+8, {align:'center'});
+        doc.setFontSize(15); doc.setFont('helvetica','bold');
+        doc.setTextColor(31,157,87); doc.text('$'+_fmt(d.ventas), margin+col*0.5, y+18, {align:'center'});
+        doc.setTextColor(214,69,69); doc.text('$'+_fmt(d.allGastosTotal), margin+col*1.5, y+18, {align:'center'});
+        doc.setTextColor(d.utilidad>=0?31:214, d.utilidad>=0?157:69, d.utilidad>=0?87:69); doc.text('$'+_fmt(d.utilidad), margin+col*2.5, y+18, {align:'center'});
+        doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(110);
+        var margen = d.ventas>0?Math.round((d.utilidad/d.ventas)*100):0;
+        doc.text(d.ventasList.length+' cobro(s)', margin+col*0.5, y+26, {align:'center'});
+        doc.text(d.gastosList.length+' gasto(s)', margin+col*1.5, y+26, {align:'center'});
+        doc.text('Margen '+margen+'%', margin+col*2.5, y+26, {align:'center'});
+        doc.setTextColor(0); y += 42;
+      } else {
+        doc.setFillColor(244,242,251); doc.roundedRect(margin, y, contentW, 20, 3, 3, 'F');
+        doc.setFontSize(10); doc.setTextColor(110); doc.text('TOTAL '+_repTipoLabel(d.tipo).toUpperCase(), margin+6, y+8);
+        doc.setFontSize(16); doc.setFont('helvetica','bold'); doc.setTextColor(214,69,69);
+        doc.text('$'+_fmt(d.gastosTotal), right-6, y+13, {align:'right'});
+        doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(110);
+        doc.text(d.gastosList.length+' registro(s)', margin+6, y+15);
+        doc.setTextColor(0); y += 28;
+      }
+
+      // Ventas por método (solo completo)
+      if (d.tipo === 'completo' && Object.keys(d.ventasByM).length) {
+        ensureSpace(20);
+        doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.text('Ventas por método de pago', margin, y); y += 6;
+        doc.setFont('helvetica','normal'); doc.setFontSize(10);
+        Object.keys(d.ventasByM).forEach(function(m){
+          ensureSpace(6);
+          doc.text('• ' + m, margin+2, y);
+          doc.text('$'+_fmt(d.ventasByM[m]), right, y, {align:'right'}); y += 5.5;
+        });
+        y += 4;
+      }
+
+      // Gastos por categoría
+      var catKeys = Object.keys(d.porCat).sort(function(a,b){ return d.porCat[b]-d.porCat[a]; });
+      if (catKeys.length) {
+        ensureSpace(20);
+        doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.text('Gastos por categoría', margin, y); y += 6;
+        doc.setFont('helvetica','normal'); doc.setFontSize(10);
+        catKeys.forEach(function(c){
+          ensureSpace(6);
+          doc.text('• ' + c, margin+2, y);
+          doc.text('$'+_fmt(d.porCat[c]), right, y, {align:'right'}); y += 5.5;
+        });
+        y += 4;
+      }
+
+      // Detalle de gastos (tabla dentro de márgenes)
+      ensureSpace(14);
+      doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.text('Detalle de ' + (d.tipo==='nomina'?'nómina':'gastos'), margin, y); y += 6;
+      // Encabezado tabla
+      var cX = { fecha:margin, cat:margin+22, concepto:margin+58, tipo:margin+120, monto:right };
+      function tableHeader(){
+        doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(110);
+        doc.text('Fecha', cX.fecha, y); doc.text('Categoría', cX.cat, y); doc.text('Concepto', cX.concepto, y); doc.text('Tipo', cX.tipo, y); doc.text('Monto', cX.monto, y, {align:'right'});
+        y += 2; doc.setDrawColor(220); doc.line(margin, y, right, y); y += 4; doc.setTextColor(0);
+      }
+      function clip(str, maxW){
+        str = String(str==null?'':str);
+        if (doc.getTextWidth(str) <= maxW) return str;
+        while (str.length > 1 && doc.getTextWidth(str+'…') > maxW) str = str.slice(0,-1);
+        return str + '…';
+      }
+      tableHeader();
+      doc.setFont('helvetica','normal'); doc.setFontSize(8.5);
+      if (!d.gastosList.length) {
+        doc.setTextColor(120); doc.text('Sin registros en este periodo.', margin, y); y += 6; doc.setTextColor(0);
+      } else {
+        d.gastosList.forEach(function(g){
+          if (y > pageH - 20) { doc.addPage(); y = 18; tableHeader(); doc.setFont('helvetica','normal'); doc.setFontSize(8.5); }
+          doc.text(clip(String(g.fecha||''), 20), cX.fecha, y);
+          doc.text(clip(g.categoria||'', 34), cX.cat, y);
+          doc.text(clip(g.concepto||'', 58), cX.concepto, y);
+          doc.text(clip(g.tipo||'', 20), cX.tipo, y);
+          doc.text('$'+_fmt(g.monto||0), cX.monto, y, {align:'right'});
+          y += 5.2;
+        });
+        // Total
+        y += 1; doc.setDrawColor(180); doc.line(margin, y, right, y); y += 5;
+        doc.setFont('helvetica','bold'); doc.setFontSize(10);
+        doc.text('TOTAL', cX.concepto, y);
+        doc.text('$'+_fmt(d.gastosTotal), cX.monto, y, {align:'right'});
+      }
+
+      // Pie de página en todas las páginas
+      var pages = doc.internal.getNumberOfPages();
+      for (var pi=1; pi<=pages; pi++) {
+        doc.setPage(pi);
+        doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(150);
+        doc.text((typeof HOTEL_NAME!=='undefined'?HOTEL_NAME:'') + ' · Reporte ' + _repTipoLabel(d.tipo), margin, pageH-8);
+        doc.text('Página ' + pi + ' de ' + pages, right, pageH-8, {align:'right'});
+        doc.setTextColor(0);
+      }
+
+      doc.save(_repFileName('pdf'));
+      toast('PDF generado');
+    }
+
+    // ---- Imagen UHD del reporte ----
+    function _buildReporteNode() {
+      var d = _repData();
+      var LOGO = LOGO_H_DARK_B64 || LOGO_H_DARK;
+      var wrap = document.createElement('div');
+      wrap.style.cssText = 'position:fixed;left:-100000px;top:0;width:1000px;background:#ffffff;color:#1a1626;font-family:Inter,Arial,sans-serif;padding:48px;box-sizing:border-box;';
+      var html = '';
+      html += '<div style="text-align:center;margin-bottom:22px;"><img src="'+LOGO+'" style="height:96px;object-fit:contain;" crossorigin="anonymous"></div>';
+      html += '<div style="text-align:center;margin-bottom:6px;font-size:34px;font-weight:800;">Reporte de '+_wbEscC(_repTipoLabel(d.tipo))+'</div>';
+      html += '<div style="text-align:center;font-size:18px;color:#6b6685;margin-bottom:4px;">Periodo: '+_wbEscC(_repRangoLabel())+'</div>';
+      html += '<div style="text-align:center;font-size:13px;color:#9c98b3;margin-bottom:26px;">Generado: '+_wbEscC(now())+'</div>';
+
+      if (d.tipo === 'completo') {
+        var margen = d.ventas>0?Math.round((d.utilidad/d.ventas)*100):0;
+        html += '<div style="display:flex;gap:16px;margin-bottom:26px;">';
+        html += '<div style="flex:1;background:#f0fff6;border:2px solid #b6ecc9;border-radius:16px;padding:20px;text-align:center;"><div style="font-size:15px;color:#6b6685;margin-bottom:6px;">VENTAS</div><div style="font-size:32px;font-weight:800;color:#1f9d57;">$'+_fmt(d.ventas)+'</div><div style="font-size:13px;color:#9c98b3;margin-top:4px;">'+d.ventasList.length+' cobro(s)</div></div>';
+        html += '<div style="flex:1;background:#fff2f2;border:2px solid #f3c2c2;border-radius:16px;padding:20px;text-align:center;"><div style="font-size:15px;color:#6b6685;margin-bottom:6px;">GASTOS</div><div style="font-size:32px;font-weight:800;color:#d64545;">$'+_fmt(d.allGastosTotal)+'</div><div style="font-size:13px;color:#9c98b3;margin-top:4px;">'+d.gastosList.length+' gasto(s)</div></div>';
+        html += '<div style="flex:1;background:#f4f2fb;border:2px solid #cfc6ef;border-radius:16px;padding:20px;text-align:center;"><div style="font-size:15px;color:#6b6685;margin-bottom:6px;">UTILIDAD</div><div style="font-size:32px;font-weight:800;color:'+(d.utilidad>=0?'#1f9d57':'#d64545')+';">$'+_fmt(d.utilidad)+'</div><div style="font-size:13px;color:#9c98b3;margin-top:4px;">Margen '+margen+'%</div></div>';
+        html += '</div>';
+      } else {
+        html += '<div style="background:#fff2f2;border:2px solid #f3c2c2;border-radius:16px;padding:22px;text-align:center;margin-bottom:26px;"><div style="font-size:16px;color:#6b6685;margin-bottom:6px;">TOTAL '+_wbEscC(_repTipoLabel(d.tipo).toUpperCase())+'</div><div style="font-size:40px;font-weight:800;color:#d64545;">$'+_fmt(d.gastosTotal)+'</div><div style="font-size:13px;color:#9c98b3;margin-top:4px;">'+d.gastosList.length+' registro(s)</div></div>';
+      }
+
+      var catKeys = Object.keys(d.porCat).sort(function(a,b){ return d.porCat[b]-d.porCat[a]; });
+      if (catKeys.length) {
+        html += '<div style="font-size:20px;font-weight:800;margin-bottom:10px;">Gastos por categoría</div>';
+        html += '<div style="background:#f7f6fc;border-radius:14px;padding:16px 20px;margin-bottom:24px;">';
+        catKeys.forEach(function(c){
+          var pct = d.gastosTotal>0?Math.round((d.porCat[c]/d.gastosTotal)*100):0;
+          html += '<div style="margin-bottom:12px;"><div style="display:flex;justify-content:space-between;font-size:16px;margin-bottom:4px;"><span>'+_wbEscC(c)+'</span><b>$'+_fmt(d.porCat[c])+' <span style="color:#9c98b3;font-weight:400;">('+pct+'%)</span></b></div><div style="background:#e6e2f2;border-radius:5px;height:9px;overflow:hidden;"><div style="height:100%;width:'+pct+'%;background:#6d5bd0;border-radius:5px;"></div></div></div>';
+        });
+        html += '</div>';
+      }
+
+      html += '<div style="font-size:20px;font-weight:800;margin-bottom:10px;">Detalle de '+(d.tipo==='nomina'?'nómina':'gastos')+'</div>';
+      html += '<table style="width:100%;border-collapse:collapse;font-size:15px;">';
+      html += '<thead><tr style="color:#6b6685;text-align:left;border-bottom:2px solid #e6e2f2;"><th style="padding:8px 6px;">Fecha</th><th style="padding:8px 6px;">Categoría</th><th style="padding:8px 6px;">Concepto</th><th style="padding:8px 6px;">Tipo</th><th style="padding:8px 6px;text-align:right;">Monto</th></tr></thead><tbody>';
+      if (!d.gastosList.length) {
+        html += '<tr><td colspan="5" style="padding:18px 6px;text-align:center;color:#9c98b3;">Sin registros en este periodo.</td></tr>';
+      } else {
+        d.gastosList.forEach(function(g){
+          html += '<tr style="border-bottom:1px solid #efedf6;"><td style="padding:8px 6px;">'+_wbEscC(String(g.fecha||''))+'</td><td style="padding:8px 6px;">'+_wbEscC(g.categoria||'')+'</td><td style="padding:8px 6px;">'+_wbEscC(g.concepto||'')+'</td><td style="padding:8px 6px;color:#6b6685;">'+_wbEscC(g.tipo||'')+'</td><td style="padding:8px 6px;text-align:right;font-weight:700;">$'+_fmt(g.monto||0)+'</td></tr>';
+        });
+        html += '<tr style="border-top:2px solid #cfc6ef;"><td colspan="4" style="padding:12px 6px;font-weight:800;font-size:17px;">TOTAL</td><td style="padding:12px 6px;text-align:right;font-weight:800;font-size:17px;color:#d64545;">$'+_fmt(d.gastosTotal)+'</td></tr>';
+      }
+      html += '</tbody></table>';
+      html += '<div style="margin-top:30px;text-align:center;font-size:13px;color:#9c98b3;">'+(typeof HOTEL_NAME!=='undefined'?_wbEscC(HOTEL_NAME):'')+' · Hotel Boutique</div>';
+      wrap.innerHTML = html;
+      return wrap;
+    }
+
+    async function _renderReporteCanvas() {
+      if (typeof html2canvas !== 'function') throw new Error('html2canvas no disponible');
+      var node = _buildReporteNode();
+      document.body.appendChild(node);
+      try {
+        // Escala para lograr resolución tipo UHD (ancho ~3000px desde nodo de 1000px)
+        var canvas = await html2canvas(node, { scale: 3, backgroundColor: '#ffffff', useCORS: true, logging: false, width: 1000, windowWidth: 1000 });
+        return canvas;
+      } finally {
+        try { document.body.removeChild(node); } catch(e) {}
+      }
+    }
+
+    async function generateReporteUtilImg() {
+      try {
+        await busy(async function() {
+          var canvas = await _renderReporteCanvas();
+          var dataUrl = canvas.toDataURL('image/png');
+          var a = document.createElement('a'); a.href = dataUrl; a.download = _repFileName('png');
+          document.body.appendChild(a); a.click(); document.body.removeChild(a);
+          toast('Imagen UHD generada ('+canvas.width+'×'+canvas.height+')');
+        }, 'Generando imagen UHD...');
+      } catch(e) { toast('No se pudo generar la imagen', true); }
+    }
+
+    async function sendReporteWhatsApp() {
+      var num = (typeof _waNormMX==='function') ? _waNormMX('9832079693') : '529832079693';
+      var texto = 'Reporte de ' + _repTipoLabel() + ' — ' + _repRangoLabel();
+      try {
+        await busy(async function() {
+          var canvas = await _renderReporteCanvas();
+          var blob = await new Promise(function(res){ canvas.toBlob(function(b){ res(b); }, 'image/png'); });
+          var fname = _repFileName('png');
+          var file = null;
+          try { file = new File([blob], fname, { type:'image/png' }); } catch(e) {}
+          if (file && navigator.canShare && navigator.canShare({ files:[file] })) {
+            try {
+              await navigator.share({ files:[file], title:'Casa Regina — Reporte', text: texto });
+              return;
+            } catch(e) { /* si falla, cae al respaldo */ }
+          }
+          // Respaldo: descargar imagen + abrir chat de WhatsApp
+          var url = URL.createObjectURL(blob);
+          var a = document.createElement('a'); a.href = url; a.download = fname;
+          document.body.appendChild(a); a.click(); document.body.removeChild(a);
+          setTimeout(function(){ URL.revokeObjectURL(url); }, 2000);
+          window.open('https://wa.me/' + num + '?text=' + encodeURIComponent(texto), '_blank');
+          toast('Imagen descargada — adjúntala en el chat de WhatsApp que se abrió');
+        }, 'Preparando envío...');
+      } catch(e) { toast('No se pudo preparar el envío', true); }
     }
 
     function openGastoModal(gastoId, preCat, preTipo) {
