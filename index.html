@@ -3286,7 +3286,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-09-17a';
+    var APP_BUILD = '2026-09-17c';
     var _bfPromoRowCount = 0;
     var CONFIG_KEYS = ['hotelInfo', 'hotelTerms', 'dailyRoutine', 'msgTemplates', 'emergencyContacts', 'breakfastPromo', 'guestGuide'];
 
@@ -5679,9 +5679,14 @@
         h += '<div style="font-size:12px;color:var(--text2);margin-top:4px;">No hay habitaciones disponibles en esas fechas. Prueba con otras fechas.</div>';
         h += '</div>';
       } else {
-        h += '<div style="font-size:12px;color:var(--text2);margin-bottom:12px;text-align:center">' + available.length + ' habitación(es) disponible(s) · ' + nights + ' noche(s)</div>';
+        var _ishPct = Math.round((typeof ISH_RATE !== 'undefined' ? ISH_RATE : 0.05) * 100);
+        var _ivaPct = Math.round((typeof IVA_RATE !== 'undefined' ? IVA_RATE : 0.16) * 100);
+        h += '<div style="font-size:12px;color:var(--text2);margin-bottom:10px;text-align:center">' + available.length + ' habitación(es) disponible(s) · ' + nights + ' noche(s)</div>';
+        h += '<div style="background:var(--surface2);border:1px dashed var(--accent);border-radius:10px;padding:10px 12px;margin-bottom:14px;font-size:11px;color:var(--text2);line-height:1.5">🧾 Los precios son <strong>sin impuestos</strong>. Se agregan impuestos (ISH ' + _ishPct + '% + IVA ' + _ivaPct + '%) <strong>solo si requieres factura</strong>.</div>';
         available.forEach(function(room) {
           var total = room.tarifa * nights;
+          var tbNoche = _taxBreak(room.tarifa, true);
+          var tbTotal = _taxBreak(total, true);
           h += '<div onclick="selectBookingRoom(\'' + room.numero + '\')" style="background:var(--surface3);padding:16px;border-radius:14px;margin-bottom:12px;cursor:pointer;border:2px solid transparent;transition:all 0.2s;" id="bookRoom_' + room.numero + '">';
           h += '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">';
           h += '<div>';
@@ -5689,13 +5694,20 @@
           h += '<div style="font-size:13px;font-weight:600;color:var(--text)">' + room.tipo + '</div>';
           h += '</div>';
           h += '<div style="text-align:right">';
-          h += '<div style="font-family:Space Mono,monospace;font-weight:800;font-size:20px;color:var(--accent)">$' + room.tarifa + '</div>';
-          h += '<div style="font-size:10px;color:var(--text2)">por noche</div>';
+          h += '<div style="font-family:Space Mono,monospace;font-weight:800;font-size:20px;color:var(--accent)">$' + _fmt(room.tarifa) + '</div>';
+          h += '<div style="font-size:10px;color:var(--text2)">por noche (sin imp.)</div>';
+          h += '<div style="font-size:10px;color:var(--text2)">con factura: $' + _fmt(tbNoche.total) + '</div>';
           h += '</div></div>';
           if (room.notas) h += '<div style="font-size:11px;color:var(--text2);margin-bottom:8px">' + room.notas + '</div>';
-          h += '<div style="display:flex;justify-content:space-between;align-items:center;padding-top:8px;border-top:1px solid var(--surface2)">';
-          h += '<div style="font-size:11px;color:var(--text2)">' + nights + ' noche(s)</div>';
-          h += '<div style="font-family:Space Mono,monospace;font-weight:700;font-size:15px;color:var(--green)">Total: $' + total + '</div>';
+          h += '<div style="padding-top:8px;border-top:1px solid var(--surface2)">';
+          h += '<div style="display:flex;justify-content:space-between;align-items:baseline">';
+          h += '<div style="font-size:11px;color:var(--text2)">Total ' + nights + ' noche(s)</div>';
+          h += '<div style="font-family:Space Mono,monospace;font-weight:700;font-size:16px;color:var(--green)">$' + _fmt(total) + '</div>';
+          h += '</div>';
+          h += '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:2px">';
+          h += '<div style="font-size:10px;color:var(--text2)">Con factura (ISH ' + _ishPct + '% + IVA ' + _ivaPct + '%)</div>';
+          h += '<div style="font-family:Space Mono,monospace;font-size:12px;color:var(--text2)">$' + _fmt(tbTotal.total) + '</div>';
+          h += '</div>';
           h += '</div>';
           h += '</div>';
         });
@@ -5721,13 +5733,19 @@
       var nights = daysUntil(checkin, checkout);
       var room = _bookingRooms.find(function(r) { return r.numero === roomNum; });
       var total = room.tarifa * nights;
+      var _selIsh = Math.round((typeof ISH_RATE !== 'undefined' ? ISH_RATE : 0.05) * 100);
+      var _selIva = Math.round((typeof IVA_RATE !== 'undefined' ? IVA_RATE : 0.16) * 100);
+      var tbSel = _taxBreak(total, true);
 
       var h = '<div id="bookingGuestForm" style="margin-top:16px;">';
       h += '<div style="background:var(--accent);color:white;padding:12px;border-radius:var(--radius);margin-bottom:14px;text-align:center;">';
       h += '<div style="font-size:12px;opacity:0.9;">Seleccionaste</div>';
       h += '<div style="font-weight:800;font-size:16px;">Hab. ' + roomNum + ' · ' + room.tipo + '</div>';
-      h += '<div style="font-size:13px;margin-top:2px;">' + formatDate(checkin) + ' → ' + formatDate(checkout) + ' · ' + nights + ' noche(s) · <strong>$' + total + '</strong></div>';
+      h += '<div style="font-size:13px;margin-top:2px;">' + formatDate(checkin) + ' → ' + formatDate(checkout) + ' · ' + nights + ' noche(s)</div>';
+      h += '<div style="font-size:15px;font-weight:800;margin-top:6px;">Total: $' + _fmt(total) + '</div>';
+      h += '<div style="font-size:11px;opacity:0.9;margin-top:2px;">Con factura: $' + _fmt(tbSel.total) + ' (ISH ' + _selIsh + '% + IVA ' + _selIva + '%)</div>';
       h += '</div>';
+      h += '<div style="background:var(--surface2);border-radius:10px;padding:10px 12px;margin-bottom:14px;font-size:11px;color:var(--text2);line-height:1.5;">Desglose sin factura: subtotal $' + _fmt(total) + '. Si requieres <strong>factura</strong>, se agregan ISH ($' + _fmt(tbSel.ish) + ') e IVA ($' + _fmt(tbSel.iva) + ') para un total de <strong>$' + _fmt(tbSel.total) + '</strong>.</div>';
 
       h += '<div style="background:var(--surface3);padding:14px;border-radius:var(--radius);">';
       h += '<div style="font-size:11px;color:var(--text2);margin-bottom:10px;">TUS DATOS</div>';
@@ -5826,7 +5844,11 @@
       h += '<div style="font-size:13px;margin-bottom:4px;">👤 <strong>' + nombre + '</strong></div>';
       h += '<div style="font-size:13px;margin-bottom:4px;">🏨 Habitación <strong>' + roomNum + '</strong> · ' + room.tipo + '</div>';
       h += '<div style="font-size:13px;margin-bottom:4px;">📅 ' + formatDate(checkin) + ' → ' + formatDate(checkout) + ' · ' + nights + ' noche(s)</div>';
-      h += '<div style="font-size:15px;font-weight:800;font-family:Space Mono,monospace;color:var(--accent);margin-top:8px;">Total: $' + total + '</div>';
+      var _cIsh = Math.round((typeof ISH_RATE !== 'undefined' ? ISH_RATE : 0.05) * 100);
+      var _cIva = Math.round((typeof IVA_RATE !== 'undefined' ? IVA_RATE : 0.16) * 100);
+      var tbConf = _taxBreak(total, true);
+      h += '<div style="font-size:15px;font-weight:800;font-family:Space Mono,monospace;color:var(--accent);margin-top:8px;">Total: $' + _fmt(total) + '</div>';
+      h += '<div style="font-size:11px;color:var(--text2);margin-top:2px;">Con factura: $' + _fmt(tbConf.total) + ' (ISH ' + _cIsh + '% + IVA ' + _cIva + '%)</div>';
       h += '<div style="font-size:11px;color:var(--text2);margin-top:4px;">Ref: ' + resId + '</div>';
       h += '</div>';
 
@@ -18446,10 +18468,15 @@
         h += '<div style="font-size:12.5px;color:#8a7a5f;margin-top:4px;">No hay habitaciones libres en esas fechas. Prueba con otras.</div>';
         h += '</div>';
       } else {
+        var _bkIsh = Math.round((typeof ISH_RATE !== 'undefined' ? ISH_RATE : 0.05) * 100);
+        var _bkIva = Math.round((typeof IVA_RATE !== 'undefined' ? IVA_RATE : 0.16) * 100);
         h += '<div class="bk-avail">' + available.length + ' habitación(es) disponible(s) · ' + nights + ' noche(s)</div>';
         h += '<div class="bk-disclaimer">📷 Las imágenes son de referencia; la habitación asignada puede variar del cuarto real.</div>';
+        h += '<div style="background:#fbf5e9;border:1px dashed #cdA96b;border-radius:12px;padding:11px 13px;margin-bottom:14px;font-size:11.5px;color:#7a6a4f;line-height:1.5;">🧾 Los precios se muestran <strong>sin impuestos</strong>. Los impuestos (ISH ' + _bkIsh + '% + IVA ' + _bkIva + '%) se agregan <strong>únicamente si requieres factura</strong>.</div>';
         available.forEach(function (room) {
           var total = room.tarifa * nights;
+          var tbNoche = _taxBreak(room.tarifa, true);
+          var tbTotal = _taxBreak(total, true);
           var photo = _bkRoomPhoto(room.tipo, room.numero);
           var isSel = _bookingSelected === room.numero;
           h += '<div class="bk-room' + (isSel ? ' sel' : '') + '" id="bookRoom_' + room.numero + '">';
@@ -18462,7 +18489,9 @@
           h += '<div class="bk-room-type">' + _wbEsc(room.tipo) + '</div>';
           if (room.notas) h += '<div class="bk-room-notas">' + _wbEsc(room.notas) + '</div>';
           h += '<div class="bk-room-foot">';
-          h += '<div><div class="bk-price">$' + _fmt(room.tarifa) + ' <small>/ noche</small></div><div class="bk-total">Total ' + nights + ' noche(s): $' + _fmt(total) + '</div></div>';
+          h += '<div><div class="bk-price">$' + _fmt(room.tarifa) + ' <small>/ noche</small></div>';
+          h += '<div class="bk-total">Total ' + nights + ' noche(s): $' + _fmt(total) + '</div>';
+          h += '<div style="font-size:10.5px;color:#8a7a5f;margin-top:3px;">Con factura: $' + _fmt(tbTotal.total) + ' <span style="opacity:.85;">(ISH ' + _bkIsh + '% + IVA ' + _bkIva + '%)</span></div></div>';
           h += '<button class="bk-btn" style="width:auto;padding:11px 22px;flex:0 0 auto;" onclick="selectBookingRoom(\'' + room.numero + '\')">Reservar</button>';
           h += '</div>';
           h += '</div></div>';
@@ -18483,6 +18512,9 @@
       var nights = daysUntil(checkin, checkout);
       var room = _bookingRooms.find(function (r) { return r.numero === roomNum; });
       var total = room.tarifa * nights;
+      var _selIsh = Math.round((typeof ISH_RATE !== 'undefined' ? ISH_RATE : 0.05) * 100);
+      var _selIva = Math.round((typeof IVA_RATE !== 'undefined' ? IVA_RATE : 0.16) * 100);
+      var tbSel = _taxBreak(total, true);
 
       var existing = document.getElementById('bookingGuestForm');
       if (existing) existing.remove();
@@ -18491,8 +18523,11 @@
       h += '<div class="bk-sel-banner">';
       h += '<div style="font-size:11px;opacity:.9;letter-spacing:.5px;">SELECCIONASTE</div>';
       h += '<div style="font-family:\'Cormorant Garamond\',serif;font-size:21px;font-weight:700;margin:2px 0;">' + _wbEsc(room.tipo) + ' · Hab. ' + _wbEsc(roomNum) + '</div>';
-      h += '<div style="font-size:12.5px;">' + formatDate(checkin) + ' → ' + formatDate(checkout) + ' · ' + nights + ' noche(s) · <strong>$' + _fmt(total) + '</strong></div>';
+      h += '<div style="font-size:12.5px;">' + formatDate(checkin) + ' → ' + formatDate(checkout) + ' · ' + nights + ' noche(s)</div>';
+      h += '<div style="font-size:15px;font-weight:800;margin-top:5px;">Total: $' + _fmt(total) + '</div>';
+      h += '<div style="font-size:11px;opacity:.92;margin-top:1px;">Con factura: $' + _fmt(tbSel.total) + '</div>';
       h += '</div>';
+      h += '<div style="background:#fbf5e9;border-radius:12px;padding:11px 13px;margin-bottom:14px;font-size:11.5px;color:#7a6a4f;line-height:1.55;">Sin factura pagas <strong>$' + _fmt(total) + '</strong>. Si necesitas <strong>factura</strong>, se agregan ISH ($' + _fmt(tbSel.ish) + ') e IVA ($' + _fmt(tbSel.iva) + '): total <strong>$' + _fmt(tbSel.total) + '</strong> (ISH ' + _selIsh + '% + IVA ' + _selIva + '%).</div>';
       h += '<div class="bk-eyebrow">Tus datos</div>';
       h += '<form onsubmit="submitBooking(event)">';
       h += '<div class="bk-field"><label>Nombre completo *</label><input type="text" id="bk_nombre" class="bk-input" required></div>';
@@ -18531,8 +18566,12 @@
       h += '🛏️ Habitación <strong>' + _wbEsc(roomNum) + '</strong> · ' + _wbEsc(room.tipo) + '<br>';
       h += '📅 ' + formatDate(checkin) + ' → ' + formatDate(checkout) + ' · ' + nights + ' noche(s)';
       h += '</div>';
+      var _confIsh = Math.round((typeof ISH_RATE !== 'undefined' ? ISH_RATE : 0.05) * 100);
+      var _confIva = Math.round((typeof IVA_RATE !== 'undefined' ? IVA_RATE : 0.16) * 100);
+      var tbConf = _taxBreak(total, true);
       h += '<div style="font-family:\'Cormorant Garamond\',serif;font-size:26px;font-weight:700;color:#b1893f;margin-top:10px;">Total: $' + _fmt(total) + '</div>';
-      h += '<div style="font-size:11px;color:#a89878;margin-top:2px;">Ref: ' + _wbEsc(resId) + '</div>';
+      h += '<div style="font-size:11.5px;color:#8a7a5f;margin-top:2px;">Con factura: $' + _fmt(tbConf.total) + ' <span style="opacity:.85;">(ISH ' + _confIsh + '% + IVA ' + _confIva + '%)</span></div>';
+      h += '<div style="font-size:11px;color:#a89878;margin-top:6px;">Ref: ' + _wbEsc(resId) + '</div>';
       h += '</div>';
 
       var waText = '🏨 *' + hotelName + '* — Solicitud de Reserva\n\n';
