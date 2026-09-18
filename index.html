@@ -3294,7 +3294,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-09-18h';
+    var APP_BUILD = '2026-09-18i';
     var _bfPromoRowCount = 0;
     var CONFIG_KEYS = ['hotelInfo', 'hotelTerms', 'dailyRoutine', 'msgTemplates', 'emergencyContacts', 'breakfastPromo', 'guestGuide'];
 
@@ -19803,6 +19803,7 @@
       var h = '';
       h += '<div style="font-size:12px;color:var(--text2);margin-bottom:8px;">Reserva varias habitaciones para un mismo titular, con un total combinado y cobro único.</div>';
       h += '<button onclick="openGroupExistingModal()" style="width:100%;background:var(--surface2);border:1px solid var(--surface3);border-radius:8px;padding:8px;font-size:12px;cursor:pointer;color:var(--accent);font-weight:600;margin-bottom:12px;">🔗 ¿Ya tienes reservas creadas? Agrúpalas aquí</button>';
+      h += '<label style="display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--surface3);border-radius:8px;padding:10px;margin-bottom:12px;cursor:pointer;"><input type="checkbox" id="grp_walkin" onchange="_groupWalkinToggle()" style="width:18px;height:18px;accent-color:var(--accent);flex-shrink:0;"><span style="font-size:12px;"><b>🚶 Walk-in (check-in inmediato)</b><br><span style="color:var(--text2);font-size:11px;">Márcalo si el grupo llega ahora: se hace check-in de todas y las habitaciones quedan ocupadas.</span></span></label>';
       h += '<label class="form-label" style="font-size:12px;">Titular</label>';
       h += '<input id="grp_nombre" class="login-input" placeholder="Nombre del titular" style="margin-bottom:8px;">';
       h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">';
@@ -19883,6 +19884,11 @@
         box.innerHTML = keys.length + ' hab. · ' + nights + ' noche(s) · Total: <span style="color:var(--accent);">$' + _fmt(total) + '</span>';
       }
     }
+    function _groupWalkinToggle() {
+      var on = document.getElementById('grp_walkin') && document.getElementById('grp_walkin').checked;
+      var btn = document.querySelector('#taskDetailActions .form-button');
+      if (btn) btn.textContent = on ? '🚶 Crear walk-in de grupo (check-in)' : 'Crear reserva de grupo';
+    }
     async function saveGroupReserva() {
       var nombre = (document.getElementById('grp_nombre').value || '').trim();
       var tel = (document.getElementById('grp_tel').value || '').trim();
@@ -19905,10 +19911,11 @@
         try { _hotelNombre = getHotelInfo().nombre; } catch (e) {}
       }
       var _aPct = 0; try { _aPct = getAnticipoPct(); } catch (e) {}
-      var estado = (_aPct === 0) ? 'Confirmada' : 'Reservada';
+      var walkin = !!(document.getElementById('grp_walkin') && document.getElementById('grp_walkin').checked);
+      var estado = walkin ? 'Check-in' : ((_aPct === 0) ? 'Confirmada' : 'Reservada');
       var n = now(), fecha = normDate(new Date()), hora = n.split(' ')[1];
       await busy(async function () {
-        var ops = [], newRes = [], newRegs = [];
+        var ops = [], newRes = [], newRegs = [], occRooms = [];
         nums.forEach(function (num, idx) {
           var rm = (S.rooms || []).find(function (r) { return r.numero === num; });
           var tarifa = parseFloat(rm.tarifa) || 0;
@@ -19929,13 +19936,20 @@
           ops.push({ type: 'append', sheet: '📝 Registro', values: [regId, resId, guestName, num, fecha, '', '', '', '', '', '', n] });
           newRegs.push({ regId: regId, resId: resId, nombre: guestName, habitacionNum: num, fecha: fecha, tipoId: '', numId: '', nacionalidad: '', procedencia: '', motivo: '', observaciones: '', ts: n });
           newRes.push({ id: resId, habitacionNum: num, huesped: guestName, telefono: tel, email: email, fechaEntrada: checkin, fechaSalida: checkout, adultos: 1, niños: 0, tarifa: tarifa, tarifaTotal: total, estado: estado, notas: notas, creadoPor: (S.user && S.user.usuario) || '', fechaCreacion: n });
+          // Walk-in de grupo: marcar la habitación como Ocupada (check-in inmediato)
+          if (walkin && rm && rm.estado !== 'Ocupada') {
+            ops.push({ type: 'updateById', sheet: '🏨 Habitaciones', id: rm.id, values: [rm.id, rm.numero, rm.tipo, rm.tarifa, 'Ocupada', rm.notas || ''] });
+            occRooms.push(num);
+          }
         });
-        ops.push({ type: 'append', sheet: '📜 Bitácora', values: [fecha, hora, (S.user && S.user.usuario) || '', 'Reserva de grupo', nombre + ' · ' + nums.length + ' hab. (' + groupId + ')', 'info'] });
+        ops.push({ type: 'append', sheet: '📜 Bitácora', values: [fecha, hora, (S.user && S.user.usuario) || '', (walkin ? 'Walk-in de grupo' : 'Reserva de grupo'), nombre + ' · ' + nums.length + ' hab. (' + groupId + ')', 'info'] });
         await sheets.multi(ops);
         S.reservas = S.reservas.concat(newRes);
         S.registros = (S.registros || []).concat(newRegs);
+        // Estado local de habitaciones ocupadas por walk-in
+        occRooms.forEach(function (num) { var ri = S.rooms.findIndex(function (r) { return r.numero === num; }); if (ri !== -1) S.rooms[ri].estado = 'Ocupada'; });
         try { addOrUpdateClient(nombre, tel, email); } catch (e) {}
-        toast('✅ Grupo creado: ' + nums.length + ' habitaciones');
+        toast(walkin ? ('✅ Walk-in de grupo: ' + nums.length + ' hab. con check-in') : ('✅ Grupo creado: ' + nums.length + ' habitaciones'));
         closeModal();
         render();
         setTimeout(function () { openGroupSummary(groupId); }, 300);
