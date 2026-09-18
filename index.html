@@ -3294,7 +3294,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-09-18l';
+    var APP_BUILD = '2026-09-18m';
     var _bfPromoRowCount = 0;
     var CONFIG_KEYS = ['hotelInfo', 'hotelTerms', 'dailyRoutine', 'msgTemplates', 'emergencyContacts', 'breakfastPromo', 'guestGuide'];
 
@@ -13498,7 +13498,21 @@
     // ============ ROOM MODAL ============
     async function openRoomModal(roomId) {
       const room = S.rooms.find(r => r.id === roomId);
-      const res = S.reservas.find(r => r.habitacionNum === room.numero && r.estado !== 'Cancelada');
+      // Mostrar solo la reserva VIGENTE de la habitación (no reservas viejas ya terminadas):
+      // se excluyen canceladas, con check-out o completadas, y las que ya salieron antes de hoy.
+      var _rmToday = normDate(new Date());
+      var _rmRes = (S.reservas || []).filter(function (r) {
+        if (String(r.habitacionNum) !== String(room.numero)) return false;
+        if (['Cancelada', 'Cancelado', 'Check-out', 'Completada'].indexOf(r.estado) !== -1) return false;
+        if (r.estado === 'Check-in') return true;              // huésped en casa ahora
+        return String(r.fechaSalida) >= _rmToday;               // aún vigente o próxima
+      });
+      _rmRes.sort(function (a, b) {
+        var ai = a.estado === 'Check-in' ? 0 : 1, bi = b.estado === 'Check-in' ? 0 : 1;
+        if (ai !== bi) return ai - bi;                           // primero la que está en check-in
+        return String(a.fechaEntrada).localeCompare(String(b.fechaEntrada)); // luego la entrada más próxima
+      });
+      const res = _rmRes[0];
 
       let content = `
         <div style="margin-bottom: 20px;">
@@ -19892,15 +19906,32 @@
       var rooms = (S.rooms || []).filter(function (rm) { return rm.estado !== 'Mantenimiento' && rm.estado !== 'Fuera de servicio'; });
       var h = '';
       rooms.forEach(function (rm) {
-        var avail = true;
-        try { avail = !hasOverlap(rm.numero, checkin, checkout, null); } catch (e) {}
+        // Disponible = sin traslape de reservas Y sin bloqueo manual por estado "Ocupada"
+        var overlap = false;
+        try { overlap = hasOverlap(rm.numero, checkin, checkout, null); } catch (e) {}
+        var manualBlock = false;
+        try { manualBlock = _ocupManualBlocksRange(rm, checkin); } catch (e) {}
+        var avail = !overlap && !manualBlock;
+        var reason = manualBlock ? ' · 🔒 ocupada (estado)' : (overlap ? ' · ocupada estas fechas' : '');
         var sel = window._groupSel[rm.numero];
-        h += '<div style="display:flex;align-items:center;gap:8px;padding:8px;border-radius:8px;margin-bottom:6px;background:var(--surface2);' + (avail ? '' : 'opacity:.5;') + '">';
+        var std = sel ? (parseFloat(sel.stdTarifa) || 0) : (parseFloat(rm.tarifa) || 0);
+        var cur = sel ? (parseFloat(sel.tarifa) || 0) : std;
+        var esp = sel && std > 0 && cur < std;
+        h += '<div style="border-radius:8px;margin-bottom:6px;background:var(--surface2);' + (avail ? '' : 'opacity:.5;') + '">';
+        h += '<div style="display:flex;align-items:center;gap:8px;padding:8px;">';
         h += '<input type="checkbox" ' + (sel ? 'checked' : '') + ' ' + (avail ? '' : 'disabled') + ' onchange="_groupToggleRoom(\'' + rm.numero + '\',this.checked)" style="width:18px;height:18px;flex-shrink:0;">';
-        h += '<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:600;">Hab. ' + rm.numero + ' · ' + _wbEsc(rm.tipo) + '</div><div style="font-size:11px;color:var(--text2);">$' + _fmt(rm.tarifa) + '/noche' + (avail ? '' : ' · ocupada estas fechas') + '</div></div>';
+        h += '<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:600;">Hab. ' + rm.numero + ' · ' + _wbEsc(rm.tipo) + '</div><div style="font-size:11px;color:var(--text2);">$' + _fmt(rm.tarifa) + '/noche' + reason + '</div></div>';
         if (sel) {
-          h += '<input type="text" value="' + _wbEsc(sel.guest || '') + '" placeholder="Huésped" onchange="_groupSetGuest(\'' + rm.numero + '\',this.value)" style="width:82px;font-size:11px;padding:5px;border-radius:6px;border:1px solid var(--surface3);background:var(--surface3);color:var(--text);">';
+          h += '<input type="text" value="' + _wbEsc(sel.guest || '') + '" placeholder="Huésped" onchange="_groupSetGuest(\'' + rm.numero + '\',this.value)" style="width:78px;font-size:11px;padding:5px;border-radius:6px;border:1px solid var(--surface3);background:var(--surface3);color:var(--text);">';
+          h += '<input type="number" min="0" step="1" value="' + cur + '" title="Tarifa por noche" onchange="_groupSetTarifa(\'' + rm.numero + '\',this.value)" style="width:64px;font-size:11px;padding:5px;border-radius:6px;border:1px solid ' + (esp ? 'var(--accent)' : 'var(--surface3)') + ';background:var(--surface3);color:' + (esp ? 'var(--accent)' : 'var(--text)') + ';font-weight:' + (esp ? '700' : '400') + ';">';
           h += '<label style="display:flex;align-items:center;gap:3px;font-size:11px;color:' + (sel.factura ? 'var(--accent)' : 'var(--text2)') + ';cursor:pointer;white-space:nowrap;flex-shrink:0;"><input type="checkbox" ' + (sel.factura ? 'checked' : '') + ' onchange="_groupSetFactura(\'' + rm.numero + '\',this.checked)" style="width:15px;height:15px;accent-color:var(--accent);">🧾</label>';
+        }
+        h += '</div>';
+        if (esp) {
+          h += '<div style="padding:0 8px 8px 8px;">';
+          h += '<div style="font-size:10.5px;color:var(--accent);margin-bottom:4px;">⭐ Precio especial: estándar $' + _fmt(std) + ' → cobrando $' + _fmt(cur) + ' (−$' + _fmt(std - cur) + '/noche)</div>';
+          h += '<input type="text" value="' + _wbEsc(sel.motivo || '') + '" placeholder="Motivo del precio especial (obligatorio)" onchange="_groupSetMotivo(\'' + rm.numero + '\',this.value)" style="width:100%;box-sizing:border-box;font-size:11px;padding:6px;border-radius:6px;border:1px solid var(--accent);background:var(--surface3);color:var(--text);">';
+          h += '</div>';
         }
         h += '</div>';
       });
@@ -19909,11 +19940,19 @@
     }
     function _groupToggleRoom(num, on) {
       var rm = (S.rooms || []).find(function (r) { return r.numero === num; });
-      if (on) window._groupSel[num] = { tarifa: parseFloat(rm.tarifa) || 0, guest: '', factura: false };
+      if (on) window._groupSel[num] = { tarifa: parseFloat(rm.tarifa) || 0, stdTarifa: parseFloat(rm.tarifa) || 0, motivo: '', guest: '', factura: false };
       else delete window._groupSel[num];
       _groupRefreshRooms();
     }
     function _groupSetGuest(num, val) { if (window._groupSel[num]) window._groupSel[num].guest = val; }
+    function _groupSetTarifa(num, val) {
+      if (window._groupSel[num]) {
+        var v = parseFloat(val);
+        window._groupSel[num].tarifa = (isNaN(v) || v < 0) ? 0 : v;
+      }
+      _groupRefreshRooms();
+    }
+    function _groupSetMotivo(num, val) { if (window._groupSel[num]) window._groupSel[num].motivo = val; }
     function _groupSetFactura(num, on) { if (window._groupSel[num]) window._groupSel[num].factura = !!on; _groupRefreshRooms(); }
     function _groupAnyFactura() { return Object.keys(window._groupSel || {}).some(function (k) { return window._groupSel[k].factura; }); }
     function _groupUpdateTotal() {
@@ -19956,6 +19995,26 @@
       if (!nombre) { toast('Escribe el titular', true); return; }
       if (!nums.length) { toast('Selecciona al menos una habitación', true); return; }
       if (checkin >= checkout) { toast('La salida debe ser después de la entrada', true); return; }
+      // Validar que ninguna habitación seleccionada esté ocupada (por estado o por otra reserva)
+      var _blocked = [];
+      nums.forEach(function (num) {
+        var rm = (S.rooms || []).find(function (r) { return r.numero === num; });
+        if (!rm) { _blocked.push('Hab. ' + num + ' (no existe)'); return; }
+        var mb = false; try { mb = _ocupManualBlocksRange(rm, checkin); } catch (e) {}
+        var ov = false; try { ov = hasOverlap(rm.numero, checkin, checkout, null); } catch (e) {}
+        if (mb) _blocked.push('Hab. ' + num + ' (ocupada por estado)');
+        else if (ov) _blocked.push('Hab. ' + num + ' (ya reservada esas fechas)');
+      });
+      if (_blocked.length) { toast('No se puede crear la reserva: ' + _blocked.join(', ') + '. Quítalas de la selección o cambia las fechas.', true); return; }
+      // Validar motivo obligatorio en habitaciones con precio especial (tarifa por debajo de la estándar)
+      var _needMotivo = [];
+      nums.forEach(function (num) {
+        var rm = (S.rooms || []).find(function (r) { return r.numero === num; });
+        var std = parseFloat(rm && rm.tarifa) || 0;
+        var cur = parseFloat(sel[num].tarifa); if (isNaN(cur)) cur = std;
+        if (std > 0 && cur < std && !(sel[num].motivo || '').trim()) _needMotivo.push('Hab. ' + num);
+      });
+      if (_needMotivo.length) { toast('Escribe el motivo del precio especial en: ' + _needMotivo.join(', '), true); return; }
       var nights = Math.max(daysUntil(checkin, checkout), 1);
       var groupId = 'G-' + Date.now();
       var anyFactura = _groupAnyFactura();
@@ -19974,7 +20033,9 @@
         var ops = [], newRes = [], newRegs = [], occRooms = [];
         nums.forEach(function (num, idx) {
           var rm = (S.rooms || []).find(function (r) { return r.numero === num; });
-          var tarifa = parseFloat(rm.tarifa) || 0;
+          var stdTar = parseFloat(rm.tarifa) || 0;
+          var tarifa = parseFloat(sel[num].tarifa);
+          if (isNaN(tarifa) || tarifa < 0) tarifa = stdTar;
           var subtotal = tarifa * nights;
           var roomFactura = !!sel[num].factura;
           var _tb = _taxBreak(subtotal, roomFactura);
@@ -19985,6 +20046,12 @@
           if (roomFactura) {
             var ivaData = JSON.stringify({ factura: true, folio: _grpFolio, hotel: _hotelNombre, rfc: rfc, razonSocial: razonSocial, subtotal: subtotal, iva: _tb.iva, ish: _tb.ish });
             notas += '[IVA:' + ivaData + ']';
+          }
+          // Precio especial (tarifa reducida por debajo de la estándar) con su motivo
+          if (stdTar > 0 && tarifa < stdTar) {
+            var _mot = (sel[num].motivo || '').trim();
+            notas += ' | Precio especial: ' + _mot + ' (estándar $' + _fmt(stdTar) + ' → $' + _fmt(tarifa) + '/noche)';
+            ops.push({ type: 'append', sheet: '📜 Bitácora', values: [fecha, hora, (S.user && S.user.usuario) || '', 'Precio especial (grupo)', 'Hab. ' + num + ' · $' + _fmt(stdTar) + '→$' + _fmt(tarifa) + '/noche · ' + _mot, 'warning'] });
           }
           var row = [resId, num, guestName, tel, email, checkin, checkout, 1, 0, tarifa, total, estado, notas, (S.user && S.user.usuario) || '', n];
           ops.push({ type: 'append', sheet: '📋 Reservas', values: row });
