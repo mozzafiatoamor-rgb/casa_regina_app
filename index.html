@@ -3294,7 +3294,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-09-18j';
+    var APP_BUILD = '2026-09-18k';
     var _bfPromoRowCount = 0;
     var CONFIG_KEYS = ['hotelInfo', 'hotelTerms', 'dailyRoutine', 'msgTemplates', 'emergencyContacts', 'breakfastPromo', 'guestGuide'];
 
@@ -19805,10 +19805,14 @@
       h += '<button onclick="openGroupExistingModal()" style="width:100%;background:var(--surface2);border:1px solid var(--surface3);border-radius:8px;padding:8px;font-size:12px;cursor:pointer;color:var(--accent);font-weight:600;margin-bottom:12px;">🔗 ¿Ya tienes reservas creadas? Agrúpalas aquí</button>';
       h += '<label style="display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--surface3);border-radius:8px;padding:10px;margin-bottom:12px;cursor:pointer;"><input type="checkbox" id="grp_walkin" onchange="_groupWalkinToggle()" style="width:18px;height:18px;accent-color:var(--accent);flex-shrink:0;"><span style="font-size:12px;"><b>🚶 Walk-in (check-in inmediato)</b><br><span style="color:var(--text2);font-size:11px;">Márcalo si el grupo llega ahora: se hace check-in de todas y las habitaciones quedan ocupadas.</span></span></label>';
       h += '<label class="form-label" style="font-size:12px;">Titular</label>';
-      h += '<input id="grp_nombre" class="login-input" placeholder="Nombre del titular" style="margin-bottom:8px;">';
+      h += '<div style="position:relative;">';
+      h += '<input id="grp_nombre" class="login-input" placeholder="Buscar cliente o escribir nombre" autocomplete="off" oninput="onGrpTitularInput()" onfocus="onGrpTitularInput()" style="margin-bottom:8px;width:100%;box-sizing:border-box;">';
+      h += '<div class="ac-dropdown" id="grpAcDropdown"></div>';
+      h += '</div>';
+      h += '<div id="grpSelectedBadge" style="display:none;margin-bottom:8px;padding:8px 12px;background:rgba(139,170,106,.15);border:1px solid var(--accent);border-radius:10px;font-size:12px;"></div>';
       h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">';
-      h += '<input id="grp_tel" class="login-input" placeholder="Teléfono">';
-      h += '<input id="grp_email" class="login-input" placeholder="Email (opcional)">';
+      h += '<input id="grp_tel" class="login-input" placeholder="Teléfono" style="width:100%;box-sizing:border-box;min-width:0;">';
+      h += '<input id="grp_email" type="email" class="login-input" placeholder="Email (opcional)" style="width:100%;box-sizing:border-box;min-width:0;">';
       h += '</div>';
       h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">';
       h += '<div><label class="form-label" style="font-size:12px;">Entrada</label><input type="date" id="grp_checkin" class="login-input" value="' + today + '" onchange="_groupRefreshRooms()"></div>';
@@ -19826,9 +19830,63 @@
       document.getElementById('taskDetailContent').innerHTML = h;
       document.getElementById('taskDetailModal').querySelector('.modal-title').textContent = '👥 Reserva de grupo';
       document.getElementById('taskDetailActions').innerHTML = '<button class="form-button" onclick="saveGroupReserva()" style="width:100%;">Crear reserva de grupo</button>';
+      window._grpSelectedClient = null;
       openModal('taskDetailModal');
       _groupRefreshRooms();
     }
+    function onGrpTitularInput() {
+      var input = document.getElementById('grp_nombre');
+      var dropdown = document.getElementById('grpAcDropdown');
+      var badge = document.getElementById('grpSelectedBadge');
+      if (!input || !dropdown) return;
+      var val = input.value.trim();
+      window._grpSelectedClient = null;
+      if (badge) badge.style.display = 'none';
+      if (val.length < 2) { dropdown.classList.remove('open'); return; }
+      var matches = [];
+      try { matches = searchClients(val); } catch (e) { matches = []; }
+      if (!matches.length) { dropdown.classList.remove('open'); return; }
+      var html = '';
+      matches.forEach(function (c) {
+        var vb = c.visitas > 0 ? '<span class="ac-item-badge repeat">🔁 ' + c.visitas + '</span>' : '';
+        html += '<div class="ac-item" onclick="selectGrpClient(\'' + escapeAttr(c.nombre) + '\')">';
+        html += '<div class="ac-item-name">' + highlightMatch(c.nombre, val) + vb + '</div>';
+        html += '<div class="ac-item-meta">';
+        if (c.telefono) html += '📞 ' + escapeHtml(c.telefono);
+        if (c.telefono && c.email) html += ' · ';
+        if (c.email) html += '✉️ ' + escapeHtml(c.email);
+        html += '</div></div>';
+      });
+      dropdown.innerHTML = html;
+      dropdown.classList.add('open');
+    }
+    function selectGrpClient(nombre) {
+      var client = (getClients() || []).find(function (c) { return c.nombre === nombre; });
+      if (!client) return;
+      window._grpSelectedClient = client;
+      document.getElementById('grp_nombre').value = client.nombre;
+      document.getElementById('grp_tel').value = client.telefono || '';
+      document.getElementById('grp_email').value = client.email || '';
+      var dd = document.getElementById('grpAcDropdown'); if (dd) dd.classList.remove('open');
+      var badge = document.getElementById('grpSelectedBadge');
+      if (badge) {
+        badge.style.display = 'block';
+        badge.innerHTML = '✅ <strong>' + escapeHtml(client.nombre) + '</strong>' +
+          (client.visitas > 0 ? ' — 🔁 ' + client.visitas + ' visita' + (client.visitas > 1 ? 's' : '') : ' — cliente guardado') +
+          ' · sus datos se usarán en el check-in' +
+          ' <span onclick="_grpClearClient()" style="cursor:pointer;margin-left:8px;color:var(--text2)">✕</span>';
+      }
+    }
+    function _grpClearClient() {
+      window._grpSelectedClient = null;
+      var b = document.getElementById('grpSelectedBadge'); if (b) b.style.display = 'none';
+      ['grp_nombre', 'grp_tel', 'grp_email'].forEach(function (id) { var e = document.getElementById(id); if (e) e.value = ''; });
+      var n = document.getElementById('grp_nombre'); if (n) n.focus();
+    }
+    document.addEventListener('click', function (e) {
+      var dd = document.getElementById('grpAcDropdown');
+      if (dd && !dd.contains(e.target) && e.target.id !== 'grp_nombre') dd.classList.remove('open');
+    });
     function _groupRefreshRooms() {
       var checkin = document.getElementById('grp_checkin').value;
       var checkout = document.getElementById('grp_checkout').value;
