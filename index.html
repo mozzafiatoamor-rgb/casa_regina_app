@@ -2470,6 +2470,14 @@
           <label class="form-label">Tarifa Diaria</label>
           <input type="number" id="newResTarifa" class="form-input" placeholder="Tarifa" required />
         </div>
+        <div class="form-group" id="newResPrecioMotivoBox" style="display:none;">
+          <div style="background:rgba(245,158,11,0.12);border:1px solid var(--yellow);border-radius:var(--radius);padding:10px 12px;">
+            <div style="font-size:11px;color:var(--yellow);font-weight:700;margin-bottom:4px;">⭐ Precio especial</div>
+            <div id="newResTarifaStdRef" style="font-size:11px;color:var(--text2);margin-bottom:8px;"></div>
+            <label class="form-label" style="font-size:11px;">Motivo del precio especial *</label>
+            <input type="text" id="newResPrecioMotivo" class="form-input" placeholder="Ej: Doble al precio de sencilla — cliente frecuente" />
+          </div>
+        </div>
         <div class="form-group">
           <label class="form-label">Total</label>
           <div style="background: var(--surface2); padding: 12px; border-radius: var(--radius); font-weight: 700; font-family: 'Space Mono', monospace; color: var(--accent);" id="newResTotal">$0</div>
@@ -3286,7 +3294,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-09-18d';
+    var APP_BUILD = '2026-09-18e';
     var _bfPromoRowCount = 0;
     var CONFIG_KEYS = ['hotelInfo', 'hotelTerms', 'dailyRoutine', 'msgTemplates', 'emergencyContacts', 'breakfastPromo', 'guestGuide'];
 
@@ -14413,6 +14421,7 @@
       document.getElementById('newResNinos').value = '0';
       try { var _nrb = document.getElementById('newResGuestsBox'); if (_nrb) _nrb.innerHTML = ''; _renderNewResGuests(); } catch (e) {}
       document.getElementById('newResNotas').value = '';
+      try { var _pmB = document.getElementById('newResPrecioMotivoBox'); if (_pmB) _pmB.style.display = 'none'; var _pmI = document.getElementById('newResPrecioMotivo'); if (_pmI) _pmI.value = ''; } catch(e) {}
       // Reset factura/IVA fields
       document.getElementById('newResFactura').checked = false;
       document.getElementById('newResFacturaFields').style.display = 'none';
@@ -14489,10 +14498,30 @@
       }
     });
 
+    function _newResStdTarifa() {
+      var rn = (document.getElementById('newResRoomId') || {}).value || '';
+      var room = (S.rooms || []).find(function(r){ return String(r.numero) === String(rn); });
+      return room ? (parseFloat(room.tarifa) || 0) : 0;
+    }
+    function _checkPrecioEspecial() {
+      var box = document.getElementById('newResPrecioMotivoBox');
+      if (!box) return;
+      var std = _newResStdTarifa();
+      var cur = parseFloat((document.getElementById('newResTarifa') || {}).value) || 0;
+      var ref = document.getElementById('newResTarifaStdRef');
+      if (std > 0 && cur > 0 && cur < std) {
+        box.style.display = '';
+        if (ref) ref.innerHTML = 'Tarifa estándar: <b>$' + _fmt(std) + '</b> · cobrando <b>$' + _fmt(cur) + '</b> (−$' + _fmt(std - cur) + '/noche)';
+      } else {
+        box.style.display = 'none';
+      }
+    }
+
     function calculateReservaTotal() {
       const checkin = document.getElementById('newResCheckIn').value;
       const checkout = document.getElementById('newResCheckOut').value;
       const tarifa = parseFloat(document.getElementById('newResTarifa').value) || 0;
+      try { _checkPrecioEspecial(); } catch(e) {}
 
       if (checkin && checkout) {
         const days = daysUntil(checkin, checkout);
@@ -14552,6 +14581,15 @@
         return;
       }
 
+      // Precio especial: si la tarifa es menor a la estándar de la habitación, exige un motivo
+      var _stdTar = 0; try { _stdTar = _newResStdTarifa(); } catch(e) {}
+      var _precioMotivo = '';
+      if (_stdTar > 0 && tarifa > 0 && tarifa < _stdTar) {
+        var _pmEl = document.getElementById('newResPrecioMotivo');
+        _precioMotivo = (_pmEl && _pmEl.value || '').trim();
+        if (!_precioMotivo) { toast('Escribe el motivo del precio especial', true); return; }
+      }
+
       if (checkin > checkout) {
         toast('La fecha de salida no puede ser anterior a la entrada', true);
         return;
@@ -14593,11 +14631,15 @@
 
         // Build notas: combine user notes with IVA data if applicable
         var notas = notasText;
+        if (_precioMotivo) {
+          var _peNote = 'Precio especial: ' + _precioMotivo + ' (estándar $' + _fmt(_stdTar) + ' → $' + _fmt(tarifa) + '/noche)';
+          notas = notas ? (notas + ' | ' + _peNote) : _peNote;
+        }
         if (wantsFactura) {
           var _factFolio = nextFacturaFolio();
           var _hi = getHotelInfo();
           var ivaData = JSON.stringify({factura:true, folio:_factFolio, hotel:_hi.nombre, rfc:rfc, razonSocial:razonSocial, subtotal:subtotal, iva:ivaAmount, ish:ishAmount});
-          notas = (notasText ? notasText + ' | ' : '') + '[IVA:' + ivaData + ']';
+          notas = (notas ? notas + ' | ' : '') + '[IVA:' + ivaData + ']';
         }
 
         // Determine initial state: if anticipo is configured and payment covers it, or no anticipo required → Confirmada; otherwise → Reservada
@@ -14610,7 +14652,7 @@
           if (payMonto >= _minReqNew - PAY_EPS) _initEstado = 'Confirmada';
         }
         const row = [id, roomNum, huesped, tel, email, checkin, checkout, adultos, niños, tarifa, total, _initEstado, notas, S.user.usuario, n];
-        const logRow = [fecha, hora, S.user.usuario, 'Nueva Reserva', huesped + ' en Hab. ' + roomNum + (wantsFactura ? ' (Factura)' : ''), 'info'];
+        const logRow = [fecha, hora, S.user.usuario, 'Nueva Reserva', huesped + ' en Hab. ' + roomNum + (wantsFactura ? ' (Factura)' : '') + (_precioMotivo ? ' · Precio especial: ' + _precioMotivo : ''), 'info'];
 
         var _titRegId = 'REG-' + Date.now();
         var _extraGuests = (typeof _collectNewResGuests === 'function') ? _collectNewResGuests().filter(function(g){ return g.nombre; }) : [];
