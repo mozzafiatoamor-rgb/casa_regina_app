@@ -3286,7 +3286,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-09-18c';
+    var APP_BUILD = '2026-09-18d';
     var _bfPromoRowCount = 0;
     var CONFIG_KEYS = ['hotelInfo', 'hotelTerms', 'dailyRoutine', 'msgTemplates', 'emergencyContacts', 'breakfastPromo', 'guestGuide'];
 
@@ -15361,8 +15361,27 @@
       // Save registration to sheet and do check-in
       await busy(async function() {
         var n = now();
-        var regId = 'REG' + Date.now().toString(36).toUpperCase();
-        var regRow = [regId, res.id, res.huesped, res.habitacionNum, normDate(new Date()), regData.tipoID, regData.numID, regData.nacionalidad, regData.procedencia, regData.motivo, regData.observaciones, n];
+        // Buscar la fila de Registro del TITULAR que ya se creó al hacer la reserva,
+        // para ACTUALIZARLA en lugar de crear una duplicada (bug de nombres duplicados).
+        var _existingReg = null;
+        try {
+          var _gs = _resGuests(res.id);
+          _existingReg = _gs.find(function(g){ return String(g.nombre||'').trim().toLowerCase() === String(res.huesped||'').trim().toLowerCase(); }) || _gs[0] || null;
+        } catch(e) {}
+
+        var _regFecha = (_existingReg && _existingReg.fecha) ? _existingReg.fecha : normDate(new Date());
+        var _regTs = (_existingReg && _existingReg.ts) ? _existingReg.ts : n;
+        var _regTel = (_existingReg && _existingReg.telefono) ? _existingReg.telefono : (res.telefono || '');
+        var regId, regRow, regOp;
+        if (_existingReg && _existingReg.regId) {
+          regId = _existingReg.regId;
+          regRow = [regId, res.id, res.huesped, res.habitacionNum, _regFecha, regData.tipoID, regData.numID, regData.nacionalidad, regData.procedencia, regData.motivo, regData.observaciones, _regTs, _regTel];
+          regOp = { type: 'updateById', sheet: '📝 Registro', id: regId, values: regRow };
+        } else {
+          regId = 'REG' + Date.now().toString(36).toUpperCase();
+          regRow = [regId, res.id, res.huesped, res.habitacionNum, _regFecha, regData.tipoID, regData.numID, regData.nacionalidad, regData.procedencia, regData.motivo, regData.observaciones, _regTs, _regTel];
+          regOp = { type: 'append', sheet: '📝 Registro', values: regRow };
+        }
 
         var resRow = [res.id, res.habitacionNum, res.huesped, res.telefono, res.email, res.fechaEntrada, res.fechaSalida, res.adultos, res.niños, res.tarifa, res.tarifaTotal, 'Check-in', res.notas, res.creadoPor, res.fechaCreacion];
         var roomRow = [room.id, room.numero, room.tipo, room.tarifa, 'Ocupada', room.notas];
@@ -15372,13 +15391,19 @@
           { type: 'updateById', sheet: '📋 Reservas', id: res.id, values: resRow },
           { type: 'updateById', sheet: '🏨 Habitaciones', id: room.id, values: roomRow },
           { type: 'append', sheet: '📜 Bitácora', values: logRow },
-          { type: 'append', sheet: '📝 Registro', values: regRow }
+          regOp
         ]);
 
         var resIdx = S.reservas.findIndex(function(r) { return r.id === res.id; });
         S.reservas[resIdx].estado = 'Check-in';
         var roomIdx = S.rooms.findIndex(function(r) { return r.numero === res.habitacionNum; });
         S.rooms[roomIdx].estado = 'Ocupada';
+
+        // Estado local: actualizar la fila del titular o insertarla (sin duplicar)
+        S.registros = S.registros || [];
+        var _regObj = { regId: regId, resId: res.id, nombre: res.huesped, habitacionNum: res.habitacionNum, fecha: _regFecha, tipoId: regData.tipoID, numId: regData.numID, nacionalidad: regData.nacionalidad, procedencia: regData.procedencia, motivo: regData.motivo, observaciones: regData.observaciones, ts: _regTs, telefono: _regTel };
+        var _liReg = S.registros.findIndex(function(x){ return x.regId === regId; });
+        if (_liReg !== -1) S.registros[_liReg] = _regObj; else S.registros.push(_regObj);
 
         toast('Check-in completado con registro');
         render();
