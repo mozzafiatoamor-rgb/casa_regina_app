@@ -3294,7 +3294,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-09-18i';
+    var APP_BUILD = '2026-09-18j';
     var _bfPromoRowCount = 0;
     var CONFIG_KEYS = ['hotelInfo', 'hotelTerms', 'dailyRoutine', 'msgTemplates', 'emergencyContacts', 'breakfastPromo', 'guestGuide'];
 
@@ -19974,6 +19974,9 @@
         h += '<div style="flex:1;min-width:0;cursor:pointer;" onclick="closeModal();openReservaModal(\'' + r.id + '\')"><div style="font-size:13px;font-weight:600;">Hab. ' + r.habitacionNum + ' · ' + _wbEsc(r.huesped) + (v ? ' <span style="font-size:9px;background:#e8f5e9;color:#2e7d32;padding:1px 5px;border-radius:4px;">🧾</span>' : '') + '</div><div style="font-size:11px;color:var(--text2);">' + r.estado + ' · Total $' + _fmt(r.tarifaTotal) + '</div></div>';
         h += '<div style="text-align:right;font-size:12px;"><div style="color:var(--green);">Pagado $' + _fmt(b.paid) + '</div><div style="color:' + (b.balance > 0 ? 'var(--red)' : 'var(--green)') + ';font-weight:700;">Saldo $' + _fmt(b.balance) + '</div></div>';
         h += '</div>';
+        if (b.balance > 0.01) {
+          h += '<button onclick="closeModal();openPaymentModal(\'' + r.id + '\')" style="width:100%;margin-top:8px;background:var(--surface3);border:1px solid var(--accent);color:var(--accent);border-radius:8px;padding:7px;font-size:11px;font-weight:700;cursor:pointer;">💵 Cobrar solo esta habitación ($' + _fmt(b.balance) + ')</button>';
+        }
         if (v) {
           var _ish = v.ish || 0;
           h += '<div style="font-size:10px;color:var(--text2);margin-top:4px;border-top:1px dashed var(--surface3);padding-top:4px;">Sub $' + _fmt(v.subtotal) + ' · ISH $' + _fmt(_ish) + ' · IVA $' + _fmt(v.iva) + (v.rfc ? ' · RFC ' + _wbEsc(v.rfc) : '') + '</div>';
@@ -20097,7 +20100,7 @@
     function openGroupPayment(groupId) {
       var t = _groupTotals(groupId);
       var h = '';
-      h += '<div style="font-size:12px;color:var(--text2);margin-bottom:10px;">El pago se reparte automáticamente entre las habitaciones del grupo (cubre saldos en orden).</div>';
+      h += '<div style="font-size:12px;color:var(--text2);margin-bottom:10px;">Puedes cobrar el total o solo una parte: el monto se reparte automáticamente entre las habitaciones del grupo (cubre saldos en orden). Para cobrar una habitación específica, usa el botón de cada habitación en el resumen.</div>';
       var _gttP = _groupTaxTotals(groupId);
       if (_gttP.hasFactura) { h += _taxDesgloseHTML(_gttP.subtotal, _gttP.ish, _gttP.iva, _gttP.total, ''); }
       h += '<div style="display:flex;justify-content:space-between;background:var(--surface3);padding:10px;border-radius:8px;margin-bottom:10px;"><span>Saldo del grupo</span><b style="font-family:Space Mono,monospace;">$' + _fmt(t.balance) + '</b></div>';
