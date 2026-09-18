@@ -3294,7 +3294,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-09-18f';
+    var APP_BUILD = '2026-09-18g';
     var _bfPromoRowCount = 0;
     var CONFIG_KEYS = ['hotelInfo', 'hotelTerms', 'dailyRoutine', 'msgTemplates', 'emergencyContacts', 'breakfastPromo', 'guestGuide'];
 
@@ -13719,6 +13719,7 @@
         }
         buttons += '<button class="form-button secondary" onclick="closeModal();executeCheckout(\'' + res.habitacionNum + '\')" style="background:var(--red)">Ejecutar Check-out</button>';
         buttons += '<button class="form-button secondary" onclick="revertirCheckin(\'' + resId + '\')" style="border-color:var(--yellow);color:var(--yellow)">\u21a9\ufe0f Revertir Check-in (corregir)</button>';
+        buttons += '<button class="form-button secondary" onclick="cancelReserva(\'' + resId + '\')" style="border-color:var(--red);color:var(--red)">\u274c Cancelar reserva</button>';
       }
 
       if (buttons) {
@@ -14135,23 +14136,114 @@
     }
 
     // ============ CANCEL RESERVA ============
-    async function cancelReserva(resId) {
-      if (!confirm('¿Cancelar esta reserva? Esta acción no se puede deshacer.')) return;
-      var res = S.reservas.find(r => r.id === resId);
-      await busy(async () => {
-        var resRow = [res.id, res.habitacionNum, res.huesped, res.telefono, res.email, res.fechaEntrada, res.fechaSalida, res.adultos, res.niños, res.tarifa, res.tarifaTotal, 'Cancelada', res.notas, res.creadoPor, res.fechaCreacion];
-        var n = now();
-        var logRow = [normDate(new Date()), n.split(' ')[1], S.user.usuario, 'Reserva Cancelada', res.huesped + ' Hab. ' + res.habitacionNum, 'info'];
-        await sheets.multi([
-          { type: 'updateById', sheet: '📋 Reservas', id: res.id, values: resRow },
-          { type: 'append', sheet: '📜 Bitácora', values: logRow }
-        ]);
-        var resIdx = S.reservas.findIndex(r => r.id === resId);
-        S.reservas[resIdx].estado = 'Cancelada';
-        toast('Reserva cancelada');
-        closeModal();
-        render();
-      }, 'Cancelando reserva...');
+    function cancelReserva(resId) {
+      var res = S.reservas.find(function(r){ return r.id === resId; });
+      if (!res) { toast('Reserva no encontrada', true); return; }
+      var payments = (S.cobros || []).filter(function(c){ return c.reservaId === resId; });
+      var totalPaid = payments.reduce(function(s,c){ return s + (c.monto||0); }, 0);
+      var isCheckedIn = res.estado === 'Check-in';
+
+      var h = '';
+      h += '<div style="background:var(--surface2);border-radius:10px;padding:11px 13px;margin-bottom:14px;">';
+      h += '<div style="font-weight:700;font-size:14px;">' + _wbEscC(res.huesped || '') + '</div>';
+      h += '<div style="font-size:12px;color:var(--text2);">Hab. ' + _wbEscC(res.habitacionNum || '') + ' · ' + _wbEscC(res.estado || '') + '</div>';
+      h += '</div>';
+
+      if (isCheckedIn) {
+        h += '<div style="background:rgba(239,68,68,0.12);border:1px solid var(--red);border-radius:10px;padding:10px 12px;margin-bottom:14px;font-size:12px;color:var(--red);line-height:1.5;">⚠️ Este huésped tiene <b>check-in activo</b> (hospedado). Al cancelar se liberará la habitación (pasará a Limpieza).</div>';
+      }
+
+      if (totalPaid > 0) {
+        h += '<div style="background:var(--surface2);border-radius:10px;padding:11px 13px;margin-bottom:12px;">';
+        h += '<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:10px;"><span style="color:var(--text2);">Pagos registrados</span><b style="font-family:Space Mono,monospace;color:var(--green);">$' + _fmt(totalPaid) + '</b></div>';
+        h += '<div style="font-size:11px;color:var(--text2);margin-bottom:8px;">¿Qué hago con ese dinero?</div>';
+        h += '<label style="display:flex;align-items:flex-start;gap:9px;background:var(--surface3);border:1px solid var(--surface3);border-radius:8px;padding:10px;cursor:pointer;margin-bottom:8px;"><input type="radio" name="cancelPago" value="cargo" checked style="margin-top:2px;"><span><b style="font-size:13px;">Dejar como cargo (penalización / no-show)</b><br><span style="font-size:11px;color:var(--text2);">El dinero se queda como ingreso.</span></span></label>';
+        h += '<label style="display:flex;align-items:flex-start;gap:9px;background:var(--surface3);border:1px solid var(--surface3);border-radius:8px;padding:10px;cursor:pointer;"><input type="radio" name="cancelPago" value="reembolso" style="margin-top:2px;"><span><b style="font-size:13px;">Marcar como reembolso</b><br><span style="font-size:11px;color:var(--text2);">Se resta de ingresos (−$' + _fmt(totalPaid) + ').</span></span></label>';
+        h += '</div>';
+      }
+
+      h += '<label style="display:block;font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;">Motivo de la cancelación *</label>';
+      h += '<input type="text" id="cancelMotivo" placeholder="Ej: no-show, cambio de planes del huésped..." style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--surface3);border-radius:8px;padding:11px;font-size:14px;color:var(--text);margin-bottom:14px;">';
+      h += '<button class="form-button" onclick="doCancelReserva(\'' + resId + '\')" style="width:100%;background:var(--red);color:#fff;">🗑️ Confirmar cancelación</button>';
+
+      document.getElementById('taskDetailContent').innerHTML = h;
+      document.getElementById('taskDetailModal').querySelector('.modal-title').textContent = '❌ Cancelar reserva';
+      document.getElementById('taskDetailActions').innerHTML = '';
+      openModal('taskDetailModal');
+    }
+
+    async function doCancelReserva(resId) {
+      if (window._cancelBusy) return;
+      var res = S.reservas.find(function(r){ return r.id === resId; });
+      if (!res) { toast('Reserva no encontrada', true); return; }
+      var motivo = ((document.getElementById('cancelMotivo') || {}).value || '').trim();
+      if (!motivo) { toast('Escribe el motivo de la cancelación', true); return; }
+      var payments = (S.cobros || []).filter(function(c){ return c.reservaId === resId; });
+      var totalPaid = payments.reduce(function(s,c){ return s + (c.monto||0); }, 0);
+      var refund = false;
+      if (totalPaid > 0) {
+        var _r = document.querySelector('input[name="cancelPago"]:checked');
+        refund = _r && _r.value === 'reembolso';
+      }
+      var isCheckedIn = res.estado === 'Check-in';
+
+      window._cancelBusy = true;
+      try {
+        await busy(async function() {
+          var n = now();
+          var fecha = normDate(new Date());
+          var hora = n.split(' ')[1];
+          var _notasClean = getNotasWithoutIVA(res.notas || '');
+          var _newNotas = (res.notas || '');
+          // Anexar el motivo de cancelación a las notas (conservando etiquetas existentes)
+          _newNotas = (_newNotas ? _newNotas + ' | ' : '') + 'Cancelación: ' + motivo + (refund ? ' (reembolso $' + _fmt(totalPaid) + ')' : (totalPaid > 0 ? ' (cargo retenido $' + _fmt(totalPaid) + ')' : ''));
+          var resRow = [res.id, res.habitacionNum, res.huesped, res.telefono, res.email, res.fechaEntrada, res.fechaSalida, res.adultos, res.niños, res.tarifa, res.tarifaTotal, 'Cancelada', _newNotas, res.creadoPor, res.fechaCreacion];
+
+          var ops = [{ type: 'updateById', sheet: '📋 Reservas', id: res.id, values: resRow }];
+
+          // Liberar la habitación si tenía check-in (estaba ocupada por esta reserva)
+          var room = S.rooms.find(function(r){ return String(r.numero) === String(res.habitacionNum); });
+          var hkTask = null;
+          var freedRoom = false;
+          if (isCheckedIn && room && room.estado === 'Ocupada') {
+            var _roomNotasClean = String(room.notas || '').replace(/\[OCUP:[^\]]*\]\s*\|?\s*/g, '').replace(/^\s*\|\s*/, '').trim();
+            ops.push({ type: 'updateById', sheet: '🏨 Habitaciones', id: room.id, values: [room.id, room.numero, room.tipo, room.tarifa, 'Limpieza', _roomNotasClean] });
+            var taskId = nextId('HK', S.housekeeping);
+            hkTask = { id: taskId, fecha: fecha, habitacionNum: room.numero, tarea: 'Limpieza (cancelación)', prioridad: 'Alta', estado: 'Pendiente', asignadoA: '', notas: motivo, horaInicio: '', horaFin: '', verificado: '', checklist: '' };
+            ops.push({ type: 'append', sheet: '🧹 Housekeeping', values: [taskId, fecha, room.numero, 'Limpieza (cancelación)', 'Alta', 'Pendiente', '', motivo, '', '', '', ''] });
+            freedRoom = true;
+          }
+
+          // Reembolso: registrar un cobro negativo que revierte lo pagado
+          var refundCobro = null;
+          if (refund && totalPaid > 0) {
+            var payId = nextId('PAY', S.cobros);
+            refundCobro = { id: payId, reservaId: resId, fecha: fecha, hora: hora, monto: -Math.abs(totalPaid), metodoPago: 'Reembolso', concepto: 'Reembolso por cancelación', notas: motivo, responsable: (S.user && S.user.usuario) || '' };
+            ops.push({ type: 'append', sheet: '💰 Cobros', values: [payId, resId, fecha, hora, -Math.abs(totalPaid), 'Reembolso', 'Reembolso por cancelación', motivo, (S.user && S.user.usuario) || ''] });
+          }
+
+          var _logDetail = res.huesped + ' Hab. ' + res.habitacionNum + ' — ' + motivo + (isCheckedIn ? ' (tenía check-in)' : '') + (totalPaid > 0 ? (refund ? ' · Reembolso $' + _fmt(totalPaid) : ' · Cargo retenido $' + _fmt(totalPaid)) : '');
+          ops.push({ type: 'append', sheet: '📜 Bitácora', values: [fecha, hora, S.user.usuario, 'Reserva Cancelada', _logDetail, 'warning'] });
+
+          await sheets.multi(ops);
+
+          // Estado local
+          var ri = S.reservas.findIndex(function(r){ return r.id === resId; });
+          if (ri !== -1) { S.reservas[ri].estado = 'Cancelada'; S.reservas[ri].notas = _newNotas; }
+          if (freedRoom && room) {
+            var rmi = S.rooms.findIndex(function(r){ return r.id === room.id; });
+            if (rmi !== -1) { S.rooms[rmi].estado = 'Limpieza'; S.rooms[rmi].notas = String(room.notas || '').replace(/\[OCUP:[^\]]*\]\s*\|?\s*/g, '').replace(/^\s*\|\s*/, '').trim(); }
+            if (hkTask) { S.housekeeping = S.housekeeping || []; S.housekeeping.push(hkTask); }
+          }
+          if (refundCobro) { S.cobros = S.cobros || []; S.cobros.push(refundCobro); }
+
+          toast('Reserva cancelada' + (refund ? ' · reembolso registrado' : ''));
+          closeModal();
+          render();
+        }, 'Cancelando reserva...');
+      } finally {
+        window._cancelBusy = false;
+      }
     }
 
     // ============ PAYMENT FUNCTIONS ============
