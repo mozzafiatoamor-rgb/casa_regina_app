@@ -3294,7 +3294,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-09-18e';
+    var APP_BUILD = '2026-09-18f';
     var _bfPromoRowCount = 0;
     var CONFIG_KEYS = ['hotelInfo', 'hotelTerms', 'dailyRoutine', 'msgTemplates', 'emergencyContacts', 'breakfastPromo', 'guestGuide'];
 
@@ -6739,6 +6739,9 @@
 
         // Sync: add clients from reservations that aren't in the Sheet yet
         await syncClientesFromReservas();
+
+        // Liberar habitaciones cuyo bloqueo manual "Ocupada" con fecha ya venció
+        try { await _autoFreeExpiredOcup(); } catch (e) {}
 
         render();
       }, 'Cargando datos del hotel...');
@@ -14339,8 +14342,9 @@
       S.rooms.forEach(function(room) {
         var blocked = (checkin && checkout) ? hasOverlap(room.numero, checkin, checkout, null) : false;
         var inMaint = room.estado === 'Mantenimiento';
-        if (blocked || inMaint) {
-          select.innerHTML += '<option value="" disabled>Hab. ' + room.numero + ' - ' + room.tipo + (blocked ? ' ⛔ Ocupada en esas fechas' : ' 🔧 Mantenimiento') + '</option>';
+        var manualBlock = checkin ? _ocupManualBlocksRange(room, checkin) : (room.estado === 'Ocupada' && _ocupManualBlocksRange(room, normDate(new Date())));
+        if (blocked || inMaint || manualBlock) {
+          select.innerHTML += '<option value="" disabled>Hab. ' + room.numero + ' - ' + room.tipo + (inMaint ? ' 🔧 Mantenimiento' : manualBlock ? ' 🔒 Ocupada (bloqueada)' : ' ⛔ Ocupada en esas fechas') + '</option>';
         } else {
           select.innerHTML += '<option value="' + room.numero + '" data-tarifa="' + room.tarifa + '">Hab. ' + room.numero + ' - ' + room.tipo + ' ($' + room.tarifa + ')</option>';
         }
@@ -14356,7 +14360,38 @@
 
     function getNotasWithoutIVA(notas) {
       if (!notas) return '';
-      return notas.replace(/\s*\|\s*\[IVA:\{.*?\}\]/, '').replace(/\[IVA:\{.*?\}\]/, '').replace(/\s*\|\s*\[FACT:[^\]]*\]/g, '').replace(/\[FACT:[^\]]*\]/g, '').replace(/\s*\|\s*\[GRUPO:[^\]]*\]/g, '').replace(/\[GRUPO:[^\]]*\]/g, '').trim();
+      return notas.replace(/\s*\|\s*\[IVA:\{.*?\}\]/, '').replace(/\[IVA:\{.*?\}\]/, '').replace(/\s*\|\s*\[FACT:[^\]]*\]/g, '').replace(/\[FACT:[^\]]*\]/g, '').replace(/\s*\|\s*\[GRUPO:[^\]]*\]/g, '').replace(/\[GRUPO:[^\]]*\]/g, '').replace(/\s*\|\s*\[OCUP:[^\]]*\]/g, '').replace(/\[OCUP:[^\]]*\]/g, '').trim();
+    }
+
+    // Bloqueo manual: habitación marcada "Ocupada" a mano (no por check-in).
+    // Se identifica por [OCUP:indef] o [OCUP:hasta=YYYY-MM-DD] en notas; si está "Ocupada"
+    // sin etiqueta y sin reserva en Check-in, se trata como bloqueo indefinido.
+    function _ocupManualBlocksRange(room, checkinStr, resList) {
+      if (!room || room.estado !== 'Ocupada') return false;
+      var m = String(room.notas || '').match(/\[OCUP:(indef|hasta=(\d{4}-\d{2}-\d{2}))\]/);
+      if (m) { var h = m[2] || null; return h ? (String(checkinStr) < h) : true; }
+      var list = resList || S.reservas || [];
+      var hasCheckin = list.some(function(r){ return String(r.habitacionNum) === String(room.numero) && r.estado === 'Check-in'; });
+      return !hasCheckin;
+    }
+    // Al cargar: liberar automáticamente las habitaciones cuyo bloqueo manual con fecha ya venció.
+    async function _autoFreeExpiredOcup() {
+      try {
+        if (!S.rooms || S._publicMode) return;
+        var today = normDate(new Date());
+        var ops = [];
+        S.rooms.forEach(function(room){
+          if (room.estado !== 'Ocupada') return;
+          var m = String(room.notas || '').match(/\[OCUP:hasta=(\d{4}-\d{2}-\d{2})\]/);
+          if (!m) return;
+          if (today >= m[1]) {
+            var clean = String(room.notas || '').replace(/\[OCUP:[^\]]*\]\s*\|?\s*/g, '').replace(/^\s*\|\s*/, '').trim();
+            room.estado = 'Disponible'; room.notas = clean;
+            ops.push({ type: 'updateById', sheet: '🏨 Habitaciones', id: room.id, values: [room.id, room.numero, room.tipo, room.tarifa, 'Disponible', clean] });
+          }
+        });
+        if (ops.length && S.scriptUrl) { await sheets.multi(ops).catch(function(){}); }
+      } catch (e) {}
     }
 
     function toggleNewResIVA() {
@@ -17272,8 +17307,43 @@
         return;
       }
 
+      // Si se marca OCUPADA manualmente: preguntar por cuántos días (o indefinido)
+      if (newStatus === 'Ocupada') {
+        var diasStr = prompt('¿Por cuántos días queda ocupada la Hab. ' + room.numero + '?\n\nEscribe un número de días, o déjalo vacío para dejarla ocupada indefinidamente (hasta que le quites el estado).');
+        if (diasStr === null) return; // cancelado
+        var dias = parseInt(diasStr, 10);
+        var ocupTag, hastaTxt;
+        if (String(diasStr).trim() !== '' && !isNaN(dias) && dias > 0) {
+          hastaTxt = _addDays(normDate(new Date()), dias); // se libera en esta fecha
+          ocupTag = '[OCUP:hasta=' + hastaTxt + ']';
+        } else {
+          ocupTag = '[OCUP:indef]'; hastaTxt = '';
+        }
+        var _oClean = (room.notas || '').replace(/\[OCUP:[^\]]*\]\s*\|?\s*/g, '').replace(/\[MANT\][^|]*/g, '').replace(/^\s*\|\s*/, '').trim();
+        var _oNotas = ocupTag + (_oClean ? ' | ' + _oClean : '');
+        await busy(async () => {
+          var n = now();
+          var roomRow = [room.id, room.numero, room.tipo, room.tarifa, 'Ocupada', _oNotas];
+          var _oDetalle = 'Hab. ' + room.numero + ' ocupada (manual)' + (hastaTxt ? ' hasta ' + hastaTxt : ' — indefinido');
+          var logRow = [normDate(new Date()), n.split(' ')[1], S.user.usuario, 'Cambio Estado', _oDetalle, 'info'];
+          await sheets.multi([
+            { type: 'updateById', sheet: '🏨 Habitaciones', id: room.id, values: roomRow },
+            { type: 'append', sheet: '📜 Bitácora', values: logRow }
+          ]);
+          var roomIdx = S.rooms.findIndex(r => r.id === roomId);
+          S.rooms[roomIdx].estado = 'Ocupada';
+          S.rooms[roomIdx].notas = _oNotas;
+          toast('Hab. ' + room.numero + ' ocupada' + (hastaTxt ? ' hasta ' + hastaTxt : ' (indefinido)'));
+          closeModal();
+          render();
+        }, 'Bloqueando habitación...');
+        return;
+      }
+
       // If leaving Mantenimiento, clean up maintenance note
       var finalNotas = room.notas || '';
+      // Al salir de OCUPADA manual, limpiar la etiqueta de bloqueo
+      finalNotas = finalNotas.replace(/\[OCUP:[^\]]*\]\s*\|?\s*/g, '').replace(/^\s*\|\s*/, '').trim();
       if (room.estado === 'Mantenimiento') {
         finalNotas = finalNotas.replace(/\[MANT\] [^|]*/g, '').replace(/^\s*\|\s*/, '').trim();
       }
@@ -18348,6 +18418,7 @@
       var available = [], unavailable = [];
       S.rooms.forEach(function(room) {
         if (room.estado === 'Mantenimiento') { unavailable.push({ room: room, reason: '🛠️ Mantenimiento' }); return; }
+        if (_ocupManualBlocksRange(room, checkin)) { unavailable.push({ room: room, reason: '🔒 Ocupada' }); return; }
         var conflict = S.reservas.find(function(r) {
           return r.habitacionNum === room.numero && r.estado !== 'Cancelada' && r.estado !== 'Check-out' && r.fechaEntrada < checkout && r.fechaSalida > checkin;
         });
@@ -18690,6 +18761,7 @@
       }
       var nights = daysUntil(checkin, checkout);
       var available = _bookingRooms.filter(function (room) {
+        if (_ocupManualBlocksRange(room, checkin, _bookingReservas)) return false;
         var conflict = _bookingReservas.some(function (res) {
           return res.habitacionNum === room.numero && res.fechaEntrada < checkout && res.fechaSalida > checkin;
         });
