@@ -2665,7 +2665,7 @@
         <input type="hidden" id="payResId" />
         <div class="form-group">
           <label class="form-label">Monto</label>
-          <input type="number" id="payMonto" class="form-input" placeholder="0.00" step="0.01" min="0" required />
+          <input type="number" id="payMonto" class="form-input" placeholder="0.00" step="0.01" min="0" required oninput="if(typeof calcPayCashCambio==='function')calcPayCashCambio();" />
           <button type="button" id="payFillBalance" onclick="document.getElementById('payMonto').value=(window._payBalance||'');if(typeof calcPayCashCambio==='function')calcPayCashCambio();" style="margin-top:6px;background:var(--surface2);border:1px dashed var(--accent);color:var(--accent);border-radius:8px;padding:6px 10px;font-size:11px;cursor:pointer;">Usar saldo total: $<span id="payBalanceLbl">0</span></button>
           <div style="font-size:11px;color:var(--text2);margin-top:5px;">Escribe solo lo que el huésped paga ahora. Si pagará después, usa “Check-in a crédito”.</div>
         </div>
@@ -3294,7 +3294,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-09-18g';
+    var APP_BUILD = '2026-09-18h';
     var _bfPromoRowCount = 0;
     var CONFIG_KEYS = ['hotelInfo', 'hotelTerms', 'dailyRoutine', 'msgTemplates', 'emergencyContacts', 'breakfastPromo', 'guestGuide'];
 
@@ -14277,7 +14277,7 @@
 
       document.getElementById('paymentResInfo').innerHTML = info;
       document.getElementById('payResId').value = resId;
-      document.getElementById('payMonto').value = '';
+      document.getElementById('payMonto').value = (balance > 0 ? balance : '');
       window._payBalance = balance;
       var _pmInp = document.getElementById('payMonto'); if (_pmInp) _pmInp.placeholder = balance > 0 ? ('Monto recibido ahora (saldo $' + balance + ')') : '0.00';
       var _pbl = document.getElementById('payBalanceLbl'); if (_pbl) _pbl.textContent = balance;
@@ -14516,6 +14516,22 @@
         document.getElementById('newResPayMonto').value = '';
         document.getElementById('newResPayMetodo').value = '';
         document.getElementById('newResPayNotas').value = '';
+      } else {
+        // Prellenar el monto con el total de la reserva (el usuario puede editarlo)
+        var mEl = document.getElementById('newResPayMonto');
+        if (mEl && !mEl.value) {
+          var tarifa = parseFloat(document.getElementById('newResTarifa').value) || 0;
+          var checkin = document.getElementById('newResCheckIn').value;
+          var checkout = document.getElementById('newResCheckOut').value;
+          if (tarifa && checkin && checkout) {
+            var days = daysUntil(checkin, checkout);
+            var subtotal = Math.max(days, 1) * tarifa;
+            var factura = document.getElementById('newResFactura') && document.getElementById('newResFactura').checked;
+            var total = _taxBreak(subtotal, factura).total;
+            mEl.value = Math.round(total * 100) / 100;
+          }
+        }
+        try { if (typeof calcNewResPayCash === 'function') calcNewResPayCash(); } catch (e) {}
       }
     }
 
@@ -19966,9 +19982,104 @@
       if (t.balance > 0.01) acts += '<button class="form-button" onclick="openGroupPayment(\'' + groupId + '\')" style="width:100%;background:var(--accent);color:var(--bg);">💰 Cobrar grupo ($' + _fmt(t.balance) + ')</button>';
       else acts += '<div style="text-align:center;color:var(--green);font-weight:700;">✅ Grupo pagado completo</div>';
       acts += '<button class="form-button secondary" onclick="openGroupFacturaModal(\'' + groupId + '\')" style="width:100%;">🧾 Factura del grupo</button>';
+      acts += '<button class="form-button secondary" onclick="cancelGroup(\'' + groupId + '\')" style="width:100%;border-color:var(--red);color:var(--red);">❌ Cancelar grupo</button>';
       document.getElementById('taskDetailActions').innerHTML = acts;
       openModal('taskDetailModal');
     }
+
+    function cancelGroup(groupId) {
+      var list = _groupReservas(groupId).filter(function(r){ return r.estado !== 'Cancelada' && r.estado !== 'Check-out'; });
+      if (!list.length) { toast('No hay reservas activas en el grupo', true); return; }
+      var totalPaid = 0, anyCheckin = false;
+      list.forEach(function(r){
+        totalPaid += (S.cobros || []).filter(function(c){ return c.reservaId === r.id; }).reduce(function(s,c){ return s + (c.monto||0); }, 0);
+        if (r.estado === 'Check-in') anyCheckin = true;
+      });
+      var h = '';
+      h += '<div style="background:var(--surface2);border-radius:10px;padding:11px 13px;margin-bottom:14px;">';
+      h += '<div style="font-weight:700;font-size:14px;">Grupo · ' + list.length + ' habitación(es)</div>';
+      h += '<div style="font-size:12px;color:var(--text2);">' + list.map(function(r){ return _wbEscC(r.habitacionNum); }).join(', ') + '</div>';
+      h += '</div>';
+      if (anyCheckin) h += '<div style="background:rgba(239,68,68,0.12);border:1px solid var(--red);border-radius:10px;padding:10px 12px;margin-bottom:14px;font-size:12px;color:var(--red);line-height:1.5;">⚠️ Al menos una habitación del grupo tiene <b>check-in activo</b>. Al cancelar se liberarán esas habitaciones (pasan a Limpieza).</div>';
+      if (totalPaid > 0) {
+        h += '<div style="background:var(--surface2);border-radius:10px;padding:11px 13px;margin-bottom:12px;">';
+        h += '<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:10px;"><span style="color:var(--text2);">Pagado en el grupo</span><b style="font-family:Space Mono,monospace;color:var(--green);">$' + _fmt(totalPaid) + '</b></div>';
+        h += '<div style="font-size:11px;color:var(--text2);margin-bottom:8px;">¿Qué hago con ese dinero?</div>';
+        h += '<label style="display:flex;align-items:flex-start;gap:9px;background:var(--surface3);border-radius:8px;padding:10px;cursor:pointer;margin-bottom:8px;"><input type="radio" name="cancelGrpPago" value="cargo" checked style="margin-top:2px;"><span><b style="font-size:13px;">Dejar como cargo</b><br><span style="font-size:11px;color:var(--text2);">El dinero se queda como ingreso.</span></span></label>';
+        h += '<label style="display:flex;align-items:flex-start;gap:9px;background:var(--surface3);border-radius:8px;padding:10px;cursor:pointer;"><input type="radio" name="cancelGrpPago" value="reembolso" style="margin-top:2px;"><span><b style="font-size:13px;">Marcar como reembolso</b><br><span style="font-size:11px;color:var(--text2);">Se resta de ingresos (−$' + _fmt(totalPaid) + ').</span></span></label>';
+        h += '</div>';
+      }
+      h += '<label style="display:block;font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;">Motivo de la cancelación *</label>';
+      h += '<input type="text" id="cancelGrpMotivo" placeholder="Ej: cancelación del grupo..." style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--surface3);border-radius:8px;padding:11px;font-size:14px;color:var(--text);margin-bottom:14px;">';
+      h += '<button class="form-button" onclick="doCancelGroup(\'' + groupId + '\')" style="width:100%;background:var(--red);color:#fff;">🗑️ Cancelar todo el grupo</button>';
+      document.getElementById('taskDetailContent').innerHTML = h;
+      document.getElementById('taskDetailModal').querySelector('.modal-title').textContent = '❌ Cancelar grupo';
+      document.getElementById('taskDetailActions').innerHTML = '';
+      openModal('taskDetailModal');
+    }
+
+    async function doCancelGroup(groupId) {
+      if (window._cancelBusy) return;
+      var motivo = ((document.getElementById('cancelGrpMotivo') || {}).value || '').trim();
+      if (!motivo) { toast('Escribe el motivo de la cancelación', true); return; }
+      var list = _groupReservas(groupId).filter(function(r){ return r.estado !== 'Cancelada' && r.estado !== 'Check-out'; });
+      if (!list.length) { toast('No hay reservas activas en el grupo', true); return; }
+      var grpPaid = 0;
+      list.forEach(function(r){ grpPaid += (S.cobros || []).filter(function(c){ return c.reservaId === r.id; }).reduce(function(s,c){ return s + (c.monto||0); }, 0); });
+      var refund = false;
+      if (grpPaid > 0) { var _r = document.querySelector('input[name="cancelGrpPago"]:checked'); refund = _r && _r.value === 'reembolso'; }
+
+      window._cancelBusy = true;
+      try {
+        await busy(async function() {
+          var n = now(); var fecha = normDate(new Date()); var hora = n.split(' ')[1];
+          var ops = [];
+          var localChanges = [];
+          list.forEach(function(res){
+            var isCI = res.estado === 'Check-in';
+            var paid = (S.cobros || []).filter(function(c){ return c.reservaId === res.id; }).reduce(function(s,c){ return s + (c.monto||0); }, 0);
+            var _newNotas = (res.notas ? res.notas + ' | ' : '') + 'Cancelación grupo: ' + motivo + (refund && paid>0 ? ' (reembolso $' + _fmt(paid) + ')' : (paid>0 ? ' (cargo retenido $' + _fmt(paid) + ')' : ''));
+            ops.push({ type: 'updateById', sheet: '📋 Reservas', id: res.id, values: [res.id, res.habitacionNum, res.huesped, res.telefono, res.email, res.fechaEntrada, res.fechaSalida, res.adultos, res.niños, res.tarifa, res.tarifaTotal, 'Cancelada', _newNotas, res.creadoPor, res.fechaCreacion] });
+            var room = S.rooms.find(function(r){ return String(r.numero) === String(res.habitacionNum); });
+            var freed = false, hkTask = null;
+            if (isCI && room && room.estado === 'Ocupada') {
+              var _rClean = String(room.notas || '').replace(/\[OCUP:[^\]]*\]\s*\|?\s*/g, '').replace(/^\s*\|\s*/, '').trim();
+              ops.push({ type: 'updateById', sheet: '🏨 Habitaciones', id: room.id, values: [room.id, room.numero, room.tipo, room.tarifa, 'Limpieza', _rClean] });
+              var taskId = nextId('HK', S.housekeeping.concat(localChanges.filter(function(x){return x._hk;}).map(function(x){return x._hk;})));
+              hkTask = { id: taskId, fecha: fecha, habitacionNum: room.numero, tarea: 'Limpieza (cancelación)', prioridad: 'Alta', estado: 'Pendiente', asignadoA: '', notas: motivo, horaInicio: '', horaFin: '', verificado: '', checklist: '' };
+              ops.push({ type: 'append', sheet: '🧹 Housekeeping', values: [taskId, fecha, room.numero, 'Limpieza (cancelación)', 'Alta', 'Pendiente', '', motivo, '', '', '', ''] });
+              freed = true;
+            }
+            var refundCobro = null;
+            if (refund && paid > 0) {
+              var payId = nextId('PAY', S.cobros.concat(localChanges.filter(function(x){return x._cobro;}).map(function(x){return x._cobro;})));
+              refundCobro = { id: payId, reservaId: res.id, fecha: fecha, hora: hora, monto: -Math.abs(paid), metodoPago: 'Reembolso', concepto: 'Reembolso por cancelación', notas: motivo, responsable: (S.user && S.user.usuario) || '' };
+              ops.push({ type: 'append', sheet: '💰 Cobros', values: [payId, res.id, fecha, hora, -Math.abs(paid), 'Reembolso', 'Reembolso por cancelación', motivo, (S.user && S.user.usuario) || ''] });
+            }
+            localChanges.push({ resId: res.id, notas: _newNotas, room: freed ? room : null, roomNotas: freed ? String(room.notas || '').replace(/\[OCUP:[^\]]*\]\s*\|?\s*/g, '').replace(/^\s*\|\s*/, '').trim() : null, _hk: hkTask, _cobro: refundCobro });
+          });
+          ops.push({ type: 'append', sheet: '📜 Bitácora', values: [fecha, hora, S.user.usuario, 'Grupo Cancelado', list.length + ' hab. — ' + motivo + (grpPaid>0 ? (refund ? ' · Reembolso $' + _fmt(grpPaid) : ' · Cargo retenido $' + _fmt(grpPaid)) : ''), 'warning'] });
+
+          await sheets.multi(ops);
+
+          // Estado local
+          localChanges.forEach(function(ch){
+            var ri = S.reservas.findIndex(function(r){ return r.id === ch.resId; });
+            if (ri !== -1) { S.reservas[ri].estado = 'Cancelada'; S.reservas[ri].notas = ch.notas; }
+            if (ch.room) { var rmi = S.rooms.findIndex(function(r){ return r.id === ch.room.id; }); if (rmi !== -1) { S.rooms[rmi].estado = 'Limpieza'; S.rooms[rmi].notas = ch.roomNotas; } }
+            if (ch._hk) { S.housekeeping = S.housekeeping || []; S.housekeeping.push(ch._hk); }
+            if (ch._cobro) { S.cobros = S.cobros || []; S.cobros.push(ch._cobro); }
+          });
+
+          toast('Grupo cancelado (' + list.length + ' hab.)' + (refund && grpPaid>0 ? ' · reembolso registrado' : ''));
+          closeModal();
+          render();
+        }, 'Cancelando grupo…');
+      } finally {
+        window._cancelBusy = false;
+      }
+    }
+
     function openGroupPayment(groupId) {
       var t = _groupTotals(groupId);
       var h = '';
