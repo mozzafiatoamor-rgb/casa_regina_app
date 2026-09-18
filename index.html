@@ -3286,7 +3286,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-09-17c';
+    var APP_BUILD = '2026-09-18a';
     var _bfPromoRowCount = 0;
     var CONFIG_KEYS = ['hotelInfo', 'hotelTerms', 'dailyRoutine', 'msgTemplates', 'emergencyContacts', 'breakfastPromo', 'guestGuide'];
 
@@ -10119,12 +10119,12 @@
       var wr = _utilWeekRange();
       var inWeek = function(f){ f = String(f||'').substring(0,10); return f >= wr.startStr && f <= wr.endStr; };
 
-      var ventasList = (S.cobros || []).filter(function(c){ return inWeek(c.fecha); });
-      var ventas = ventasList.reduce(function(s,c){ return s + (c.monto||0); }, 0);
+      var fin = _finMetrics(inWeek);
+      var occ = _ocupacionMetrics(wr.startStr, wr.endStr);
       var gastosList = (S.gastos || []).filter(function(g){ return inWeek(g.fecha); });
       var gastos = gastosList.reduce(function(s,g){ return s + (g.monto||0); }, 0);
-      var utilidad = ventas - gastos;
-      var margen = ventas > 0 ? Math.round((utilidad/ventas)*100) : 0;
+      var utilidad = fin.neto - gastos;
+      var margen = fin.neto > 0 ? Math.round((utilidad/fin.neto)*100) : 0;
 
       // Desglose por categoría
       var porCat = {};
@@ -10144,14 +10144,29 @@
       // Tarjeta de resultado
       var utilColor = utilidad >= 0 ? 'var(--green)' : 'var(--red)';
       h += '<div style="background:var(--surface2);border-radius:var(--radius);padding:16px;margin-bottom:14px;">';
-      h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">';
-      h += '<div style="background:var(--surface3);border-radius:12px;padding:12px;"><div style="font-size:11px;color:var(--text2);margin-bottom:4px;">Ventas (cobros)</div><div style="font-size:20px;font-weight:800;font-family:Space Mono,monospace;color:var(--green);">$'+_fmt(ventas)+'</div><div style="font-size:10px;color:var(--text2);margin-top:2px;">'+ventasList.length+' cobro(s)</div></div>';
-      h += '<div style="background:var(--surface3);border-radius:12px;padding:12px;"><div style="font-size:11px;color:var(--text2);margin-bottom:4px;">Gastos</div><div style="font-size:20px;font-weight:800;font-family:Space Mono,monospace;color:var(--red);">$'+_fmt(gastos)+'</div><div style="font-size:10px;color:var(--text2);margin-top:2px;">'+gastosList.length+' gasto(s)</div></div>';
+      // Ocupación
+      h += '<div style="display:flex;gap:8px;text-align:center;margin-bottom:14px;">';
+      h += '<div style="flex:1;background:var(--surface3);border-radius:12px;padding:10px 6px;"><div style="font-size:20px;font-weight:800;color:var(--accent);font-family:Space Mono,monospace;">'+occ.estancias+'</div><div style="font-size:10px;color:var(--text2);margin-top:2px;">🛏️ Hab. rentadas</div></div>';
+      h += '<div style="flex:1;background:var(--surface3);border-radius:12px;padding:10px 6px;"><div style="font-size:20px;font-weight:800;color:var(--accent);font-family:Space Mono,monospace;">'+occ.noches+'</div><div style="font-size:10px;color:var(--text2);margin-top:2px;">🌙 Noches</div></div>';
+      h += '<div style="flex:1;background:var(--surface3);border-radius:12px;padding:10px 6px;"><div style="font-size:20px;font-weight:800;color:var(--accent);font-family:Space Mono,monospace;">'+occ.ocupacion+'%</div><div style="font-size:10px;color:var(--text2);margin-top:2px;">📊 Ocupación</div></div>';
       h += '</div>';
-      h += '<div style="border-top:1px solid var(--surface3);padding-top:12px;display:flex;justify-content:space-between;align-items:center;">';
-      h += '<div><div style="font-size:12px;color:var(--text2);">Utilidad de la semana</div><div style="font-size:11px;color:var(--text2);">Margen: '+margen+'%</div></div>';
+      // Desglose financiero (impuestos van al SAT, no cuentan como utilidad)
+      function _uRow(lbl, valTxt, sub, color, strong){
+        return '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;">'
+          +'<div><div style="font-size:12.5px;color:var(--text);'+(strong?'font-weight:700;':'')+'">'+lbl+'</div>'+(sub?'<div style="font-size:10px;color:var(--text2);">'+sub+'</div>':'')+'</div>'
+          +'<div style="font-family:Space Mono,monospace;font-weight:'+(strong?'800':'700')+';font-size:15px;color:'+(color||'var(--text)')+';">'+valTxt+'</div></div>';
+      }
+      h += '<div style="border-top:1px solid var(--surface3);padding-top:12px;">';
+      h += _uRow('Ingresos cobrados', '$'+_fmt(fin.bruto), fin.nCobros+' cobro(s)', 'var(--text)', false);
+      if (fin.impuestos > 0) h += _uRow('− Impuestos (para el SAT)', '−$'+_fmt(fin.impuestos), 'ISH $'+_fmt(fin.ish)+' + IVA $'+_fmt(fin.iva), 'var(--red)', false);
+      h += _uRow('= Ventas netas', '$'+_fmt(fin.neto), '', 'var(--green)', true);
+      h += _uRow('− Gastos', '−$'+_fmt(gastos), gastosList.length+' gasto(s)', 'var(--red)', false);
+      h += '</div>';
+      h += '<div style="border-top:1px solid var(--surface3);margin-top:8px;padding-top:12px;display:flex;justify-content:space-between;align-items:center;">';
+      h += '<div><div style="font-size:12px;color:var(--text2);">Utilidad de la semana</div><div style="font-size:11px;color:var(--text2);">Margen s/ventas netas: '+margen+'%</div></div>';
       h += '<div style="font-size:28px;font-weight:800;font-family:Space Mono,monospace;color:'+utilColor+';">$'+_fmt(utilidad)+'</div>';
       h += '</div></div>';
+      if (fin.impuestos > 0) h += '<div style="font-size:10.5px;color:var(--text2);background:var(--surface2);border-radius:10px;padding:9px 12px;margin-bottom:14px;">💡 Los impuestos cobrados (ISH + IVA de reservas con factura) no son utilidad: se pagan al SAT.</div>';
 
       // Botones de acción
       h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">';
@@ -10239,11 +10254,65 @@
       var hh=document.getElementById('repHasta'); if(hh) hh.value=ha;
     }
 
+    // ---- Helpers financieros: separar impuestos (SAT) de ingresos netos + ocupación ----
+    function _addDays(str, n){ var d=new Date(String(str)+'T00:00:00'); d.setDate(d.getDate()+n); return normDate(d); }
+    function _daysInclusive(a, b){ if(!a||!b||b<a) return 0; var da=new Date(a+'T00:00:00'), db=new Date(b+'T00:00:00'); return Math.round((db-da)/86400000)+1; }
+    // Porción de impuesto (ISH+IVA) de un cobro, según si su reserva lleva factura
+    function _cobroDesglose(c){
+      var res = (S.reservas||[]).find(function(r){ return r.id === c.reservaId; });
+      var monto = c.monto || 0;
+      if (res) {
+        var iv = (typeof parseIVAData==='function') ? parseIVAData(res.notas) : null;
+        if (iv) {
+          var ishV = parseFloat(iv.ish)||0, ivaV = parseFloat(iv.iva)||0, sub = parseFloat(iv.subtotal)||0;
+          var tax = ishV + ivaV;
+          var total = parseFloat(res.tarifaTotal) || (sub + tax);
+          if (total > 0 && tax > 0) {
+            var ish = Math.round(monto*(ishV/total)*100)/100;
+            var iva = Math.round(monto*(ivaV/total)*100)/100;
+            var imp = Math.round((ish+iva)*100)/100;
+            return { neto: Math.round((monto-imp)*100)/100, impuesto: imp, ish: ish, iva: iva };
+          }
+        }
+      }
+      return { neto: monto, impuesto: 0, ish: 0, iva: 0 };
+    }
+    function _finMetrics(inR){
+      var cobros = (S.cobros||[]).filter(function(c){ return inR(String(c.fecha||'').substring(0,10)); });
+      var bruto=0, imp=0, ishT=0, ivaT=0;
+      cobros.forEach(function(c){ var d=_cobroDesglose(c); bruto+=(c.monto||0); imp+=d.impuesto; ishT+=d.ish; ivaT+=d.iva; });
+      var R=function(x){ return Math.round(x*100)/100; };
+      bruto=R(bruto); imp=R(imp); ishT=R(ishT); ivaT=R(ivaT);
+      return { cobrosList:cobros, bruto:bruto, impuestos:imp, ish:ishT, iva:ivaT, neto:R(bruto-imp), nCobros:cobros.length };
+    }
+    function _ocupacionMetrics(desde, hasta){
+      var est = (S.reservas||[]).filter(function(r){
+        if (r.estado!=='Check-in' && r.estado!=='Check-out') return false;
+        var fe=String(r.fechaEntrada||'').substring(0,10), fs=String(r.fechaSalida||'').substring(0,10);
+        if (!fe || !fs) return false;
+        var lastNight=_addDays(fs,-1);
+        return fe<=hasta && lastNight>=desde;
+      });
+      var noches=0;
+      est.forEach(function(r){
+        var fe=String(r.fechaEntrada).substring(0,10), fs=String(r.fechaSalida).substring(0,10);
+        var lastNight=_addDays(fs,-1);
+        var start=fe>desde?fe:desde;
+        var end=lastNight<hasta?lastNight:hasta;
+        noches+=_daysInclusive(start,end);
+      });
+      var dias=_daysInclusive(desde,hasta);
+      var numRooms=(S.rooms&&S.rooms.length)?S.rooms.length:(typeof ROOMS_COUNT!=='undefined'?ROOMS_COUNT:9);
+      var ocup=(dias*numRooms)>0?Math.round((noches/(dias*numRooms))*100):0;
+      return { estancias:est.length, noches:noches, dias:dias, numRooms:numRooms, ocupacion:ocup };
+    }
+
     function _repData() {
       var desde = S.repDesde, hasta = S.repHasta, tipo = S.repTipo || 'completo';
       var inR = function(f){ f=String(f||'').substring(0,10); return (!desde || f>=desde) && (!hasta || f<=hasta); };
-      var ventasList = (S.cobros||[]).filter(function(c){ return inR(c.fecha); });
-      var ventas = ventasList.reduce(function(s,c){ return s+(c.monto||0); }, 0);
+      var fin = _finMetrics(inR);
+      var ventasList = fin.cobrosList;
+      var ventas = fin.bruto;
       var ventasByM = {}; ventasList.forEach(function(c){ var m=c.metodoPago||'Otro'; ventasByM[m]=(ventasByM[m]||0)+(c.monto||0); });
       var allGastos = (S.gastos||[]).filter(function(g){ return inR(g.fecha); });
       var allGastosTotal = allGastos.reduce(function(s,g){ return s+(g.monto||0); }, 0);
@@ -10251,8 +10320,10 @@
       gastosList = gastosList.slice().sort(function(a,b){ return String(a.fecha).localeCompare(String(b.fecha)); });
       var gastosTotal = gastosList.reduce(function(s,g){ return s+(g.monto||0); }, 0);
       var porCat = {}; gastosList.forEach(function(g){ var c=g.categoria||'Otros'; porCat[c]=(porCat[c]||0)+(g.monto||0); });
+      var occ = _ocupacionMetrics(desde, hasta);
       return { desde:desde, hasta:hasta, tipo:tipo, ventasList:ventasList, ventas:ventas, ventasByM:ventasByM,
-               gastosList:gastosList, gastosTotal:gastosTotal, porCat:porCat, allGastosTotal:allGastosTotal, utilidad: ventas-allGastosTotal };
+               bruto:fin.bruto, impuestos:fin.impuestos, ish:fin.ish, iva:fin.iva, neto:fin.neto, nCobros:fin.nCobros, occ:occ,
+               gastosList:gastosList, gastosTotal:gastosTotal, porCat:porCat, allGastosTotal:allGastosTotal, utilidad: fin.neto-allGastosTotal };
     }
     function _repTipoLabel(tipo) { tipo = tipo || S.repTipo; return tipo==='nomina'?'Nómina':tipo==='gastos'?'Gastos':'Utilidad'; }
     function _repRangoLabel() { return formatDate(S.repDesde) + ' al ' + formatDate(S.repHasta); }
@@ -10284,22 +10355,45 @@
 
       // Resumen
       if (d.tipo === 'completo') {
-        doc.setFillColor(244,242,251); doc.roundedRect(margin, y, contentW, 34, 3, 3, 'F');
-        var col = contentW/3;
-        doc.setFontSize(9); doc.setTextColor(110);
-        doc.text('VENTAS (cobros)', margin+col*0.5, y+8, {align:'center'});
-        doc.text('GASTOS', margin+col*1.5, y+8, {align:'center'});
-        doc.text('UTILIDAD', margin+col*2.5, y+8, {align:'center'});
-        doc.setFontSize(15); doc.setFont('helvetica','bold');
-        doc.setTextColor(31,157,87); doc.text('$'+_fmt(d.ventas), margin+col*0.5, y+18, {align:'center'});
-        doc.setTextColor(214,69,69); doc.text('$'+_fmt(d.allGastosTotal), margin+col*1.5, y+18, {align:'center'});
-        doc.setTextColor(d.utilidad>=0?31:214, d.utilidad>=0?157:69, d.utilidad>=0?87:69); doc.text('$'+_fmt(d.utilidad), margin+col*2.5, y+18, {align:'center'});
+        // Ocupación (habitaciones rentadas)
+        doc.setFillColor(240,247,252); doc.roundedRect(margin, y, contentW, 20, 3, 3, 'F');
+        var oc = contentW/3;
+        doc.setFontSize(8.5); doc.setTextColor(110); doc.setFont('helvetica','normal');
+        doc.text('HABITACIONES RENTADAS', margin+oc*0.5, y+7, {align:'center'});
+        doc.text('NOCHES VENDIDAS', margin+oc*1.5, y+7, {align:'center'});
+        doc.text('OCUPACIÓN', margin+oc*2.5, y+7, {align:'center'});
+        doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(40);
+        doc.text(String(d.occ.estancias), margin+oc*0.5, y+15, {align:'center'});
+        doc.text(String(d.occ.noches), margin+oc*1.5, y+15, {align:'center'});
+        doc.text(d.occ.ocupacion+'%', margin+oc*2.5, y+15, {align:'center'});
+        doc.setTextColor(0); y += 26;
+
+        // Desglose financiero (cascada) — impuestos separados (van al SAT)
+        var normalRows = 3 + (d.impuestos>0?1:0);
+        var boxH = 9 + normalRows*7 + 11;
+        doc.setFillColor(244,242,251); doc.roundedRect(margin, y, contentW, boxH, 3, 3, 'F');
+        var lx = margin+6, rx = right-6, ly = y+9;
+        function sumRow(lbl, val, opt){ opt=opt||{};
+          doc.setFont('helvetica', opt.bold?'bold':'normal'); doc.setFontSize(opt.big?12:10);
+          if (opt.color) doc.setTextColor(opt.color[0],opt.color[1],opt.color[2]); else doc.setTextColor(40);
+          doc.text(lbl, lx, ly);
+          doc.text((opt.neg?'-$':'$')+_fmt(Math.abs(val)), rx, ly, {align:'right'});
+          doc.setTextColor(0); ly += opt.big?10:7;
+        }
+        sumRow('Ingresos cobrados', d.bruto);
+        if (d.impuestos>0) sumRow('(-) Impuestos por pagar al SAT', d.impuestos, {neg:true, color:[214,69,69]});
+        sumRow('(=) Ventas netas', d.neto, {bold:true, color:[31,157,87]});
+        sumRow('(-) Gastos', d.allGastosTotal, {neg:true, color:[214,69,69]});
+        doc.setDrawColor(205); doc.line(lx, ly-3, rx, ly-3); ly += 1;
+        sumRow('(=) UTILIDAD', d.utilidad, {bold:true, big:true, color:(d.utilidad>=0?[31,157,87]:[214,69,69])});
+        y += boxH + 5;
+
+        var margen = d.neto>0?Math.round((d.utilidad/d.neto)*100):0;
         doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(110);
-        var margen = d.ventas>0?Math.round((d.utilidad/d.ventas)*100):0;
-        doc.text(d.ventasList.length+' cobro(s)', margin+col*0.5, y+26, {align:'center'});
-        doc.text(d.gastosList.length+' gasto(s)', margin+col*1.5, y+26, {align:'center'});
-        doc.text('Margen '+margen+'%', margin+col*2.5, y+26, {align:'center'});
-        doc.setTextColor(0); y += 42;
+        var _impNote = 'Margen s/ventas netas: '+margen+'%  ·  '+d.nCobros+' cobro(s)  ·  '+d.gastosList.length+' gasto(s)';
+        doc.text(_impNote, margin, y); y += 4.5;
+        if (d.impuestos>0) { doc.text('Impuestos para el SAT: ISH $'+_fmt(d.ish)+' + IVA $'+_fmt(d.iva)+' = $'+_fmt(d.impuestos)+' (no cuentan como utilidad).', margin, y); y += 4.5; }
+        doc.setTextColor(0); y += 3;
       } else {
         doc.setFillColor(244,242,251); doc.roundedRect(margin, y, contentW, 20, 3, 3, 'F');
         doc.setFontSize(10); doc.setTextColor(110); doc.text('TOTAL '+_repTipoLabel(d.tipo).toUpperCase(), margin+6, y+8);
@@ -10401,12 +10495,24 @@
       html += '<div style="text-align:center;font-size:13px;color:#9c98b3;margin-bottom:26px;">Generado: '+_wbEscC(now())+'</div>';
 
       if (d.tipo === 'completo') {
-        var margen = d.ventas>0?Math.round((d.utilidad/d.ventas)*100):0;
-        html += '<div style="display:flex;gap:16px;margin-bottom:26px;">';
-        html += '<div style="flex:1;background:#f0fff6;border:2px solid #b6ecc9;border-radius:16px;padding:20px;text-align:center;"><div style="font-size:15px;color:#6b6685;margin-bottom:6px;">VENTAS</div><div style="font-size:32px;font-weight:800;color:#1f9d57;">$'+_fmt(d.ventas)+'</div><div style="font-size:13px;color:#9c98b3;margin-top:4px;">'+d.ventasList.length+' cobro(s)</div></div>';
-        html += '<div style="flex:1;background:#fff2f2;border:2px solid #f3c2c2;border-radius:16px;padding:20px;text-align:center;"><div style="font-size:15px;color:#6b6685;margin-bottom:6px;">GASTOS</div><div style="font-size:32px;font-weight:800;color:#d64545;">$'+_fmt(d.allGastosTotal)+'</div><div style="font-size:13px;color:#9c98b3;margin-top:4px;">'+d.gastosList.length+' gasto(s)</div></div>';
-        html += '<div style="flex:1;background:#f4f2fb;border:2px solid #cfc6ef;border-radius:16px;padding:20px;text-align:center;"><div style="font-size:15px;color:#6b6685;margin-bottom:6px;">UTILIDAD</div><div style="font-size:32px;font-weight:800;color:'+(d.utilidad>=0?'#1f9d57':'#d64545')+';">$'+_fmt(d.utilidad)+'</div><div style="font-size:13px;color:#9c98b3;margin-top:4px;">Margen '+margen+'%</div></div>';
+        var margen = d.neto>0?Math.round((d.utilidad/d.neto)*100):0;
+        // Ocupación
+        function occCard(icon,label,val){ return '<div style="flex:1;background:#f4f2fb;border:2px solid #cfc6ef;border-radius:16px;padding:18px;text-align:center;"><div style="font-size:24px;">'+icon+'</div><div style="font-size:30px;font-weight:800;color:#3d3324;margin:2px 0;">'+val+'</div><div style="font-size:13px;color:#6b6685;">'+label+'</div></div>'; }
+        html += '<div style="display:flex;gap:16px;margin-bottom:22px;">';
+        html += occCard('🛏️','Habitaciones rentadas', d.occ.estancias);
+        html += occCard('🌙','Noches vendidas', d.occ.noches);
+        html += occCard('📊','Ocupación', d.occ.ocupacion+'%');
         html += '</div>';
+        // Cascada financiera (impuestos separados, van al SAT)
+        function wfRow(lbl,valStr,color,bold,sub){ return '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:'+(sub?'13':'11')+'px;"><div><div style="font-size:'+(bold?'19':'17')+'px;font-weight:'+(bold?'800':'500')+';color:#1a1626;">'+lbl+'</div>'+(sub?'<div style="font-size:12px;color:#9c98b3;">'+sub+'</div>':'')+'</div><div style="font-size:'+(bold?'22':'20')+'px;font-weight:'+(bold?'800':'700')+';color:'+color+';">'+valStr+'</div></div>'; }
+        html += '<div style="background:#f7f6fc;border-radius:16px;padding:22px 24px;margin-bottom:24px;">';
+        html += wfRow('Ingresos cobrados', '$'+_fmt(d.bruto), '#1a1626', false, d.nCobros+' cobro(s)');
+        if (d.impuestos>0) html += wfRow('− Impuestos por pagar al SAT', '−$'+_fmt(d.impuestos), '#d64545', false, 'ISH $'+_fmt(d.ish)+' + IVA $'+_fmt(d.iva));
+        html += wfRow('= Ventas netas', '$'+_fmt(d.neto), '#1f9d57', true, '');
+        html += wfRow('− Gastos', '−$'+_fmt(d.allGastosTotal), '#d64545', false, d.gastosList.length+' gasto(s)');
+        html += '<div style="border-top:2px solid #cfc6ef;margin-top:8px;padding-top:14px;display:flex;justify-content:space-between;align-items:baseline;"><div><div style="font-size:22px;font-weight:800;color:#1a1626;">UTILIDAD</div><div style="font-size:13px;color:#9c98b3;">Margen sobre ventas netas: '+margen+'%</div></div><div style="font-size:36px;font-weight:800;color:'+(d.utilidad>=0?'#1f9d57':'#d64545')+';">$'+_fmt(d.utilidad)+'</div></div>';
+        html += '</div>';
+        if (d.impuestos>0) html += '<div style="background:#fbf5e9;border-radius:12px;padding:12px 16px;margin-bottom:24px;font-size:13px;color:#7a6a4f;">💡 Los impuestos cobrados (ISH + IVA de reservas con factura) no son utilidad: se pagan al SAT.</div>';
       } else {
         html += '<div style="background:#fff2f2;border:2px solid #f3c2c2;border-radius:16px;padding:22px;text-align:center;margin-bottom:26px;"><div style="font-size:16px;color:#6b6685;margin-bottom:6px;">TOTAL '+_wbEscC(_repTipoLabel(d.tipo).toUpperCase())+'</div><div style="font-size:40px;font-weight:800;color:#d64545;">$'+_fmt(d.gastosTotal)+'</div><div style="font-size:13px;color:#9c98b3;margin-top:4px;">'+d.gastosList.length+' registro(s)</div></div>';
       }
