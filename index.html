@@ -3332,7 +3332,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-09-30n';
+    var APP_BUILD = '2026-09-30o';
     var _bfPromoRowCount = 0;
     var CONFIG_KEYS = ['hotelInfo', 'hotelTerms', 'dailyRoutine', 'msgTemplates', 'emergencyContacts', 'breakfastPromo', 'guestGuide'];
 
@@ -5845,12 +5845,12 @@
         if (!files.length) return;
         var maxDim = kind === 'logo' ? 600 : 1500;
         var baseName = (g[cat][i].nombre || cat).toString();
+        var okCount = 0, lastErr = '';
         for (var f = 0; f < files.length; f++) {
-          (function () {})();
           toast('Subiendo ' + (kind === 'logo' ? 'logo' : 'foto ' + (f + 1) + '/' + files.length) + '…');
           await new Promise(function (resolve) {
             _imgFileToBase64(files[f], maxDim, kind === 'logo', async function (r) {
-              if (!r) { toast('No se pudo leer la imagen', true); return resolve(); }
+              if (!r) { lastErr = 'No se pudo leer la imagen'; return resolve(); }
               try {
                 var up = await sheets.uploadImage(r.base64, baseName + '-' + kind, r.ext, cat);
                 var gg = getGuestGuide();
@@ -5858,14 +5858,19 @@
                 if (kind === 'logo') { gg[cat][i].logo = up.url; }
                 else { if (!Array.isArray(gg[cat][i].fotos)) gg[cat][i].fotos = []; gg[cat][i].fotos.push(up.url); }
                 saveGuestGuideLocal(gg);
-              } catch (err) { toast('Error al subir: ' + err.message, true); }
+                okCount++;
+              } catch (err) { lastErr = err.message; }
               resolve();
             });
           });
         }
-        // Publicar al Sheet para que el huésped lo vea de inmediato
-        try { saveGuestGuide(getGuestGuide()); } catch (e) {}
-        toast('✅ ' + (kind === 'logo' ? 'Logo subido y publicado' : 'Foto(s) subida(s) y publicada(s)'));
+        if (okCount > 0) {
+          // Publicar al Sheet solo si algo se subió realmente
+          try { saveGuestGuide(getGuestGuide()); } catch (e) {}
+          toast('✅ ' + (kind === 'logo' ? 'Logo subido y publicado' : okCount + ' foto(s) subida(s) y publicada(s)'));
+        } else {
+          toast('❌ No se subió: ' + (lastErr || 'error desconocido'), true);
+        }
         renderMarcasConfig();
       };
       input.click();

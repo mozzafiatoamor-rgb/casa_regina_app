@@ -25,6 +25,22 @@ var GH_DEFAULT_OWNER  = 'mozzafiatoamor-rgb';
 var GH_DEFAULT_REPO   = 'casa_regina_app';
 var GH_DEFAULT_BRANCH = 'main';
 
+// ⚠️ EJECUTA ESTA FUNCIÓN UNA VEZ desde el editor (botón ▶ Ejecutar, con "autorizar" seleccionada)
+// para conceder el permiso de conexión externa (UrlFetchApp). Acepta el diálogo de permisos que aparece.
+// Sin esto, subir logos/fotos falla con "No cuentas con el permiso para llamar a UrlFetchApp.fetch".
+function autorizar() {
+  var props = PropertiesService.getScriptProperties();
+  var token = props.getProperty('GITHUB_TOKEN');
+  // Hace una llamada externa mínima para forzar el consentimiento del permiso.
+  var resp = UrlFetchApp.fetch('https://api.github.com/rate_limit', {
+    method: 'get',
+    headers: token ? { 'Authorization': 'token ' + token, 'User-Agent': 'CasaReginaPMS' } : { 'User-Agent': 'CasaReginaPMS' },
+    muteHttpExceptions: true
+  });
+  Logger.log('Permiso OK. GitHub respondió: ' + resp.getResponseCode());
+  Logger.log(token ? 'GITHUB_TOKEN presente ✅' : 'FALTA GITHUB_TOKEN ❌ (agrégalo en Propiedades del script)');
+}
+
 function getOrCreateSheet(ss, name) {
   var sheet = ss.getSheetByName(name);
   if (!sheet && SHEET_HEADERS[name]) {
