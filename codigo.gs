@@ -15,6 +15,16 @@ var SHEET_HEADERS = {
   '💸 Gastos': ['ID', 'Fecha', 'Categoria', 'Concepto', 'Monto', 'Tipo', 'Responsable', 'Notas']
 };
 
+// === Repositorio de GitHub para subir imágenes (logos/fotos de marcas) ===
+// El token se guarda en Propiedades del script (GITHUB_TOKEN); NO se escribe aquí.
+// En el editor de Apps Script:
+//   Configuración del proyecto (⚙️) → Propiedades del script → Agregar propiedad:
+//     GITHUB_TOKEN = <token de GitHub con permiso "Contents: Read and write" en este repo>
+// (Opcional) sobreescribe owner/repo/branch con las propiedades GH_OWNER, GH_REPO, GH_BRANCH.
+var GH_DEFAULT_OWNER  = 'mozzafiatoamor-rgb';
+var GH_DEFAULT_REPO   = 'casa_regina_app';
+var GH_DEFAULT_BRANCH = 'main';
+
 function getOrCreateSheet(ss, name) {
   var sheet = ss.getSheetByName(name);
   if (!sheet && SHEET_HEADERS[name]) {
@@ -28,6 +38,11 @@ function doPost(e) {
   try {
     var data = JSON.parse(e.postData.contents);
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+    // === UPLOAD IMAGE (sube una imagen al repo de GitHub y devuelve su URL) ===
+    if (data.action === 'uploadImage') {
+      return uploadImageToGitHub(data);
+    }
 
     // === APPEND (agregar fila) ===
     if (!data.action || data.action === 'append') {
@@ -208,4 +223,58 @@ function jsonResponse(obj) {
   return ContentService
     .createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+// Sube una imagen (base64) a la carpeta assets/marcas del repo de GitHub y devuelve su URL directa.
+function uploadImageToGitHub(data) {
+  try {
+    var props = PropertiesService.getScriptProperties();
+    var token = props.getProperty('GITHUB_TOKEN');
+    if (!token) {
+      return jsonResponse({ success: false, error: 'Falta GITHUB_TOKEN en Propiedades del script. Agrégalo en Configuración del proyecto → Propiedades del script.' });
+    }
+    var owner  = props.getProperty('GH_OWNER')  || GH_DEFAULT_OWNER;
+    var repo   = props.getProperty('GH_REPO')   || GH_DEFAULT_REPO;
+    var branch = props.getProperty('GH_BRANCH') || GH_DEFAULT_BRANCH;
+
+    // Limpia el base64 (quita el prefijo data:image/...;base64, si viene incluido)
+    var b64 = String(data.base64 || '');
+    var comma = b64.indexOf(',');
+    if (b64.indexOf('data:') === 0 && comma !== -1) b64 = b64.substring(comma + 1);
+    b64 = b64.replace(/\s/g, '');
+    if (!b64) return jsonResponse({ success: false, error: 'Imagen vacía' });
+
+    var ext = String(data.ext || 'jpg').replace(/[^a-z0-9]/gi, '').toLowerCase() || 'jpg';
+    var safe = String(data.name || 'img').toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').substring(0, 40) || 'img';
+    var sub = String(data.folder || '').replace(/[^a-z0-9_-]/gi, '');
+    var dir = 'assets/marcas' + (sub ? ('/' + sub) : '');
+    var rand = Utilities.getUuid().substring(0, 8);
+    var path = dir + '/' + safe + '-' + Date.now() + '-' + rand + '.' + ext;
+
+    var apiUrl = 'https://api.github.com/repos/' + owner + '/' + repo + '/contents/' + encodeURI(path);
+    var payload = { message: 'PMS: subir ' + path, content: b64, branch: branch };
+    var resp = UrlFetchApp.fetch(apiUrl, {
+      method: 'put',
+      contentType: 'application/json',
+      headers: {
+        'Authorization': 'token ' + token,
+        'Accept': 'application/vnd.github+json',
+        'User-Agent': 'CasaReginaPMS'
+      },
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    });
+    var code = resp.getResponseCode();
+    var body = {};
+    try { body = JSON.parse(resp.getContentText() || '{}'); } catch (e) {}
+    if (code >= 200 && code < 300 && body.content) {
+      var rawUrl = body.content.download_url ||
+        ('https://raw.githubusercontent.com/' + owner + '/' + repo + '/' + branch + '/' + path);
+      return jsonResponse({ success: true, url: rawUrl, path: path });
+    }
+    return jsonResponse({ success: false, error: 'GitHub ' + code + ': ' + (body.message || resp.getContentText()) });
+  } catch (err) {
+    return jsonResponse({ success: false, error: err.toString() });
+  }
 }

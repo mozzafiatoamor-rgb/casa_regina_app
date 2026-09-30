@@ -1762,6 +1762,44 @@
       border-radius:20px; padding:6px 12px; font-size:12.5px; font-weight:600;
     }
     .wb-chip-red { background:#fdeeee; border-color:rgba(200,60,60,.3); color:#b23838; }
+    /* Directorio de marcas (publicidad) */
+    .wb-brand {
+      position:relative; background:#fffdf8; border:1px solid rgba(150,120,70,.22);
+      border-radius:16px; padding:15px; margin-bottom:14px; box-shadow:0 3px 12px rgba(90,70,40,.07);
+    }
+    .wb-brand-feat { border-color:rgba(197,153,86,.7); box-shadow:0 4px 18px rgba(197,153,86,.22); }
+    .wb-brand-ribbon {
+      display:inline-block; background:linear-gradient(135deg,#c59956,#a9803c); color:#fff;
+      font-size:10.5px; font-weight:800; letter-spacing:.4px; text-transform:uppercase;
+      padding:3px 10px; border-radius:20px; margin-bottom:10px;
+    }
+    .wb-brand-head { display:flex; align-items:center; gap:12px; }
+    .wb-brand-logo {
+      width:58px; height:58px; object-fit:contain; border-radius:12px; flex-shrink:0;
+      background:#fff; border:1px solid rgba(150,120,70,.18); padding:4px;
+    }
+    .wb-brand-htext { min-width:0; }
+    .wb-brand-name { font-size:17px; font-weight:800; color:#38301f; line-height:1.2; }
+    .wb-brand-cat {
+      display:inline-block; margin-top:5px; background:#efe7d6; color:#8a6a2a;
+      font-size:11px; font-weight:700; padding:2px 9px; border-radius:12px;
+    }
+    .wb-brand-addr { font-size:12.5px; color:#7a6a4f; margin-top:8px; }
+    .wb-gallery {
+      display:flex; gap:8px; overflow-x:auto; margin-top:12px; padding-bottom:4px;
+      scroll-snap-type:x mandatory; -webkit-overflow-scrolling:touch;
+    }
+    .wb-gallery-img {
+      height:120px; width:auto; min-width:150px; max-width:82%; object-fit:cover;
+      border-radius:12px; flex-shrink:0; scroll-snap-align:start; cursor:pointer;
+      background:#f0e9dc;
+    }
+    .wb-lb {
+      position:fixed; inset:0; background:rgba(20,15,8,.92); z-index:99999;
+      display:flex; align-items:center; justify-content:center; padding:20px; cursor:zoom-out;
+    }
+    .wb-lb img { max-width:100%; max-height:100%; border-radius:10px; object-fit:contain; }
+    .wb-lb-x { position:absolute; top:16px; right:20px; color:#fff; font-size:26px; font-weight:700; }
     .wb-foot { text-align:center; margin-top:auto; padding-top:28px; }
     .wb-foot-logo { height:56px; width:auto; max-width:60%; object-fit:contain; opacity:.85; margin:0 auto 6px; display:block; }
     .wb-foot-txt { font-size:11px; color:#9a8a6f; letter-spacing:.5px; }
@@ -3294,7 +3332,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-09-18m';
+    var APP_BUILD = '2026-09-30n';
     var _bfPromoRowCount = 0;
     var CONFIG_KEYS = ['hotelInfo', 'hotelTerms', 'dailyRoutine', 'msgTemplates', 'emergencyContacts', 'breakfastPromo', 'guestGuide'];
 
@@ -4037,6 +4075,9 @@
       restrictions: { es:'Restricciones', en:'Restrictions', fr:'Restrictions', it:'Restrizioni', de:'Einschränkungen' },
       scheduleLbl:  { es:'Horario', en:'Hours', fr:'Horaires', it:'Orario', de:'Öffnungszeiten' },
       partnerRest:  { es:'Nuestro restaurante asociado', en:'Our partner restaurant', fr:'Notre restaurant partenaire', it:'Il nostro ristorante partner', de:'Unser Partnerrestaurant' },
+      sponsored:    { es:'Destacado', en:'Featured', fr:'En vedette', it:'In evidenza', de:'Empfohlen' },
+      website:      { es:'Sitio web', en:'Website', fr:'Site web', it:'Sito web', de:'Webseite' },
+      social:       { es:'Redes', en:'Social', fr:'Réseaux', it:'Social', de:'Social' },
       arrivalDate:  { es:'Tu llegada', en:'Your arrival', fr:'Votre arrivée', it:'Il tuo arrivo', de:'Deine Ankunft' },
       departureDate:{ es:'Tu salida', en:'Your departure', fr:'Votre départ', it:'La tua partenza', de:'Deine Abreise' },
       guestLbl:     { es:'Huésped', en:'Guest', fr:'Client', it:'Ospite', de:'Gast' },
@@ -4806,6 +4847,67 @@
       }).join('');
     }
 
+    // Normaliza teléfono MX para enlaces de WhatsApp (fallback si no existe _waNormMX)
+    function _wbWa(num) {
+      if (typeof _waNormMX === 'function') { try { return _waNormMX(num); } catch (e) {} }
+      var d = String(num || '').replace(/[^0-9]/g, '');
+      if (!d) return '';
+      if (d.length === 10) d = '52' + d;
+      return d;
+    }
+    // Directorio de marcas/negocios (publicidad): tarjeta con logo, galería y contacto
+    function _wbBrandList(items, g) {
+      if (!items || !items.length) return _wbCard('<div class="wb-muted">' + _wbEsc(_wbLabel('noInfo')) + '</div>');
+      // Los destacados (patrocinadores) van primero, conservando el orden relativo
+      var ordered = items.slice().map(function (it, i) { return { it: it, i: i }; });
+      ordered.sort(function (a, b) {
+        var ad = a.it.destacado ? 0 : 1, bd = b.it.destacado ? 0 : 1;
+        if (ad !== bd) return ad - bd;
+        return a.i - b.i;
+      });
+      return ordered.map(function (o) {
+        var it = o.it;
+        var feat = !!it.destacado;
+        var h = '<div class="wb-brand' + (feat ? ' wb-brand-feat' : '') + '">';
+        if (feat) h += '<div class="wb-brand-ribbon">⭐ ' + _wbEsc(_wbLabel('sponsored')) + '</div>';
+        h += '<div class="wb-brand-head">';
+        if (it.logo) h += '<img class="wb-brand-logo" src="' + _wbEsc(it.logo) + '" alt="' + _wbEsc(it.nombre || '') + '" onerror="this.style.display=\'none\'">';
+        h += '<div class="wb-brand-htext"><div class="wb-brand-name">' + _wbEsc(it.nombre || '') + '</div>';
+        if (it.categoria) h += '<span class="wb-brand-cat">' + _wbEsc(it.categoria) + '</span>';
+        h += '</div></div>';
+        // Galería de fotos (scroll horizontal)
+        var fotos = Array.isArray(it.fotos) ? it.fotos.filter(Boolean) : [];
+        if (fotos.length) {
+          h += '<div class="wb-gallery">' + fotos.map(function (f) {
+            return '<img class="wb-gallery-img" src="' + _wbEsc(f) + '" loading="lazy" onclick="_wbLightbox(\'' + encodeURIComponent(f) + '\')" onerror="this.style.display=\'none\'">';
+          }).join('') + '</div>';
+        }
+        var d = _wbT(it.desc, g);
+        if (d) h += '<div class="wb-place-desc" style="margin-top:8px;">' + _wbNl2br(d) + '</div>';
+        if (it.direccion) h += '<div class="wb-brand-addr">📍 ' + _wbEsc(it.direccion) + '</div>';
+        var acts = '';
+        if (it.mapLink) acts += '<a class="wb-chip" href="' + _wbEsc(it.mapLink) + '" target="_blank" rel="noopener">🗺️ ' + _wbEsc(_wbLabel('openMap')) + '</a>';
+        var wa = _wbWa(it.whatsapp);
+        if (wa) acts += '<a class="wb-chip" href="https://wa.me/' + wa + '" target="_blank" rel="noopener">💬 WhatsApp</a>';
+        if (it.tel) acts += '<a class="wb-chip" href="tel:' + _wbEsc(String(it.tel).replace(/[^0-9+]/g, '')) + '">📞 ' + _wbEsc(it.tel) + '</a>';
+        if (it.web) { var _w = /^https?:\/\//.test(it.web) ? it.web : ('https://' + it.web); acts += '<a class="wb-chip" href="' + _wbEsc(_w) + '" target="_blank" rel="noopener">🌐 ' + _wbEsc(_wbLabel('website')) + '</a>'; }
+        if (it.redes) { var _r = /^https?:\/\//.test(it.redes) ? it.redes : ('https://' + it.redes); acts += '<a class="wb-chip" href="' + _wbEsc(_r) + '" target="_blank" rel="noopener">📱 ' + _wbEsc(_wbLabel('social')) + '</a>'; }
+        if (acts) h += '<div class="wb-place-acts" style="margin-top:10px;">' + acts + '</div>';
+        h += '</div>';
+        return h;
+      }).join('');
+    }
+    // Visor de foto a pantalla completa
+    function _wbLightbox(encUrl) {
+      var url = decodeURIComponent(encUrl || '');
+      if (!url) return;
+      var ov = document.createElement('div');
+      ov.className = 'wb-lb';
+      ov.onclick = function () { ov.remove(); };
+      ov.innerHTML = '<img src="' + _wbEsc(url) + '"><div class="wb-lb-x">✕</div>';
+      document.body.appendChild(ov);
+    }
+
     function _wbValidarUrl(code) {
       var base = window.location.origin + window.location.pathname;
       var url = S.scriptUrl || localStorage.getItem('scriptUrl') || '';
@@ -4907,7 +5009,11 @@
         }
         return out;
       }
-      if (key === 'transporte')  return _wbText(g.transporte, g);
+      if (key === 'transporte') {
+        // Directorio de marcas de transporte (taxis, rentas, tours). Si no hay, usa el texto clásico.
+        if (Array.isArray(g.transportes) && g.transportes.length) return _wbBrandList(g.transportes, g);
+        return _wbText(g.transporte, g);
+      }
       if (key === 'servicios')   return _wbPhoto(g.photos && g.photos.servicios, 'wb-sec-photo') + _wbText(g.servicios, g);
       if (key === 'pagos') {
         var hp = _wbPhoto(g.photos && g.photos.pagos, 'wb-photo-full');
@@ -4935,7 +5041,7 @@
       }
       if (key === 'informacion') return _wbText(g.informacion, g);
       if (key === 'actividades') return _wbList(g.actividades, g);
-      if (key === 'bares')       return _wbList(g.bares, g);
+      if (key === 'bares')       return _wbBrandList(g.bares, g);
       if (key === 'restaurantes') {
         var hr2 = '';
         var promoR = _wbBreakfastPromo();
@@ -4943,12 +5049,11 @@
           hr2 += '<div class="wb-featured-lb">⭐ ' + _wbEsc(_wbLabel('partnerRest')) + '</div>';
           hr2 += _wbMozzaCard(promoR, { address: true, map: true, fb: true });
         }
-        var rest = _wbList(g.restaurantes, g);
-        // Solo añade la lista si el anfitrión capturó restaurantes (evita el "no disponible" redundante)
-        if (g.restaurantes && g.restaurantes.length) hr2 += rest;
-        return hr2 || rest;
+        // Solo añade la lista de marcas si el anfitrión capturó restaurantes
+        if (g.restaurantes && g.restaurantes.length) hr2 += _wbBrandList(g.restaurantes, g);
+        return hr2 || _wbBrandList(g.restaurantes, g);
       }
-      if (key === 'compras')     return _wbList(g.compras, g);
+      if (key === 'compras')     return _wbBrandList(g.compras, g);
       if (key === 'desayuno')    return _wbBreakfastSection(g);
       if (key === 'habitaciones') {
         var rules = [];
@@ -5537,6 +5642,237 @@
       var g = getGuestGuide();
       saveGuestGuide(g);
       toast('Guía guardada y sincronizada');
+    }
+
+    // ============ PANEL DE MARCAS / PUBLICIDAD ============
+    // Directorios de negocios asociados que se muestran en el Welcome Book del huésped.
+    var MARCA_CATS = [
+      ['restaurantes', '🍽️ Restaurantes'],
+      ['bares', '🍸 Bares'],
+      ['compras', '🛍️ Compras'],
+      ['transportes', '🚕 Transporte']
+    ];
+    function _marcaShape() {
+      return { nombre: '', categoria: '', desc: {}, tel: '', whatsapp: '', direccion: '', mapLink: '', web: '', redes: '', logo: '', fotos: [], destacado: false };
+    }
+    function renderMarcasConfig() {
+      var g = getGuestGuide();
+      if (!S.marcaCat) S.marcaCat = 'restaurantes';
+      var cat = S.marcaCat;
+      if (!Array.isArray(g[cat])) { g[cat] = []; saveGuestGuideLocal(g); }
+      var items = g[cat];
+
+      var h = '';
+      h += '<div style="margin-bottom:12px"><div class="section-title">📣 Marcas / Publicidad</div>';
+      h += '<div style="font-size:12px;color:var(--text2);">Gestiona los negocios asociados que aparecen en el Welcome Book del huésped. Cada marca puede llevar logo, galería de fotos, descripción y contacto. Las fotos se suben directo a tu repositorio (carpeta <b>assets/marcas</b>) y se publican al instante.</div></div>';
+
+      // Aviso si no hay backend
+      if (!S.scriptUrl) {
+        h += '<div style="background:#fdeeee;border:1px solid #e0a0a0;border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:#a04040;">⚠️ No hay conexión al backend. La subida de imágenes necesita tu Script URL configurada (Config → App).</div>';
+      }
+
+      // Selector de sección
+      h += '<div class="tabs-pills" style="margin-bottom:12px;">';
+      MARCA_CATS.forEach(function (c) {
+        var n = (g[c[0]] && g[c[0]].length) ? (' (' + g[c[0]].length + ')') : '';
+        h += '<div class="pill ' + (cat === c[0] ? 'active' : '') + '" onclick="S.marcaCat=\'' + c[0] + '\';renderMarcasConfig()">' + c[1] + n + '</div>';
+      });
+      h += '</div>';
+
+      // Selector de idioma (para la descripción)
+      h += '<div style="font-size:11px;color:var(--text2);margin-bottom:4px;">Descripción en idioma:</div>';
+      h += '<div class="tabs-pills" style="margin-bottom:14px;">';
+      WB_ALL_LANGS.forEach(function (l) {
+        h += '<div class="pill ' + (_wbEditLang === l[0] ? 'active' : '') + '" onclick="_wbEditLang=\'' + l[0] + '\';renderMarcasConfig()">' + l[1] + '</div>';
+      });
+      h += '</div>';
+
+      if (!items.length) {
+        h += '<div style="text-align:center;padding:24px;color:var(--text2);font-size:13px;background:var(--surface3);border-radius:10px;margin-bottom:12px;">Aún no hay marcas en esta sección.</div>';
+      }
+
+      items.forEach(function (it, i) {
+        h += '<div style="background:var(--surface3);padding:12px;border-radius:12px;margin-bottom:12px;border:1px solid ' + (it.destacado ? 'var(--accent)' : 'var(--surface2)') + ';">';
+        // Encabezado: nombre + acciones
+        h += '<div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;">';
+        h += '<input type="text" value="' + _wbEsc(it.nombre || '') + '" placeholder="Nombre del negocio" onchange="marcaSetItem(\'' + cat + '\',' + i + ',\'nombre\',this.value)" style="flex:1;min-width:0;background:var(--surface2);border:1px solid var(--surface3);border-radius:6px;padding:7px 9px;font-size:13px;color:var(--text);font-weight:700;" />';
+        h += '<button title="Subir" onclick="marcaMove(\'' + cat + '\',' + i + ',-1)" style="background:none;border:none;color:var(--text2);cursor:pointer;font-size:15px;padding:2px 4px;">▲</button>';
+        h += '<button title="Bajar" onclick="marcaMove(\'' + cat + '\',' + i + ',1)" style="background:none;border:none;color:var(--text2);cursor:pointer;font-size:15px;padding:2px 4px;">▼</button>';
+        h += '<button title="Eliminar" onclick="marcaDelItem(\'' + cat + '\',' + i + ')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:15px;padding:2px 4px;">🗑️</button>';
+        h += '</div>';
+
+        // Destacado
+        h += '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:10px;font-size:12px;color:' + (it.destacado ? 'var(--accent)' : 'var(--text2)') + ';font-weight:600;">';
+        h += '<input type="checkbox" ' + (it.destacado ? 'checked' : '') + ' onchange="marcaSetItem(\'' + cat + '\',' + i + ',\'destacado\',this.checked)" style="width:16px;height:16px;accent-color:var(--accent);"> ⭐ Patrocinador destacado (aparece primero)</label>';
+
+        // Logo
+        h += '<div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:10px;">';
+        h += '<div style="text-align:center;">';
+        if (it.logo) {
+          h += '<img src="' + _wbEsc(it.logo) + '" style="width:66px;height:66px;object-fit:contain;border-radius:10px;background:#fff;border:1px solid var(--surface2);padding:3px;display:block;" onerror="this.style.display=\'none\'">';
+          h += '<button onclick="marcaSetItem(\'' + cat + '\',' + i + ',\'logo\',\'\')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:10px;margin-top:2px;">Quitar</button>';
+        } else {
+          h += '<div style="width:66px;height:66px;border-radius:10px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:22px;color:var(--text2);">🏷️</div>';
+        }
+        h += '</div>';
+        h += '<div style="flex:1;min-width:0;">';
+        h += '<button class="form-button secondary" onclick="marcaUpload(\'' + cat + '\',' + i + ',\'logo\')" style="width:100%;padding:8px;font-size:12px;margin-bottom:6px;">🖼️ ' + (it.logo ? 'Cambiar logo' : 'Subir logo') + '</button>';
+        h += '<input type="text" value="' + _wbEsc(it.categoria || '') + '" placeholder="Categoría (ej. Italiano, Mariscos, Taxi)" onchange="marcaSetItem(\'' + cat + '\',' + i + ',\'categoria\',this.value)" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--surface3);border-radius:6px;padding:7px 9px;font-size:12px;color:var(--text);" />';
+        h += '</div></div>';
+
+        // Galería de fotos
+        h += '<div style="font-size:11px;font-weight:700;margin-bottom:4px;">📷 Galería</div>';
+        var fotos = Array.isArray(it.fotos) ? it.fotos : [];
+        h += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;">';
+        fotos.forEach(function (f, fi) {
+          h += '<div style="position:relative;">';
+          h += '<img src="' + _wbEsc(f) + '" style="width:64px;height:64px;object-fit:cover;border-radius:8px;background:var(--surface2);display:block;" onerror="this.style.display=\'none\'">';
+          h += '<button onclick="marcaDelFoto(\'' + cat + '\',' + i + ',' + fi + ')" style="position:absolute;top:-6px;right:-6px;background:var(--red);color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:11px;cursor:pointer;line-height:1;">✕</button>';
+          h += '</div>';
+        });
+        h += '</div>';
+        h += '<button class="form-button secondary" onclick="marcaUpload(\'' + cat + '\',' + i + ',\'foto\')" style="width:100%;padding:8px;font-size:12px;margin-bottom:10px;">➕ Agregar fotos</button>';
+
+        // Descripción (por idioma)
+        var dv = (it.desc && it.desc[_wbEditLang]) ? it.desc[_wbEditLang] : '';
+        h += '<textarea placeholder="Descripción (' + _wbEditLang + ')" onchange="marcaSetItem(\'' + cat + '\',' + i + ',\'desc\',this.value)" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--surface3);border-radius:6px;padding:8px;font-size:12px;color:var(--text);min-height:52px;margin-bottom:8px;resize:vertical;">' + _wbEsc(dv) + '</textarea>';
+
+        // Contacto
+        h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px;">';
+        h += '<input type="tel" value="' + _wbEsc(it.tel || '') + '" placeholder="📞 Teléfono" onchange="marcaSetItem(\'' + cat + '\',' + i + ',\'tel\',this.value)" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--surface3);border-radius:6px;padding:7px 9px;font-size:12px;color:var(--text);" />';
+        h += '<input type="tel" value="' + _wbEsc(it.whatsapp || '') + '" placeholder="💬 WhatsApp" onchange="marcaSetItem(\'' + cat + '\',' + i + ',\'whatsapp\',this.value)" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--surface3);border-radius:6px;padding:7px 9px;font-size:12px;color:var(--text);" />';
+        h += '</div>';
+        h += '<input type="text" value="' + _wbEsc(it.direccion || '') + '" placeholder="📍 Dirección" onchange="marcaSetItem(\'' + cat + '\',' + i + ',\'direccion\',this.value)" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--surface3);border-radius:6px;padding:7px 9px;font-size:12px;color:var(--text);margin-bottom:6px;" />';
+        h += '<input type="text" value="' + _wbEsc(it.mapLink || '') + '" placeholder="🗺️ Enlace de Google Maps" onchange="marcaSetItem(\'' + cat + '\',' + i + ',\'mapLink\',this.value)" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--surface3);border-radius:6px;padding:7px 9px;font-size:12px;color:var(--text);margin-bottom:6px;" />';
+        h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">';
+        h += '<input type="text" value="' + _wbEsc(it.web || '') + '" placeholder="🌐 Sitio web" onchange="marcaSetItem(\'' + cat + '\',' + i + ',\'web\',this.value)" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--surface3);border-radius:6px;padding:7px 9px;font-size:12px;color:var(--text);" />';
+        h += '<input type="text" value="' + _wbEsc(it.redes || '') + '" placeholder="📱 Instagram/Facebook" onchange="marcaSetItem(\'' + cat + '\',' + i + ',\'redes\',this.value)" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--surface3);border-radius:6px;padding:7px 9px;font-size:12px;color:var(--text);" />';
+        h += '</div>';
+        h += '</div>';
+      });
+
+      h += '<button class="form-button secondary" onclick="marcaAddItem(\'' + cat + '\')" style="width:100%;padding:10px;font-size:13px;margin-bottom:14px;">+ Agregar marca a ' + _wbEsc(MARCA_CATS.filter(function (c) { return c[0] === cat; })[0][1]) + '</button>';
+
+      h += '<div style="margin-top:6px;"><button class="form-button" onclick="marcaSaveSync()" style="width:100%;background:var(--accent);color:var(--bg);padding:12px;font-size:13px;">☁️ Guardar y publicar</button></div>';
+      h += '<div style="font-size:10px;color:var(--text2);text-align:center;margin-top:8px;">Las fotos y logos se publican al subirlos. Este botón publica también los textos y el orden.</div>';
+
+      document.getElementById('configContent').innerHTML = h;
+    }
+    function marcaAddItem(cat) {
+      var g = getGuestGuide();
+      if (!Array.isArray(g[cat])) g[cat] = [];
+      g[cat].push(_marcaShape());
+      saveGuestGuideLocal(g);
+      renderMarcasConfig();
+    }
+    function marcaSetItem(cat, i, field, value) {
+      var g = getGuestGuide();
+      if (!g[cat] || !g[cat][i]) return;
+      if (field === 'desc') {
+        if (!g[cat][i].desc || typeof g[cat][i].desc !== 'object') g[cat][i].desc = {};
+        g[cat][i].desc[_wbEditLang] = value;
+      } else if (field === 'destacado') {
+        g[cat][i].destacado = !!value;
+      } else {
+        g[cat][i][field] = value;
+      }
+      saveGuestGuideLocal(g);
+      if (field === 'destacado' || field === 'logo') renderMarcasConfig();
+    }
+    function marcaDelItem(cat, i) {
+      var g = getGuestGuide();
+      if (!g[cat] || !g[cat][i]) return;
+      var nm = g[cat][i].nombre || 'esta marca';
+      if (!confirm('¿Eliminar "' + nm + '"? Esta acción no se puede deshacer.')) return;
+      g[cat].splice(i, 1);
+      saveGuestGuideLocal(g);
+      renderMarcasConfig();
+    }
+    function marcaMove(cat, i, dir) {
+      var g = getGuestGuide();
+      if (!g[cat]) return;
+      var j = i + dir;
+      if (j < 0 || j >= g[cat].length) return;
+      var tmp = g[cat][i]; g[cat][i] = g[cat][j]; g[cat][j] = tmp;
+      saveGuestGuideLocal(g);
+      renderMarcasConfig();
+    }
+    function marcaDelFoto(cat, i, fi) {
+      var g = getGuestGuide();
+      if (!g[cat] || !g[cat][i] || !Array.isArray(g[cat][i].fotos)) return;
+      g[cat][i].fotos.splice(fi, 1);
+      saveGuestGuideLocal(g);
+      renderMarcasConfig();
+    }
+    // Comprime una imagen en el navegador y devuelve base64 (sin prefijo data:)
+    function _imgFileToBase64(file, maxDim, preferPng, cb) {
+      var reader = new FileReader();
+      reader.onload = function (e) {
+        var img = new Image();
+        img.onload = function () {
+          var w = img.width, h = img.height;
+          var scale = Math.min(1, maxDim / Math.max(w, h));
+          var nw = Math.max(1, Math.round(w * scale)), nh = Math.max(1, Math.round(h * scale));
+          var canvas = document.createElement('canvas');
+          canvas.width = nw; canvas.height = nh;
+          var ctx = canvas.getContext('2d');
+          var isPng = preferPng && /png/i.test(file.type || '');
+          if (!isPng) { ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, nw, nh); }
+          ctx.drawImage(img, 0, 0, nw, nh);
+          try {
+            var mime = isPng ? 'image/png' : 'image/jpeg';
+            var dataUrl = isPng ? canvas.toDataURL(mime) : canvas.toDataURL(mime, 0.82);
+            var comma = dataUrl.indexOf(',');
+            cb({ base64: dataUrl.substring(comma + 1), ext: isPng ? 'png' : 'jpg' });
+          } catch (err) { cb(null); }
+        };
+        img.onerror = function () { cb(null); };
+        img.src = e.target.result;
+      };
+      reader.onerror = function () { cb(null); };
+      reader.readAsDataURL(file);
+    }
+    function marcaUpload(cat, i, kind) {
+      var g = getGuestGuide();
+      if (!g[cat] || !g[cat][i]) return;
+      if (!S.scriptUrl) { toast('Configura la conexión al backend primero (Config → App)', true); return; }
+      var input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      if (kind === 'foto') input.multiple = true;
+      input.onchange = async function () {
+        var files = Array.prototype.slice.call(input.files || []);
+        if (!files.length) return;
+        var maxDim = kind === 'logo' ? 600 : 1500;
+        var baseName = (g[cat][i].nombre || cat).toString();
+        for (var f = 0; f < files.length; f++) {
+          (function () {})();
+          toast('Subiendo ' + (kind === 'logo' ? 'logo' : 'foto ' + (f + 1) + '/' + files.length) + '…');
+          await new Promise(function (resolve) {
+            _imgFileToBase64(files[f], maxDim, kind === 'logo', async function (r) {
+              if (!r) { toast('No se pudo leer la imagen', true); return resolve(); }
+              try {
+                var up = await sheets.uploadImage(r.base64, baseName + '-' + kind, r.ext, cat);
+                var gg = getGuestGuide();
+                if (!gg[cat] || !gg[cat][i]) return resolve();
+                if (kind === 'logo') { gg[cat][i].logo = up.url; }
+                else { if (!Array.isArray(gg[cat][i].fotos)) gg[cat][i].fotos = []; gg[cat][i].fotos.push(up.url); }
+                saveGuestGuideLocal(gg);
+              } catch (err) { toast('Error al subir: ' + err.message, true); }
+              resolve();
+            });
+          });
+        }
+        // Publicar al Sheet para que el huésped lo vea de inmediato
+        try { saveGuestGuide(getGuestGuide()); } catch (e) {}
+        toast('✅ ' + (kind === 'logo' ? 'Logo subido y publicado' : 'Foto(s) subida(s) y publicada(s)'));
+        renderMarcasConfig();
+      };
+      input.click();
+    }
+    async function marcaSaveSync() {
+      saveGuestGuide(getGuestGuide());
+      toast('✅ Marcas guardadas y publicadas');
     }
 
     // ============ PUBLIC BOOKING MODE ============
@@ -6578,6 +6914,16 @@
         const data = await res.json();
         if (!data.success) throw new Error(data.error || 'Error al eliminar');
         return data;
+      },
+
+      // Sube una imagen (base64) al repo de GitHub vía el backend Apps Script y devuelve su URL pública
+      async uploadImage(base64, name, ext, folder) {
+        if (!S.scriptUrl) throw new Error('No hay conexión al backend (Script URL)');
+        const payload = { action: 'uploadImage', base64: base64, name: name || 'img', ext: ext || 'jpg', folder: folder || '' };
+        const res = await fetch(S.scriptUrl, { method: 'POST', body: JSON.stringify(payload) });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || 'Error al subir la imagen');
+        return data; // { success, url, path }
       }
     };
 
@@ -11998,7 +12344,8 @@
         { id: 'ocupacion', label: '🛏️ Ocupación' },
         { id: 'desayunos', label: '🍳 Desayunos' },
         { id: 'app', label: '📱 App' },
-        { id: 'guia', label: '📖 Guía Huésped' }
+        { id: 'guia', label: '📖 Guía Huésped' },
+        { id: 'marcas', label: '📣 Marcas' }
       ];
       var ph = pills.map(function(p) {
         return '<div class="pill ' + (S.configTab === p.id ? 'active' : '') + '" onclick="S.configTab=\'' + p.id + '\';renderConfig()">' + p.label + '</div>';
@@ -12032,6 +12379,8 @@
         renderAppConfig();
       } else if (S.configTab === 'guia') {
         renderGuiaConfig();
+      } else if (S.configTab === 'marcas') {
+        renderMarcasConfig();
       }
     }
 
