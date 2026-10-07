@@ -3332,7 +3332,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-09-30o';
+    var APP_BUILD = '2026-10-07p';
     var _bfPromoRowCount = 0;
     var CONFIG_KEYS = ['hotelInfo', 'hotelTerms', 'dailyRoutine', 'msgTemplates', 'emergencyContacts', 'breakfastPromo', 'guestGuide'];
 
@@ -20829,14 +20829,46 @@
     // y como respaldo el caché de visitas anteriores. La reserva gana sobre el caché.
     function _prevRegForCheckin(res) {
       var out = {}, src = '';
+      function _norm(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim(); }
+      function _tel10(s) { return String(s || '').replace(/[^0-9]/g, '').slice(-10); }
+      var tgtName = _norm(res.huesped), tgtTel = _tel10(res.telefono);
+
+      // 1) Caché local (respaldo heredado, solo en este dispositivo)
       try {
         var prev = (typeof getGuestRegCache === 'function') ? getGuestRegCache(res.huesped) : null;
         if (prev) { out.tipoID = prev.tipoID; out.numID = prev.numID; out.nacionalidad = prev.nacionalidad; out.procedencia = prev.procedencia; out.motivo = prev.motivo; src = 'anterior'; }
       } catch (e) {}
+
+      // 2) Registro de una VISITA ANTERIOR (otra reserva) del mismo huésped, leído del historial del Sheet.
+      //    Coincide por nombre o por teléfono, y toma la visita más reciente con datos de identificación.
+      try {
+        var cands = (S.registros || []).filter(function (g) {
+          if (String(g.resId) === String(res.id)) return false;        // esos se tratan en el paso 3
+          if (!(g.numId || g.tipoId || g.nacionalidad)) return false;  // sin datos útiles
+          var nameMatch = tgtName && _norm(g.nombre) === tgtName;
+          var telMatch = tgtTel && tgtTel.length >= 10 && _tel10(g.telefono) === tgtTel;
+          return nameMatch || telMatch;
+        });
+        if (cands.length) {
+          cands.sort(function (a, b) {
+            var ak = String(a.ts || a.fecha || ''), bk = String(b.ts || b.fecha || '');
+            return bk < ak ? -1 : (bk > ak ? 1 : 0);                   // más reciente primero
+          });
+          var p0 = cands[0];
+          if (p0.tipoId) out.tipoID = _mapTipoIdCheckin(p0.tipoId);
+          if (p0.numId) out.numID = p0.numId;
+          if (p0.nacionalidad) out.nacionalidad = p0.nacionalidad;
+          if (p0.procedencia) out.procedencia = p0.procedencia;
+          if (p0.motivo) out.motivo = p0.motivo;
+          src = 'anterior';
+        }
+      } catch (e) {}
+
+      // 3) Datos ya capturados en ESTA reserva (máxima prioridad)
       try {
         var reg = (S.registros || []).filter(function (g) { return String(g.resId) === String(res.id); });
         var mine = reg.filter(function (g) { return g.numId || g.tipoId || g.nacionalidad; });
-        var pick = mine.filter(function (g) { return String(g.nombre || '').toLowerCase().trim() === String(res.huesped || '').toLowerCase().trim(); })[0] || mine[0];
+        var pick = mine.filter(function (g) { return _norm(g.nombre) === tgtName; })[0] || mine[0];
         if (pick) {
           if (pick.tipoId) out.tipoID = _mapTipoIdCheckin(pick.tipoId);
           if (pick.numId) out.numID = pick.numId;
@@ -20846,6 +20878,7 @@
           src = 'reserva';
         }
       } catch (e) {}
+
       out._source = src;
       return out;
     }
