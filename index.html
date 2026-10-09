@@ -2160,6 +2160,19 @@
     </div>
   </div>
 
+  <!-- Bloqueo por PIN (al minimizar/reabrir) -->
+  <div id="lockOverlay" style="display:none;position:fixed;inset:0;z-index:100000;background:var(--bg,#1a1712);flex-direction:column;align-items:center;justify-content:center;padding:24px;">
+    <div style="width:100%;max-width:300px;text-align:center;">
+      <div style="font-size:40px;margin-bottom:6px;">🔒</div>
+      <div id="lockName" style="font-weight:800;font-size:18px;margin-bottom:2px;"></div>
+      <div style="color:var(--text2);font-size:12px;margin-bottom:16px;">Sesión bloqueada · ingresa tu PIN</div>
+      <input type="password" inputmode="numeric" autocomplete="off" id="lockPin" class="login-input" placeholder="••••••" maxlength="12" style="text-align:center;letter-spacing:6px;font-size:20px;" onkeydown="if(event.key==='Enter')unlockSubmit()" />
+      <button class="login-button" id="lockBtn" onclick="unlockSubmit()" style="margin-top:10px;">Desbloquear</button>
+      <div class="login-error" id="lockError" style="margin-top:8px;"></div>
+      <button class="login-button secondary" onclick="lockLogout()" style="margin-top:14px;font-size:12px;">Cambiar de usuario / Cerrar sesión</button>
+    </div>
+  </div>
+
   <!-- Guest Registration Screen -->
   <div class="login-screen" id="guestScreen" style="padding:0;justify-content:flex-start;overflow-y:auto;-webkit-overflow-scrolling:touch;height:100vh;">
     <div style="width:100%;max-width:420px;padding:60px 20px 40px;" id="guestFormContainer"></div>
@@ -3348,7 +3361,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-10-09r';
+    var APP_BUILD = '2026-10-09t';
 
     // ===== Supabase (login seguro del personal) =====
     // La anon key es PÚBLICA por diseño (va en el cliente); la seguridad la dan RLS + login.
@@ -3707,8 +3720,14 @@
         if (storedUser) {
           S.user = JSON.parse(storedUser);
           try { var ss = localStorage.getItem('supaSession'); if (ss) S.supaSession = JSON.parse(ss); } catch (e) {}
-          showApp();
-          loadData();
+          if (S.supaSession && S.supaSession.email) {
+            // Al reabrir pide el PIN (más seguro). Los datos se cargan tras desbloquear.
+            S._pendingLoad = true;
+            lockApp();
+          } else {
+            showApp();
+            loadData();
+          }
         } else {
           showLoginScreen();
         }
@@ -6785,10 +6804,15 @@
           return;
         }
         var icon = { admin: '👑', recepcion: '🛎️', ama_llaves: '🧹' };
+        var rolLbl = { admin: 'Administrador', recepcion: 'Recepción', ama_llaves: 'Ama de llaves' };
         box.innerHTML = _staffList.map(function (s, i) {
+          var rl = rolLbl[s.rol] || (s.rol || '');
           return '<button class="login-button secondary" onclick="supaPick(' + i + ')" style="display:flex;align-items:center;gap:10px;justify-content:flex-start;padding:12px 14px;">' +
             '<span style="font-size:20px;">' + (icon[s.rol] || '👤') + '</span>' +
-            '<span style="font-weight:700;">' + escapeHtml(s.nombre || '') + '</span></button>';
+            '<span style="display:flex;flex-direction:column;align-items:flex-start;line-height:1.15;">' +
+              '<span style="font-weight:700;">' + escapeHtml(s.nombre || '') + '</span>' +
+              (rl ? '<span style="font-size:11px;color:var(--text2);">' + escapeHtml(rl) + '</span>' : '') +
+            '</span></button>';
         }).join('');
       } catch (e) {
         box.innerHTML = '<div style="color:var(--text2);font-size:13px;text-align:center;">No se pudo cargar la lista. Usa el acceso clásico.</div>';
@@ -6907,6 +6931,64 @@
       var le = document.getElementById('loginError'); if (le) le.innerHTML = '';
       showLoginScreen();
     }
+
+    // ============ BLOQUEO POR PIN (seguridad en dispositivo compartido) ============
+    // Pide el PIN de nuevo al reabrir la app, o al volver tras minimizarla más de X segundos.
+    var LOCK_GRACE_MS = 15000; // margen para no bloquear por cambios rápidos de app/pestaña
+    var _hiddenAt = 0;
+
+    function lockApp() {
+      if (!S.user || S._publicMode) return;
+      S.locked = true;
+      var ov = document.getElementById('lockOverlay');
+      var nm = document.getElementById('lockName'); if (nm) nm.textContent = S.user.nombre || '';
+      var pin = document.getElementById('lockPin'); if (pin) pin.value = '';
+      var er = document.getElementById('lockError'); if (er) er.textContent = '';
+      if (ov) ov.style.display = 'flex';
+      setTimeout(function () { try { document.getElementById('lockPin').focus(); } catch (e) {} }, 120);
+    }
+    async function unlockSubmit() {
+      var pin = (document.getElementById('lockPin').value || '').trim();
+      var er = document.getElementById('lockError');
+      if (!pin) { if (er) er.textContent = 'Escribe tu PIN'; return; }
+      var email = S.supaSession && S.supaSession.email;
+      if (!email) { lockLogout(); return; } // sesión clásica: re-login completo
+      var btn = document.getElementById('lockBtn');
+      try {
+        if (btn) btn.disabled = true;
+        var r = await fetch(SUPABASE_URL + '/auth/v1/token?grant_type=password', {
+          method: 'POST', headers: { apikey: SUPABASE_ANON, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email, password: pin })
+        });
+        var data = await r.json();
+        if (btn) btn.disabled = false;
+        if (!r.ok || !data.access_token) { if (er) er.textContent = 'PIN incorrecto'; document.getElementById('lockPin').value = ''; return; }
+        S.supaSession.access_token = data.access_token;
+        S.supaSession.refresh_token = data.refresh_token;
+        try { localStorage.setItem('supaSession', JSON.stringify(S.supaSession)); } catch (e) {}
+        S.locked = false;
+        document.getElementById('lockOverlay').style.display = 'none';
+        if (S._pendingLoad) { S._pendingLoad = false; showApp(); loadData(); }
+      } catch (e) {
+        if (btn) btn.disabled = false;
+        if (er) er.textContent = 'Error al conectar: ' + e.message;
+      }
+    }
+    function lockLogout() {
+      var ov = document.getElementById('lockOverlay'); if (ov) ov.style.display = 'none';
+      S.locked = false; S._pendingLoad = false;
+      logout();
+    }
+    function _maybeLock() {
+      if (!S.user || S._publicMode || S.locked) return;
+      if (S.supaSession && S.supaSession.email) lockApp();
+      else logout(); // sesión clásica
+    }
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) { _hiddenAt = Date.now(); }
+      else { if (_hiddenAt && (Date.now() - _hiddenAt) >= LOCK_GRACE_MS) _maybeLock(); }
+    });
+    window.addEventListener('pagehide', function () { _hiddenAt = Date.now(); });
 
     async function refreshData() {
       var btn = document.getElementById('refreshBtn');
