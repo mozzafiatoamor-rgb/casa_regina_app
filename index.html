@@ -3382,7 +3382,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-10-09v';
+    var APP_BUILD = '2026-10-09w';
 
     // ===== Supabase (login seguro del personal) =====
     // La anon key es PÚBLICA por diseño (va en el cliente); la seguridad la dan RLS + login.
@@ -7236,6 +7236,65 @@
         return data; // { success, url, path }
       }
     };
+
+    // ============ LECTURA DESDE SUPABASE (Fase 4.2) ============
+    // sheets.read ahora toma los datos de Supabase y los devuelve en el MISMO formato
+    // (filas como arreglos, en el orden de columnas de la hoja), para que el resto de la
+    // app funcione sin cambios. Si Supabase falla, cae de regreso a Google Sheets.
+    // Para revertir a lectura desde Sheets sin redesplegar: en la consola del navegador
+    //   localStorage.setItem('dataSource','sheets')  (y recargar). Volver: removeItem('dataSource').
+    var USE_SUPABASE_READS = (function () { try { return localStorage.getItem('dataSource') !== 'sheets'; } catch (e) { return true; } })();
+    var SUPA_READ_MAP = {
+      '🏨 Habitaciones': { table: 'habitaciones', cols: ['id', 'numero', 'tipo', 'tarifa', 'estado', 'notas'] },
+      '📋 Reservas': { table: 'reservas', cols: ['id', 'habitacion_num', 'huesped', 'telefono', 'email', 'fecha_entrada', 'fecha_salida', 'adultos', 'ninos', 'tarifa', 'tarifa_total', 'estado', 'notas', 'creado_por', 'fecha_creacion'] },
+      '🧹 Housekeeping': { table: 'housekeeping', cols: ['id', 'fecha', 'habitacion_num', 'tarea', 'prioridad', 'estado', 'asignado_a', 'notas', 'hora_inicio', 'hora_fin', 'verificado', 'checklist'] },
+      '📜 Bitácora': { table: 'bitacora', cols: ['fecha', 'hora', 'usuario', 'accion', 'detalle', 'tipo'], order: 'id.asc' },
+      '👤 Usuarios': { table: 'usuarios', cols: ['id', 'usuario', 'password', 'nombre', 'rol'] },
+      '💰 Cobros': { table: 'cobros', cols: ['id', 'reserva_id', 'fecha', 'hora', 'monto', 'metodo_pago', 'concepto', 'notas', 'responsable'] },
+      '👥 Clientes': { table: 'clientes', cols: ['id', 'nombre', 'telefono', 'email', 'notas', 'primera_visita', 'ultima_visita', 'visitas', 'total_gastado'] },
+      '📦 Inventario': { table: 'inventario', cols: ['id', 'categoria', 'producto', 'stock', 'minimo', 'unidad', 'notas', 'ultima_actualizacion'] },
+      '⚙️ Config': { table: 'config', cols: ['config_key', 'config_value'] },
+      '🍳 Desayunos': { table: 'desayunos', cols: ['codigo', 'reserva_id', 'huesped', 'habitacion', 'fecha', 'personas', 'estado', 'validado_por', 'hora_validacion', 'reg_id'] },
+      '📝 Cotizaciones': { table: 'cotizaciones', cols: ['id', 'numero', 'fecha', 'nombre', 'telefono', 'email', 'checkin', 'checkout', 'adultos', 'ninos', 'habitaciones', 'opciones', 'subtotal', 'iva', 'total', 'estado'] },
+      '🔑 Accesos': { table: 'accesos', cols: ['reserva_id', 'codigo', 'notas'] },
+      '📝 Registro': { table: 'registro', cols: ['reg_id', 'res_id', 'nombre', 'habitacion_num', 'fecha', 'tipo_id', 'num_id', 'nacionalidad', 'procedencia', 'motivo', 'observaciones', 'ts', 'telefono'] },
+      '💸 Gastos': { table: 'gastos', cols: ['id', 'fecha', 'categoria', 'concepto', 'monto', 'tipo', 'responsable', 'notas'] }
+    };
+    async function _supaReadRows(map) {
+      var token = (S.supaSession && S.supaSession.access_token) || SUPABASE_ANON;
+      var sel = map.cols.join(',');
+      var jsonCols = (map.table === 'cotizaciones') ? { habitaciones: 1, opciones: 1 } : {};
+      var all = [], page = 0, size = 1000;
+      while (page <= 50) {
+        var from = page * size, to = from + size - 1;
+        var url = SUPABASE_URL + '/rest/v1/' + map.table + '?select=' + sel + (map.order ? ('&order=' + map.order) : '');
+        var res = await fetch(url, {
+          headers: { apikey: SUPABASE_ANON, Authorization: 'Bearer ' + token, 'Accept-Profile': SUPA_SCHEMA, 'Range-Unit': 'items', 'Range': from + '-' + to }
+        });
+        if (!res.ok) throw new Error(map.table + ' HTTP ' + res.status);
+        var rows = await res.json();
+        all = all.concat(rows);
+        if (!rows.length || rows.length < size) break;
+        page++;
+      }
+      return all.map(function (o) {
+        return map.cols.map(function (c) {
+          var v = o[c];
+          if (jsonCols[c]) { try { return JSON.stringify(v == null ? (c === 'opciones' ? {} : []) : v); } catch (e) { return c === 'opciones' ? '{}' : '[]'; } }
+          return (v == null) ? '' : v;
+        });
+      });
+    }
+    (function () {
+      var _origRead = sheets.read.bind(sheets);
+      sheets.read = async function (sheetName, range) {
+        if (USE_SUPABASE_READS && S.supaSession && S.supaSession.access_token && SUPA_READ_MAP[sheetName]) {
+          try { return await _supaReadRows(SUPA_READ_MAP[sheetName]); }
+          catch (e) { try { return await _origRead(sheetName, range); } catch (e2) { throw e; } }
+        }
+        return await _origRead(sheetName, range);
+      };
+    })();
 
     // ============ DATA LOADING ============
     async function loadData() {
