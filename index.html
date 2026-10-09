@@ -2129,12 +2129,21 @@
       <p class="login-subtitle" style="margin-top:0;">Sistema de Gestión</p>
 
       <div class="login-form">
-        <!-- Login por nombre + PIN (Supabase) -->
-        <div id="pinPicker">
+        <!-- Login SOLO con PIN (el PIN identifica a la persona) -->
+        <div id="pinOnly">
+          <label class="form-label" style="text-align:center;display:block;">Ingresa tu PIN</label>
+          <input type="password" inputmode="numeric" autocomplete="off" id="loginPinOnly" class="login-input" placeholder="••••••" maxlength="12" style="text-align:center;letter-spacing:8px;font-size:22px;" onkeydown="if(event.key==='Enter')supaPinLogin()" />
+          <button class="login-button" onclick="supaPinLogin()" style="margin-top:10px;">Ingresar</button>
+          <button class="login-button secondary" onclick="showNamePicker()" style="margin-top:8px;font-size:12px;">o elige tu nombre de la lista</button>
+        </div>
+
+        <!-- Login por nombre + PIN (alternativo) -->
+        <div id="pinPicker" style="display:none;">
           <label class="form-label">Selecciona tu usuario</label>
           <div id="staffList" style="display:flex;flex-direction:column;gap:8px;margin:8px 0 4px;">
             <div style="color:var(--text2);font-size:13px;text-align:center;padding:10px;">Cargando…</div>
           </div>
+          <button class="login-button secondary" onclick="showPinOnly()" style="margin-top:4px;font-size:12px;">← Volver a solo PIN</button>
         </div>
         <div id="pinEntry" style="display:none;">
           <div id="pinWho" style="text-align:center;font-weight:700;margin-bottom:10px;font-size:15px;"></div>
@@ -3361,7 +3370,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-10-09t';
+    var APP_BUILD = '2026-10-09u';
 
     // ===== Supabase (login seguro del personal) =====
     // La anon key es PÚBLICA por diseño (va en el cliente); la seguridad la dan RLS + login.
@@ -6764,7 +6773,7 @@
       document.getElementById('loginScreen').classList.add('active');
       document.getElementById('appContainer').classList.add('hidden');
       document.getElementById('guestScreen').classList.remove('active');
-      try { supaPickBack(); } catch (e) {}
+      try { showPinOnly(); } catch (e) {}
       try { var cl = document.getElementById('classicLogin'); if (cl) cl.style.display = 'none'; } catch (e) {}
       loadStaffPicker();
     }
@@ -6837,6 +6846,70 @@
       var c = document.getElementById('classicLogin');
       if (c) c.style.display = (c.style.display === 'none' || !c.style.display) ? 'block' : 'none';
     }
+    function showPinOnly() {
+      var a = document.getElementById('pinOnly'); if (a) a.style.display = 'block';
+      var b = document.getElementById('pinPicker'); if (b) b.style.display = 'none';
+      var c = document.getElementById('pinEntry'); if (c) c.style.display = 'none';
+      var le = document.getElementById('loginError'); if (le) le.innerHTML = '';
+      var pin = document.getElementById('loginPinOnly'); if (pin) { pin.value = ''; setTimeout(function () { try { pin.focus(); } catch (e) {} }, 100); }
+    }
+    function showNamePicker() {
+      var a = document.getElementById('pinOnly'); if (a) a.style.display = 'none';
+      var c = document.getElementById('pinEntry'); if (c) c.style.display = 'none';
+      var b = document.getElementById('pinPicker'); if (b) b.style.display = 'block';
+      var le = document.getElementById('loginError'); if (le) le.innerHTML = '';
+    }
+    // Deja la sesión lista tras autenticar (busca su rol en staff y entra)
+    async function _finishSupaLogin(accessToken, refreshToken, userId, email) {
+      var sres = await fetch(SUPABASE_URL + '/rest/v1/staff?user_id=eq.' + userId + '&select=usuario,nombre,rol', {
+        headers: { apikey: SUPABASE_ANON, Authorization: 'Bearer ' + accessToken, 'Accept-Profile': SUPA_SCHEMA }
+      });
+      var staff = await sres.json();
+      if (!Array.isArray(staff) || !staff.length) throw new Error('no-staff');
+      var me = staff[0];
+      S.user = { id: userId, usuario: me.usuario || '', nombre: me.nombre || '', rol: me.rol || '' };
+      S.supaSession = { access_token: accessToken, refresh_token: refreshToken, email: email };
+      localStorage.setItem('user', JSON.stringify(S.user));
+      try { localStorage.setItem('supaSession', JSON.stringify(S.supaSession)); } catch (e) {}
+      showApp();
+      loadData();
+    }
+    // Login SOLO con PIN: prueba el PIN contra las cuentas y reconoce de quién es.
+    async function supaPinLogin() {
+      var pin = (document.getElementById('loginPinOnly').value || '').trim();
+      if (!pin) { showError('loginError', 'Escribe tu PIN'); return; }
+      try {
+        showWorking('Verificando…');
+        var list = (_staffList && _staffList.length) ? _staffList : [];
+        if (!list.length) {
+          try {
+            var rr = await fetch(SUPABASE_URL + '/rest/v1/staff_login?select=nombre,email,rol&order=nombre', {
+              headers: { apikey: SUPABASE_ANON, Authorization: 'Bearer ' + SUPABASE_ANON, 'Accept-Profile': SUPA_SCHEMA }
+            });
+            list = await rr.json(); _staffList = list;
+          } catch (e) {}
+        }
+        for (var i = 0; i < (list || []).length; i++) {
+          var r = await fetch(SUPABASE_URL + '/auth/v1/token?grant_type=password', {
+            method: 'POST', headers: { apikey: SUPABASE_ANON, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: list[i].email, password: pin })
+          });
+          if (r.ok) {
+            var d = await r.json();
+            if (d && d.access_token) {
+              try { await _finishSupaLogin(d.access_token, d.refresh_token, d.user.id, list[i].email); hideWorking(); return; }
+              catch (e2) { hideWorking(); showError('loginError', 'Esta cuenta no es personal del hotel'); return; }
+            }
+          }
+        }
+        hideWorking();
+        showError('loginError', 'PIN no reconocido');
+      } catch (e) {
+        hideWorking();
+        showError('loginError', 'Error al conectar: ' + e.message);
+      }
+    }
+
     async function supaLoginSubmit() {
       if (!_pickedStaff) { showError('loginError', 'Selecciona tu usuario'); return; }
       var pin = (document.getElementById('loginPin').value || '').trim();
