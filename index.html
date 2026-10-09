@@ -3332,7 +3332,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-10-07p';
+    var APP_BUILD = '2026-10-09q';
     var _bfPromoRowCount = 0;
     var CONFIG_KEYS = ['hotelInfo', 'hotelTerms', 'dailyRoutine', 'msgTemplates', 'emergencyContacts', 'breakfastPromo', 'guestGuide'];
 
@@ -17642,7 +17642,10 @@
     }
 
     function formatDate(dateStr) {
-      const date = new Date(dateStr + 'T00:00:00');
+      if (!dateStr) return '';
+      var date = new Date(dateStr + 'T00:00:00');
+      if (isNaN(date.getTime())) date = new Date(dateStr);
+      if (isNaN(date.getTime())) return String(dateStr); // nunca truena: devuelve el texto tal cual
       return new Intl.DateTimeFormat('es-ES', { month: 'short', day: 'numeric' }).format(date);
     }
 
