@@ -1135,6 +1135,18 @@
       background: var(--surface3);
     }
 
+    /* Teclado numérico (PIN) con estilo de la app */
+    .kp { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-top:14px; }
+    .kp button {
+      font-size:22px; font-weight:700; padding:16px 0; border-radius:14px;
+      border:1px solid var(--surface3); background:var(--surface2); color:var(--text);
+      cursor:pointer; font-family:inherit; -webkit-tap-highlight-color:transparent; user-select:none;
+      transition:transform .05s ease, background .15s ease;
+    }
+    .kp button:active { background:var(--surface3); transform:scale(.95); }
+    .kp .kp-ok { background:var(--accent); color:var(--bg); border-color:var(--accent); }
+    .kp .kp-back { color:var(--text2); }
+
     .login-button {
       background: var(--accent);
       color: var(--bg);
@@ -2132,9 +2144,9 @@
         <!-- Login SOLO con PIN (el PIN identifica a la persona) -->
         <div id="pinOnly">
           <label class="form-label" style="text-align:center;display:block;">Ingresa tu PIN</label>
-          <input type="password" inputmode="numeric" autocomplete="off" id="loginPinOnly" class="login-input" placeholder="••••••" maxlength="12" style="text-align:center;letter-spacing:8px;font-size:22px;" onkeydown="if(event.key==='Enter')supaPinLogin()" />
-          <button class="login-button" onclick="supaPinLogin()" style="margin-top:10px;">Ingresar</button>
-          <button class="login-button secondary" onclick="showNamePicker()" style="margin-top:8px;font-size:12px;">o elige tu nombre de la lista</button>
+          <input type="password" inputmode="none" readonly autocomplete="off" id="loginPinOnly" class="login-input" placeholder="••••••" maxlength="12" style="width:100%;box-sizing:border-box;text-align:center;letter-spacing:8px;font-size:22px;" />
+          <div id="kpLogin"></div>
+          <button class="login-button secondary" onclick="showNamePicker()" style="margin-top:12px;font-size:12px;">o elige tu nombre de la lista</button>
         </div>
 
         <!-- Login por nombre + PIN (alternativo) -->
@@ -2147,10 +2159,10 @@
         </div>
         <div id="pinEntry" style="display:none;">
           <div id="pinWho" style="text-align:center;font-weight:700;margin-bottom:10px;font-size:15px;"></div>
-          <label class="form-label">PIN</label>
-          <input type="password" inputmode="numeric" autocomplete="off" id="loginPin" class="login-input" placeholder="••••••" maxlength="12" style="text-align:center;letter-spacing:6px;font-size:20px;" onkeydown="if(event.key==='Enter')supaLoginSubmit()" />
-          <button class="login-button" onclick="supaLoginSubmit()" style="margin-top:10px;">Ingresar</button>
-          <button class="login-button secondary" onclick="supaPickBack()" style="margin-top:8px;">← Cambiar usuario</button>
+          <label class="form-label" style="text-align:center;display:block;">PIN</label>
+          <input type="password" inputmode="none" readonly autocomplete="off" id="loginPin" class="login-input" placeholder="••••••" maxlength="12" style="width:100%;box-sizing:border-box;text-align:center;letter-spacing:6px;font-size:20px;" />
+          <div id="kpPinEntry"></div>
+          <button class="login-button secondary" onclick="supaPickBack()" style="margin-top:12px;">← Cambiar usuario</button>
         </div>
         <div class="login-error" id="loginError"></div>
 
@@ -2175,8 +2187,8 @@
       <div style="font-size:40px;margin-bottom:6px;">🔒</div>
       <div id="lockName" style="font-weight:800;font-size:18px;margin-bottom:2px;"></div>
       <div style="color:var(--text2);font-size:12px;margin-bottom:16px;">Sesión bloqueada · ingresa tu PIN</div>
-      <input type="password" inputmode="numeric" autocomplete="off" id="lockPin" class="login-input" placeholder="••••••" maxlength="12" style="text-align:center;letter-spacing:6px;font-size:20px;" onkeydown="if(event.key==='Enter')unlockSubmit()" />
-      <button class="login-button" id="lockBtn" onclick="unlockSubmit()" style="margin-top:10px;">Desbloquear</button>
+      <input type="password" inputmode="none" readonly autocomplete="off" id="lockPin" class="login-input" placeholder="••••••" maxlength="12" style="width:100%;box-sizing:border-box;text-align:center;letter-spacing:6px;font-size:20px;" />
+      <div id="kpLock"></div>
       <div class="login-error" id="lockError" style="margin-top:8px;"></div>
       <button class="login-button secondary" onclick="lockLogout()" style="margin-top:14px;font-size:12px;">Cambiar de usuario / Cerrar sesión</button>
     </div>
@@ -3370,7 +3382,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-10-09u';
+    var APP_BUILD = '2026-10-09v';
 
     // ===== Supabase (login seguro del personal) =====
     // La anon key es PÚBLICA por diseño (va en el cliente); la seguridad la dan RLS + login.
@@ -6834,7 +6846,8 @@
       document.getElementById('pinEntry').style.display = 'block';
       document.getElementById('pinWho').textContent = '👤 ' + (_pickedStaff.nombre || '');
       document.getElementById('loginError').innerHTML = '';
-      var pin = document.getElementById('loginPin'); pin.value = ''; setTimeout(function () { try { pin.focus(); } catch (e) {} }, 100);
+      var kp = document.getElementById('kpPinEntry'); if (kp) kp.innerHTML = _numpadHTML('loginPin', 'supaLoginSubmit');
+      var pin = document.getElementById('loginPin'); if (pin) pin.value = '';
     }
     function supaPickBack() {
       _pickedStaff = null;
@@ -6846,7 +6859,26 @@
       var c = document.getElementById('classicLogin');
       if (c) c.style.display = (c.style.display === 'none' || !c.style.display) ? 'block' : 'none';
     }
+    // Teclado numérico en pantalla (no usa el teclado del celular)
+    function _numpadHTML(t, onEnter) {
+      function b(d) { return '<button type="button" onclick="kpPress(\'' + t + '\',\'' + d + '\')">' + d + '</button>'; }
+      var k = '<div class="kp">';
+      k += b('1') + b('2') + b('3') + b('4') + b('5') + b('6') + b('7') + b('8') + b('9');
+      k += '<button type="button" class="kp-back" onclick="kpBack(\'' + t + '\')">⌫</button>';
+      k += b('0');
+      k += '<button type="button" class="kp-ok" onclick="' + onEnter + '()">OK</button>';
+      k += '</div>';
+      return k;
+    }
+    function kpPress(t, d) {
+      var el = document.getElementById(t); if (!el) return;
+      var max = parseInt(el.getAttribute('maxlength')) || 12;
+      if (el.value.length < max) el.value += d;
+    }
+    function kpBack(t) { var el = document.getElementById(t); if (el) el.value = el.value.slice(0, -1); }
+
     function showPinOnly() {
+      var kp = document.getElementById('kpLogin'); if (kp) kp.innerHTML = _numpadHTML('loginPinOnly', 'supaPinLogin');
       var a = document.getElementById('pinOnly'); if (a) a.style.display = 'block';
       var b = document.getElementById('pinPicker'); if (b) b.style.display = 'none';
       var c = document.getElementById('pinEntry'); if (c) c.style.display = 'none';
@@ -7016,6 +7048,7 @@
       var ov = document.getElementById('lockOverlay');
       var nm = document.getElementById('lockName'); if (nm) nm.textContent = S.user.nombre || '';
       var pin = document.getElementById('lockPin'); if (pin) pin.value = '';
+      var kp = document.getElementById('kpLock'); if (kp) kp.innerHTML = _numpadHTML('lockPin', 'unlockSubmit');
       var er = document.getElementById('lockError'); if (er) er.textContent = '';
       if (ov) ov.style.display = 'flex';
       setTimeout(function () { try { document.getElementById('lockPin').focus(); } catch (e) {} }, 120);
@@ -12624,6 +12657,10 @@
         { id: 'guia', label: '📖 Guía Huésped' },
         { id: 'marcas', label: '📣 Marcas' }
       ];
+      // Panel de personal (Supabase) solo para admin
+      if (S.user && S.user.rol === 'admin' && S.supaSession && S.supaSession.access_token) {
+        pills.push({ id: 'personal', label: '👥 Personal' });
+      }
       var ph = pills.map(function(p) {
         return '<div class="pill ' + (S.configTab === p.id ? 'active' : '') + '" onclick="S.configTab=\'' + p.id + '\';renderConfig()">' + p.label + '</div>';
       }).join('');
@@ -12658,7 +12695,85 @@
         renderGuiaConfig();
       } else if (S.configTab === 'marcas') {
         renderMarcasConfig();
+      } else if (S.configTab === 'personal') {
+        renderPersonalConfig();
       }
+    }
+
+    // ============ PANEL DE PERSONAL (Supabase, solo admin) ============
+    async function _staffAdminCall(op, extra) {
+      var payload = Object.assign({ action: 'staffAdmin', op: op, token: (S.supaSession && S.supaSession.access_token) || '' }, extra || {});
+      var res = await fetch(S.scriptUrl, { method: 'POST', body: JSON.stringify(payload) });
+      return await res.json();
+    }
+    async function renderPersonalConfig() {
+      var el = document.getElementById('configContent');
+      el.innerHTML = '<div style="color:var(--text2);font-size:13px;text-align:center;padding:20px;">Cargando personal…</div>';
+      var data;
+      try { data = await _staffAdminCall('list', {}); } catch (e) { el.innerHTML = '<div style="color:var(--red);padding:16px;">Error: ' + e.message + '</div>'; return; }
+      if (!data || !data.success) { el.innerHTML = '<div style="color:var(--red);padding:16px;">' + ((data && data.error) || 'No autorizado') + '</div>'; return; }
+      var staff = data.staff || [];
+      var roles = [['admin', 'Administrador'], ['recepcion', 'Recepción'], ['ama_llaves', 'Ama de llaves']];
+      function esc(x) { return escapeHtml(String(x || '')).replace(/'/g, ''); }
+      var h = '<div class="section-title">👥 Personal</div>';
+      h += '<div style="font-size:12px;color:var(--text2);margin-bottom:14px;">Crea cuentas, cambia PIN o rol. Cada persona entra con su PIN — deben ser distintos entre sí.</div>';
+      h += '<div style="background:var(--surface3);padding:12px;border-radius:12px;margin-bottom:16px;">';
+      h += '<div style="font-weight:700;margin-bottom:8px;">➕ Nuevo usuario</div>';
+      h += '<input id="np_nombre" class="login-input" placeholder="Nombre completo" style="width:100%;box-sizing:border-box;margin-bottom:8px;">';
+      h += '<select id="np_rol" class="login-input" style="width:100%;box-sizing:border-box;margin-bottom:8px;padding:10px;">' + roles.map(function (r) { return '<option value="' + r[0] + '">' + r[1] + '</option>'; }).join('') + '</select>';
+      h += '<input id="np_pin" class="login-input" inputmode="numeric" placeholder="PIN (mínimo 6 dígitos)" maxlength="12" style="width:100%;box-sizing:border-box;margin-bottom:8px;">';
+      h += '<button class="form-button" onclick="personalCreate()" style="width:100%;background:var(--accent);color:var(--bg);">Crear usuario</button>';
+      h += '</div>';
+      h += staff.map(function (s) {
+        var opts = roles.map(function (r) { return '<option value="' + r[0] + '"' + (s.rol === r[0] ? ' selected' : '') + '>' + r[1] + '</option>'; }).join('');
+        return '<div style="background:var(--surface3);padding:12px;border-radius:12px;margin-bottom:10px;">' +
+          '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;">' +
+            '<div style="font-weight:700;">' + escapeHtml(s.nombre || '') + '</div>' +
+            '<button onclick="personalDelete(\'' + s.user_id + '\',\'' + esc(s.nombre) + '\')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:16px;">🗑️</button>' +
+          '</div>' +
+          '<div style="display:flex;gap:8px;">' +
+            '<select onchange="personalSetRole(\'' + s.user_id + '\',this.value)" class="login-input" style="flex:1;padding:8px;">' + opts + '</select>' +
+            '<button class="form-button secondary" onclick="personalSetPin(\'' + s.user_id + '\',\'' + esc(s.nombre) + '\')" style="white-space:nowrap;padding:8px 12px;">🔑 PIN</button>' +
+          '</div></div>';
+      }).join('');
+      el.innerHTML = h;
+    }
+    async function personalCreate() {
+      var nombre = (document.getElementById('np_nombre').value || '').trim();
+      var rol = document.getElementById('np_rol').value;
+      var pin = (document.getElementById('np_pin').value || '').trim();
+      if (!nombre) { toast('Escribe el nombre', true); return; }
+      if (pin.length < 6) { toast('El PIN debe tener al menos 6 dígitos', true); return; }
+      await busy(async function () {
+        var r = await _staffAdminCall('create', { nombre: nombre, rol: rol, pin: pin });
+        if (!r.success) { toast(r.error || 'No se pudo crear', true); return; }
+        toast('✅ Usuario creado');
+        renderPersonalConfig();
+      }, 'Creando usuario…');
+    }
+    async function personalSetPin(uid, nombre) {
+      var pin = prompt('Nuevo PIN para ' + nombre + ' (mínimo 6 dígitos):');
+      if (pin === null) return; pin = String(pin).trim();
+      if (pin.length < 6) { toast('El PIN debe tener al menos 6 dígitos', true); return; }
+      await busy(async function () {
+        var r = await _staffAdminCall('setPin', { user_id: uid, pin: pin });
+        if (!r.success) { toast(r.error || 'No se pudo cambiar', true); return; }
+        toast('✅ PIN actualizado');
+      }, 'Cambiando PIN…');
+    }
+    async function personalSetRole(uid, rol) {
+      var r = await _staffAdminCall('update', { user_id: uid, rol: rol });
+      if (!r.success) { toast(r.error || 'No se pudo cambiar el rol', true); return; }
+      toast('✅ Rol actualizado');
+    }
+    async function personalDelete(uid, nombre) {
+      if (!confirm('¿Eliminar la cuenta de ' + nombre + '? No podrá iniciar sesión.')) return;
+      await busy(async function () {
+        var r = await _staffAdminCall('delete', { user_id: uid });
+        if (!r.success) { toast(r.error || 'No se pudo eliminar', true); return; }
+        toast('Usuario eliminado');
+        renderPersonalConfig();
+      }, 'Eliminando…');
     }
 
     function renderMensajesConfig() {
