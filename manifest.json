@@ -1,9 +1,9 @@
 {
-  "id": "casa-regina-pms",
+  "id": "casa-regina-app-2026",
   "name": "Casa Regina — Gestión",
   "short_name": "Casa Regina",
   "description": "Sistema de gestión del Hotel Casa Regina Boutique",
-  "start_url": "./",
+  "start_url": "./?app=1",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait-primary",
