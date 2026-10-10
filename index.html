@@ -3382,7 +3382,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-10-09w';
+    var APP_BUILD = '2026-10-10x';
 
     // ===== Supabase (login seguro del personal) =====
     // La anon key es PÚBLICA por diseño (va en el cliente); la seguridad la dan RLS + login.
@@ -7293,6 +7293,94 @@
           catch (e) { try { return await _origRead(sheetName, range); } catch (e2) { throw e; } }
         }
         return await _origRead(sheetName, range);
+      };
+    })();
+
+    // ============ ESCRITURA DIRECTA A SUPABASE (Fase 5) ============
+    // Intercepta append / updateById / multi / deleteById para escribir directo en Supabase.
+    // Si Supabase falla, cae de regreso al backend (Apps Script → Sheets + Supabase), idempotente.
+    var USE_SUPABASE_WRITES = USE_SUPABASE_READS;
+    function _wS(v) { return (v == null) ? '' : String(v); }
+    function _wN(v) { var n = parseFloat(v); return isNaN(n) ? 0 : n; }
+    function _wI(v) { var n = parseInt(v, 10); return isNaN(n) ? 0 : n; }
+    function _wJ(v, def) { if (v && typeof v === 'object') return v; try { return JSON.parse(v || def); } catch (e) { return JSON.parse(def); } }
+    var SUPA_WRITE_MAP = {
+      '🏨 Habitaciones': { table: 'habitaciones', pk: 'id', toObj: function (r) { return { id: _wS(r[0]), numero: _wS(r[1]), tipo: _wS(r[2]), tarifa: _wN(r[3]), estado: _wS(r[4]), notas: _wS(r[5]) }; } },
+      '📋 Reservas': { table: 'reservas', pk: 'id', toObj: function (r) { return { id: _wS(r[0]), habitacion_num: _wS(r[1]), huesped: _wS(r[2]), telefono: _wS(r[3]), email: _wS(r[4]), fecha_entrada: _wS(r[5]), fecha_salida: _wS(r[6]), adultos: _wS(r[7]), ninos: _wS(r[8]), tarifa: _wN(r[9]), tarifa_total: _wN(r[10]), estado: _wS(r[11]), notas: _wS(r[12]), creado_por: _wS(r[13]), fecha_creacion: _wS(r[14]) }; } },
+      '📝 Registro': { table: 'registro', pk: 'reg_id', toObj: function (r) { return { reg_id: _wS(r[0]), res_id: _wS(r[1]), nombre: _wS(r[2]), habitacion_num: _wS(r[3]), fecha: _wS(r[4]), tipo_id: _wS(r[5]), num_id: _wS(r[6]), nacionalidad: _wS(r[7]), procedencia: _wS(r[8]), motivo: _wS(r[9]), observaciones: _wS(r[10]), ts: _wS(r[11]), telefono: _wS(r[12]) }; } },
+      '🔑 Accesos': { table: 'accesos', pk: 'reserva_id', toObj: function (r) { return { reserva_id: _wS(r[0]), codigo: _wS(r[1]).replace(/^'/, ''), notas: _wS(r[2]) }; } },
+      '🧹 Housekeeping': { table: 'housekeeping', pk: 'id', toObj: function (r) { return { id: _wS(r[0]), fecha: _wS(r[1]), habitacion_num: _wS(r[2]), tarea: _wS(r[3]), prioridad: _wS(r[4]), estado: _wS(r[5]), asignado_a: _wS(r[6]), notas: _wS(r[7]), hora_inicio: _wS(r[8]), hora_fin: _wS(r[9]), verificado: _wS(r[10]), checklist: _wS(r[11]) }; } },
+      '📜 Bitácora': { table: 'bitacora', pk: null, toObj: function (r) { return { fecha: _wS(r[0]), hora: _wS(r[1]), usuario: _wS(r[2]), accion: _wS(r[3]), detalle: _wS(r[4]), tipo: _wS(r[5]) }; } },
+      '👤 Usuarios': { table: 'usuarios', pk: 'id', toObj: function (r) { return { id: _wS(r[0]), usuario: _wS(r[1]), password: _wS(r[2]), nombre: _wS(r[3]), rol: _wS(r[4]) }; } },
+      '💰 Cobros': { table: 'cobros', pk: 'id', toObj: function (r) { return { id: _wS(r[0]), reserva_id: _wS(r[1]), fecha: _wS(r[2]), hora: _wS(r[3]), monto: _wN(r[4]), metodo_pago: _wS(r[5]), concepto: _wS(r[6]), notas: _wS(r[7]), responsable: _wS(r[8]) }; } },
+      '👥 Clientes': { table: 'clientes', pk: 'id', toObj: function (r) { return { id: _wS(r[0]), nombre: _wS(r[1]), telefono: _wS(r[2]), email: _wS(r[3]), notas: _wS(r[4]), primera_visita: _wS(r[5]), ultima_visita: _wS(r[6]), visitas: _wI(r[7]), total_gastado: _wN(r[8]) }; } },
+      '📦 Inventario': { table: 'inventario', pk: 'id', toObj: function (r) { return { id: _wS(r[0]), categoria: _wS(r[1]), producto: _wS(r[2]), stock: _wI(r[3]), minimo: _wI(r[4]), unidad: _wS(r[5]) || 'pzas', notas: _wS(r[6]), ultima_actualizacion: _wS(r[7]) }; } },
+      '🍳 Desayunos': { table: 'desayunos', pk: 'codigo', toObj: function (r) { return { codigo: _wS(r[0]), reserva_id: _wS(r[1]), huesped: _wS(r[2]), habitacion: _wS(r[3]), fecha: _wS(r[4]), personas: _wI(r[5]) || 1, estado: _wS(r[6]) || 'Pendiente', validado_por: _wS(r[7]), hora_validacion: _wS(r[8]), reg_id: _wS(r[9]) }; } },
+      '📝 Cotizaciones': { table: 'cotizaciones', pk: 'id', toObj: function (r) { return { id: _wS(r[0]), numero: _wS(r[1]), fecha: _wS(r[2]), nombre: _wS(r[3]), telefono: _wS(r[4]), email: _wS(r[5]), checkin: _wS(r[6]), checkout: _wS(r[7]), adultos: _wI(r[8]) || 1, ninos: _wI(r[9]), habitaciones: _wJ(r[10], '[]'), opciones: _wJ(r[11], '{}'), subtotal: _wN(r[12]), iva: _wN(r[13]), total: _wN(r[14]), estado: _wS(r[15]) || 'Vigente' }; } },
+      '💸 Gastos': { table: 'gastos', pk: 'id', toObj: function (r) { return { id: _wS(r[0]), fecha: _wS(r[1]).substring(0, 10), categoria: _wS(r[2]) || 'Otros', concepto: _wS(r[3]), monto: _wN(r[4]), tipo: _wS(r[5]), responsable: _wS(r[6]), notas: _wS(r[7]) }; } },
+      '⚙️ Config': { table: 'config', pk: 'config_key', toObj: function (r) { return { config_key: _wS(r[0]), config_value: _wS(r[1]) }; } }
+    };
+    async function _supaWriteUpsert(table, pk, objs) {
+      if (!objs || !objs.length) return;
+      var token = S.supaSession.access_token;
+      var url = SUPABASE_URL + '/rest/v1/' + table + (pk ? ('?on_conflict=' + pk) : '');
+      var res = await fetch(url, {
+        method: 'POST',
+        headers: { apikey: SUPABASE_ANON, Authorization: 'Bearer ' + token, 'Content-Type': 'application/json', 'Content-Profile': SUPA_SCHEMA, Prefer: (pk ? 'resolution=merge-duplicates,' : '') + 'return=minimal' },
+        body: JSON.stringify(objs)
+      });
+      if (!res.ok) throw new Error(table + ' HTTP ' + res.status + ': ' + (await res.text()));
+    }
+    async function _supaWriteDelete(table, pk, id) {
+      var token = S.supaSession.access_token;
+      var res = await fetch(SUPABASE_URL + '/rest/v1/' + table + '?' + pk + '=eq.' + encodeURIComponent(id), {
+        method: 'DELETE', headers: { apikey: SUPABASE_ANON, Authorization: 'Bearer ' + token, 'Content-Profile': SUPA_SCHEMA, Prefer: 'return=minimal' }
+      });
+      if (!res.ok) throw new Error(table + ' DEL HTTP ' + res.status);
+    }
+    (function () {
+      var oAppend = sheets.append.bind(sheets), oUpdate = sheets.updateById.bind(sheets), oMulti = sheets.multi.bind(sheets), oDelete = sheets.deleteById.bind(sheets);
+      function active() { return USE_SUPABASE_WRITES && S.supaSession && S.supaSession.access_token; }
+      function rowsFrom(values) { return (values && values.length && Array.isArray(values[0])) ? values : [values]; }
+
+      sheets.append = async function (sheet, values) {
+        if (active() && SUPA_WRITE_MAP[sheet]) {
+          try { var m = SUPA_WRITE_MAP[sheet]; await _supaWriteUpsert(m.table, m.pk, rowsFrom(values).map(m.toObj).filter(Boolean)); return { success: true, supa: true }; }
+          catch (e) { return await oAppend(sheet, values); }
+        }
+        return await oAppend(sheet, values);
+      };
+      sheets.updateById = async function (sheet, id, values) {
+        if (active() && SUPA_WRITE_MAP[sheet]) {
+          try { var m = SUPA_WRITE_MAP[sheet]; var o = m.toObj(values); await _supaWriteUpsert(m.table, m.pk, o ? [o] : []); return { success: true, supa: true }; }
+          catch (e) { return await oUpdate(sheet, id, values); }
+        }
+        return await oUpdate(sheet, id, values);
+      };
+      sheets.deleteById = async function (sheet, id) {
+        if (active() && SUPA_WRITE_MAP[sheet] && SUPA_WRITE_MAP[sheet].pk) {
+          try { var m = SUPA_WRITE_MAP[sheet]; await _supaWriteDelete(m.table, m.pk, id); return { success: true, supa: true }; }
+          catch (e) { return await oDelete(sheet, id); }
+        }
+        return await oDelete(sheet, id);
+      };
+      sheets.multi = async function (ops) {
+        if (active()) {
+          try {
+            var byTable = {};
+            for (var i = 0; i < ops.length; i++) {
+              var op = ops[i]; var m = SUPA_WRITE_MAP[op.sheet];
+              if (!m) throw new Error('tabla no mapeada: ' + op.sheet);
+              if (op.type === 'append' || op.type === 'updateById') {
+                var o = m.toObj(op.values);
+                if (o) { if (!byTable[m.table]) byTable[m.table] = { pk: m.pk, objs: [] }; byTable[m.table].objs.push(o); }
+              } else { throw new Error('op no soportada en Supabase: ' + op.type); }
+            }
+            for (var t in byTable) { await _supaWriteUpsert(t, byTable[t].pk, byTable[t].objs); }
+            return { success: true, supa: true, results: ops.map(function () { return { success: true }; }) };
+          } catch (e) { return await oMulti(ops); }
+        }
+        return await oMulti(ops);
       };
     })();
 
