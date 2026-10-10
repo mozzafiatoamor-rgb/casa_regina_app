@@ -3382,7 +3382,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-10-10x';
+    var APP_BUILD = '2026-10-10y';
 
     // ===== Supabase (login seguro del personal) =====
     // La anon key es PÚBLICA por diseño (va en el cliente); la seguridad la dan RLS + login.
@@ -3707,9 +3707,13 @@
         }
       }
 
-      // Respaldo: si es un enlace de huésped y no se resolvió el scriptUrl, usar el grabado en la app
-      if ((guestRegId || guestBooking || guestValidar || guestGuia) && !S._publicMode && !(S.sheetId && S.apiKey) && typeof DEFAULT_SCRIPT_URL !== 'undefined' && DEFAULT_SCRIPT_URL) {
-        S.scriptUrl = DEFAULT_SCRIPT_URL; S._publicMode = true;
+      // El backend siempre está disponible (URL fija en el app). La app ya NO requiere
+      // configurar Sheet ID / API Key / Script URL: trabaja directo sobre Supabase.
+      if (!S.scriptUrl && typeof DEFAULT_SCRIPT_URL !== 'undefined' && DEFAULT_SCRIPT_URL) {
+        S.scriptUrl = DEFAULT_SCRIPT_URL;
+      }
+      if ((guestRegId || guestBooking || guestValidar || guestGuia) && !S._publicMode) {
+        S._publicMode = true;
       }
 
       if (guestRegId && (S._publicMode || (S.sheetId && S.apiKey))) {
@@ -3735,7 +3739,7 @@
         return;
       }
 
-      if (S.sheetId && S.apiKey) {
+      if (true) { // la app ya no depende de Sheet ID / API Key; trabaja sobre Supabase
         // Check if user is logged in
         const storedUser = localStorage.getItem('user');
         if (storedUser) {
