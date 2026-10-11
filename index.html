@@ -2457,6 +2457,7 @@
           <div class="tabs-pills" id="configPills"></div>
           <div id="configSyncBar"></div>
           <div id="configContent"></div>
+          <div id="configVersion" style="text-align:center;font-size:10px;color:var(--text2);opacity:.7;padding:16px 0 6px;"></div>
         </div>
       </div>
     </div>
@@ -12819,6 +12820,8 @@
         return '<div class="pill ' + (S.configTab === p.id ? 'active' : '') + '" onclick="S.configTab=\'' + p.id + '\';renderConfig()">' + p.label + '</div>';
       }).join('');
       document.getElementById('configPills').innerHTML = ph;
+      var _cv = document.getElementById('configVersion');
+      if (_cv) _cv.textContent = 'Casa Regina · v' + (typeof APP_BUILD !== 'undefined' ? APP_BUILD : '?');
 
       // Sync bar at top of config
       var syncBar = '<div style="display:flex;gap:8px;margin-bottom:12px">';
