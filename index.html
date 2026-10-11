@@ -3385,7 +3385,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-10-10z';
+    var APP_BUILD = '2026-10-11a';
 
     // ===== Supabase (login seguro del personal) =====
     // La anon key es PÚBLICA por diseño (va en el cliente); la seguridad la dan RLS + login.
@@ -7494,14 +7494,14 @@
         }));
 
         S.cobros = cobrosData.map(c => ({
-          id: c[0], reservaId: c[1], fecha: c[2], hora: c[3],
+          id: c[0], reservaId: c[1], fecha: _ymd(c[2]), hora: c[3],
           monto: parseFloat(c[4]) || 0, metodoPago: c[5],
           concepto: c[6], notas: c[7] || '', responsable: c[8] || ''
         }));
 
         S.gastos = (gastosData || []).map(function(g) {
           return {
-            id: g[0], fecha: String(g[1] || '').substring(0,10), categoria: g[2] || 'Otros',
+            id: g[0], fecha: _ymd(g[1]), categoria: g[2] || 'Otros',
             concepto: g[3] || '', monto: parseFloat(g[4]) || 0, tipo: g[5] || '',
             responsable: g[6] || '', notas: g[7] || ''
           };
@@ -18180,6 +18180,18 @@
       const month = String(date.getMonth() + 1).padStart(2, '0');
       const day = String(date.getDate()).padStart(2, '0');
       return `${year}-${month}-${day}`;
+    }
+
+    // Normaliza CUALQUIER fecha a AAAA-MM-DD, sin corrimiento de zona horaria.
+    // Tolera: ya-ISO, Date, y el texto largo de JS ("Wed Sep 30 2026 ...").
+    function _ymd(v) {
+      if (v === null || v === undefined || v === '') return '';
+      if (v instanceof Date) { return isNaN(v.getTime()) ? '' : normDate(v); }
+      var s = String(v).trim(); if (!s) return '';
+      var m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); if (m) return m[1] + '-' + m[2] + '-' + m[3];
+      var m2 = s.match(/\b([A-Za-z]{3})\s+(\d{1,2})\s+(\d{4})\b/);
+      if (m2) { var MO = {Jan:'01',Feb:'02',Mar:'03',Apr:'04',May:'05',Jun:'06',Jul:'07',Aug:'08',Sep:'09',Oct:'10',Nov:'11',Dec:'12'}[m2[1]]; if (MO) return m2[3] + '-' + MO + '-' + ('0' + m2[2]).slice(-2); }
+      var d = new Date(s); return isNaN(d.getTime()) ? s.substring(0, 10) : normDate(d);
     }
 
     function formatDate(dateStr) {
