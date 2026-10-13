@@ -3403,7 +3403,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-10-13b';
+    var APP_BUILD = '2026-10-13c';
 
     // ===== Supabase (login seguro del personal) =====
     // La anon key es PÚBLICA por diseño (va en el cliente); la seguridad la dan RLS + login.
@@ -3766,8 +3766,8 @@
         if (storedUser) {
           S.user = JSON.parse(storedUser);
           try { var ss = localStorage.getItem('supaSession'); if (ss) S.supaSession = JSON.parse(ss); } catch (e) {}
-          if (S.supaSession && S.supaSession.email) {
-            // Al reabrir pide el PIN (más seguro). Los datos se cargan tras desbloquear.
+          if (S.supaSession && S.supaSession.email && _autoLockOn()) {
+            // Al reabrir pide el PIN SOLO si el bloqueo está activado en Ajustes.
             S._pendingLoad = true;
             lockApp();
           } else {
@@ -7110,7 +7110,15 @@
       S.locked = false; S._pendingLoad = false;
       logout();
     }
+    function _autoLockOn() { try { return localStorage.getItem('autoLockReopen') === '1'; } catch (e) { return false; } }
+    function toggleAutoLock() {
+      var on = _autoLockOn();
+      try { localStorage.setItem('autoLockReopen', on ? '0' : '1'); } catch (e) {}
+      try { toast(on ? 'Bloqueo al reabrir: apagado' : 'Bloqueo al reabrir: activado'); } catch (e) {}
+      try { renderConfig(); } catch (e) {}
+    }
     function _maybeLock() {
+      if (!_autoLockOn()) return;
       if (!S.user || S._publicMode || S.locked) return;
       if (S.supaSession && S.supaSession.email) lockApp();
       else logout(); // sesión clásica
@@ -13317,6 +13325,16 @@
       h += '<button class="form-button' + (currentTheme === 'light' ? '' : ' secondary') + '" onclick="localStorage.setItem(\'theme\',\'light\');applyTheme(\'light\');renderConfig()" style="flex:1;' + (currentTheme === 'light' ? 'background:var(--accent);color:var(--bg)' : '') + '">☀️ Claro</button>';
       h += '</div></div>';
 
+      // Seguridad / bloqueo al reabrir
+      var _alOn = _autoLockOn();
+      h += '<div style="background:var(--surface2);border-radius:var(--radius);padding:16px;margin-bottom:12px">';
+      h += '<div style="font-weight:700;font-size:14px;margin-bottom:4px">🔒 Seguridad</div>';
+      h += '<div style="font-size:11px;color:var(--text2);margin-bottom:10px">Si lo activas, la app te pide el PIN cada vez que la cierras y la vuelves a abrir. Apagado, solo te pide el PIN una vez al iniciar sesión (más cómodo).</div>';
+      h += '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px">';
+      h += '<span style="font-size:13px">Pedir PIN al reabrir la app</span>';
+      h += '<button class="form-button' + (_alOn ? '' : ' secondary') + '" onclick="toggleAutoLock()" style="min-width:96px;' + (_alOn ? 'background:var(--accent);color:var(--bg)' : '') + '">' + (_alOn ? 'Activado' : 'Apagado') + '</button>';
+      h += '</div></div>';
+
       // Install section
       h += '<div style="background:var(--surface2);border-radius:var(--radius);padding:16px;margin-bottom:12px">';
       h += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">';
@@ -14622,6 +14640,7 @@
       // Reservation confirmation receipt — available for all active states
       if (res.estado !== 'Cancelada') {
         buttons += '<button class="form-button" onclick="closeModal();showReservaConfirmation(\'' + resId + '\')" style="background:var(--blue)">📄 Confirmación de Reserva</button>';
+        buttons += '<button class="form-button secondary" onclick="closeModal();setTimeout(function(){openEditReservaModal(\'' + resId + '\')},120)" style="border-color:var(--accent);color:var(--accent)">✏️ Editar reserva</button>';
         buttons += '<button class="form-button secondary" onclick="closeModal();openAddFacturaModal(\'' + resId + '\')">🧾 Factura / impuestos</button>';
         var _room = S.rooms.find(function(r){return r.numero===res.habitacionNum});
         buttons += '<button class="form-button" onclick="closeModal();showPostCheckinMessages(S.reservas.find(function(r){return r.id===\'' + resId + '\'}), S.rooms.find(function(r){return r.numero===\'' + res.habitacionNum + '\'}))" style="background:#25D366;color:#fff;">📨 Enviar Mensajes al Huésped</button>';
@@ -15361,7 +15380,7 @@
         return;
       }
       S.rooms.forEach(function(room) {
-        var blocked = (checkin && checkout) ? hasOverlap(room.numero, checkin, checkout, null) : false;
+        var blocked = (checkin && checkout) ? hasOverlap(room.numero, checkin, checkout, _editResId) : false;
         var inMaint = room.estado === 'Mantenimiento';
         var manualBlock = checkin ? _ocupManualBlocksRange(room, checkin) : (room.estado === 'Ocupada' && _ocupManualBlocksRange(room, normDate(new Date())));
         if (blocked || inMaint || manualBlock) {
@@ -15477,7 +15496,9 @@
       document.getElementById('newResPayMonto').value = monto;
     }
 
+    var _editResId = null;
     function openNewReservaModal(preRoom, preDate) {
+      _editResId = null;
       window._walkinIntent = false;
       try { var _nrmT = document.getElementById('newReservaModal').querySelector('.modal-title'); if (_nrmT) _nrmT.textContent = 'Nueva Reserva'; } catch(e) {}
       var checkin = preDate || normDate(new Date());
@@ -15645,6 +15666,7 @@
 
     async function saveNewReserva(event) {
       event.preventDefault();
+      if (_editResId) { return saveEditReserva(event); }
 
       const roomNum = document.getElementById('newResRoomId').value;
       const huesped = document.getElementById('newResHuesped').value;
@@ -15730,7 +15752,7 @@
           notas = notas ? (notas + ' | ' + _peNote) : _peNote;
         }
         if (_peSave.n > 0 && _peSave.rate > 0) {
-          var _persExtNote = 'Personas extra: ' + _peSave.n + ' × $' + _fmt(_peSave.rate) + '/noche × ' + days + 'n = $' + _fmt(peSubtotal);
+          var _persExtNote = 'Personas extra: ' + _peSave.n + ' × $' + _fmt(_peSave.rate) + '/noche × ' + days + 'n = $' + _fmt(peSubtotal) + ' [PE:' + _peSave.n + ']';
           notas = notas ? (notas + ' | ' + _persExtNote) : _persExtNote;
         }
         if (wantsFactura) {
@@ -15805,6 +15827,129 @@
           setTimeout(function() { showPostReservaConfirm(id, huesped, roomNum, _isToday); }, 400);
         }
       }, 'Guardando reserva...');
+      window._resBusy = false;
+    }
+
+    // ====== EDITAR RESERVA GUARDADA ======
+    function _editResUserNotas(notas) {
+      if (!notas) return '';
+      var s = String(notas).replace(/\[IVA:[\s\S]*?\]/g, '').replace(/\[PE:\d+\]/g, '');
+      var parts = s.split('|').map(function (x) { return x.trim(); }).filter(function (x) {
+        if (!x) return false;
+        if (/^Personas extra:/i.test(x)) return false;
+        if (/^Precio especial:/i.test(x)) return false;
+        return true;
+      });
+      return parts.join(' | ');
+    }
+
+    function openEditReservaModal(resId) {
+      var res = (S.reservas || []).find(function (r) { return r.id === resId; });
+      if (!res) { toast('Reserva no encontrada', true); return; }
+      // Abre el formulario en limpio (resetea _editResId=null y arma el modal)
+      openNewReservaModal(res.habitacionNum, res.fechaEntrada);
+      _editResId = resId;
+      try { var t = document.getElementById('newReservaModal').querySelector('.modal-title'); if (t) t.textContent = '✏️ Editar Reserva'; } catch (e) {}
+      // Fechas reales
+      document.getElementById('newResCheckIn').value = res.fechaEntrada;
+      document.getElementById('newResCheckOut').value = res.fechaSalida;
+      // Repoblar habitaciones excluyendo ESTA reserva (ya con _editResId) y reseleccionar la suya
+      try { updateRoomSelect(); } catch (e) {}
+      (function () { var sel = document.getElementById('newResRoomId'); if (!sel) return; for (var i = 0; i < sel.options.length; i++) { if (sel.options[i].value === res.habitacionNum) { sel.selectedIndex = i; break; } } })();
+      // Campos
+      document.getElementById('newResTarifa').value = res.tarifa;
+      document.getElementById('newResHuesped').value = res.huesped || '';
+      document.getElementById('newResTel').value = res.telefono || '';
+      document.getElementById('newResEmail').value = res.email || '';
+      document.getElementById('newResAdultos').value = res.adultos || '1';
+      document.getElementById('newResNinos').value = (res['niños'] != null ? res['niños'] : (res.ninos != null ? res.ninos : '0'));
+      var _m = /\[PE:(\d+)\]/.exec(res.notas || '');
+      try { document.getElementById('newResPersonasExtra').value = _m ? _m[1] : '0'; } catch (e) {}
+      try { document.getElementById('newResNotas').value = _editResUserNotas(res.notas); } catch (e) {}
+      // Factura
+      try {
+        var _iva = parseIVAData(res.notas);
+        if (_iva) {
+          document.getElementById('newResFactura').checked = true;
+          try { toggleNewResIVA(); } catch (e) {}
+          var _rfc = document.getElementById('newResRFC'); if (_rfc) _rfc.value = _iva.rfc || '';
+          var _rz = document.getElementById('newResRazonSocial'); if (_rz) _rz.value = _iva.razonSocial || '';
+        }
+      } catch (e) {}
+      // En edición no aplica el cobro de anticipo
+      try { document.getElementById('newResPayToggle').checked = false; document.getElementById('newResPaySection').style.display = 'none'; } catch (e) {}
+      try { calculateReservaTotal(); } catch (e) {}
+    }
+
+    async function saveEditReserva(event) {
+      if (event && event.preventDefault) event.preventDefault();
+      var resId = _editResId;
+      var res = (S.reservas || []).find(function (r) { return r.id === resId; });
+      if (!res) { toast('Reserva no encontrada', true); _editResId = null; return; }
+
+      const roomNum = document.getElementById('newResRoomId').value;
+      const huesped = document.getElementById('newResHuesped').value;
+      const tel = document.getElementById('newResTel').value;
+      const email = document.getElementById('newResEmail').value;
+      const checkin = document.getElementById('newResCheckIn').value;
+      const checkout = document.getElementById('newResCheckOut').value;
+      const adultos = document.getElementById('newResAdultos').value;
+      const ninos = document.getElementById('newResNinos').value;
+      const tarifa = parseFloat(document.getElementById('newResTarifa').value);
+      const notasText = document.getElementById('newResNotas').value;
+      const wantsFactura = document.getElementById('newResFactura').checked;
+      const rfc = wantsFactura ? (document.getElementById('newResRFC').value || '').trim().toUpperCase() : '';
+      const razonSocial = wantsFactura ? (document.getElementById('newResRazonSocial').value || '').trim() : '';
+
+      if (!roomNum || !huesped || !checkin || !checkout || !tarifa) { toast('Completa los campos obligatorios', true); return; }
+      if (checkin > checkout) { toast('La salida no puede ser antes de la entrada', true); return; }
+      if (hasOverlap(roomNum, checkin, checkout, resId)) { toast('Hab. ' + roomNum + ' ya tiene reserva en esas fechas', true); return; }
+
+      if (window._resBusy) return;
+      window._resBusy = true;
+      try { var _b = document.querySelector('#newReservaModal [type="submit"], #newReservaModal .form-button'); if (_b) { _b.disabled = true; _b.style.opacity = '0.6'; } } catch (e) {}
+      await busy(async function () {
+        const days = Math.max(daysUntil(checkin, checkout), 1);
+        var _pe = _newResPEData();
+        const peSubtotal = days * _pe.n * _pe.rate;
+        const subtotal = days * tarifa + peSubtotal;
+        var _tb = _taxBreak(subtotal, wantsFactura);
+        const total = subtotal + _tb.iva + _tb.ish;
+
+        var notas = notasText || '';
+        if (_pe.n > 0 && _pe.rate > 0) {
+          var _peN = 'Personas extra: ' + _pe.n + ' × $' + _fmt(_pe.rate) + '/noche × ' + days + 'n = $' + _fmt(peSubtotal) + ' [PE:' + _pe.n + ']';
+          notas = notas ? (notas + ' | ' + _peN) : _peN;
+        }
+        if (wantsFactura) {
+          var _exIva = parseIVAData(res.notas);
+          var _folio = (_exIva && _exIva.folio) ? _exIva.folio : nextFacturaFolio();
+          var _hi = getHotelInfo();
+          var ivaData = JSON.stringify({ factura: true, folio: _folio, hotel: _hi.nombre, rfc: rfc, razonSocial: razonSocial, subtotal: subtotal, iva: _tb.iva, ish: _tb.ish });
+          notas = (notas ? notas + ' | ' : '') + '[IVA:' + ivaData + ']';
+        }
+
+        var n = now();
+        var fecha = normDate(new Date());
+        var hora = n.split(' ')[1];
+        var row = [resId, roomNum, huesped, tel, email, checkin, checkout, adultos, ninos, tarifa, total, res.estado, notas, res.creadoPor || (S.user && S.user.usuario) || '', res.fechaCreacion || n];
+        var logRow = [fecha, hora, (S.user && S.user.usuario) || '', 'Reserva editada', huesped + ' Hab. ' + roomNum + ' · total $' + _fmt(total), 'info'];
+
+        await sheets.multi([
+          { type: 'updateById', sheet: '📋 Reservas', id: resId, values: row },
+          { type: 'append', sheet: '📜 Bitácora', values: logRow }
+        ]);
+
+        res.habitacionNum = roomNum; res.huesped = huesped; res.telefono = tel; res.email = email;
+        res.fechaEntrada = checkin; res.fechaSalida = checkout; res.adultos = adultos; res['niños'] = ninos;
+        res.tarifa = tarifa; res.tarifaTotal = total; res.notas = notas;
+
+        try { addOrUpdateClient(huesped, tel, email); } catch (e) {}
+        _editResId = null;
+        toast('✅ Reserva actualizada');
+        closeModal();
+        try { render(); } catch (e) {}
+      }, 'Guardando cambios...');
       window._resBusy = false;
     }
 
