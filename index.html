@@ -3403,7 +3403,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-10-13c';
+    var APP_BUILD = '2026-10-13d';
 
     // ===== Supabase (login seguro del personal) =====
     // La anon key es PÚBLICA por diseño (va en el cliente); la seguridad la dan RLS + login.
@@ -7110,13 +7110,8 @@
       S.locked = false; S._pendingLoad = false;
       logout();
     }
-    function _autoLockOn() { try { return localStorage.getItem('autoLockReopen') === '1'; } catch (e) { return false; } }
-    function toggleAutoLock() {
-      var on = _autoLockOn();
-      try { localStorage.setItem('autoLockReopen', on ? '0' : '1'); } catch (e) {}
-      try { toast(on ? 'Bloqueo al reabrir: apagado' : 'Bloqueo al reabrir: activado'); } catch (e) {}
-      try { renderConfig(); } catch (e) {}
-    }
+    // Solo el personal (no admin) vuelve a pedir PIN al reabrir; el administrador entra directo.
+    function _autoLockOn() { return !!(S.user && S.user.rol && S.user.rol !== 'admin'); }
     function _maybeLock() {
       if (!_autoLockOn()) return;
       if (!S.user || S._publicMode || S.locked) return;
@@ -13325,15 +13320,11 @@
       h += '<button class="form-button' + (currentTheme === 'light' ? '' : ' secondary') + '" onclick="localStorage.setItem(\'theme\',\'light\');applyTheme(\'light\');renderConfig()" style="flex:1;' + (currentTheme === 'light' ? 'background:var(--accent);color:var(--bg)' : '') + '">☀️ Claro</button>';
       h += '</div></div>';
 
-      // Seguridad / bloqueo al reabrir
-      var _alOn = _autoLockOn();
+      // Seguridad / bloqueo al reabrir (por rol)
       h += '<div style="background:var(--surface2);border-radius:var(--radius);padding:16px;margin-bottom:12px">';
-      h += '<div style="font-weight:700;font-size:14px;margin-bottom:4px">🔒 Seguridad</div>';
-      h += '<div style="font-size:11px;color:var(--text2);margin-bottom:10px">Si lo activas, la app te pide el PIN cada vez que la cierras y la vuelves a abrir. Apagado, solo te pide el PIN una vez al iniciar sesión (más cómodo).</div>';
-      h += '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px">';
-      h += '<span style="font-size:13px">Pedir PIN al reabrir la app</span>';
-      h += '<button class="form-button' + (_alOn ? '' : ' secondary') + '" onclick="toggleAutoLock()" style="min-width:96px;' + (_alOn ? 'background:var(--accent);color:var(--bg)' : '') + '">' + (_alOn ? 'Activado' : 'Apagado') + '</button>';
-      h += '</div></div>';
+      h += '<div style="font-weight:700;font-size:14px;margin-bottom:4px">🔒 Seguridad — PIN al reabrir</div>';
+      h += '<div style="font-size:12px;color:var(--text2);line-height:1.5">El <strong>administrador</strong> entra directo al reabrir la app (sin volver a teclear el PIN). El resto del <strong>personal</strong> (recepción, etc.) vuelve a pedir su PIN cada vez que reabre, por seguridad.</div>';
+      h += '</div>';
 
       // Install section
       h += '<div style="background:var(--surface2);border-radius:var(--radius);padding:16px;margin-bottom:12px">';
