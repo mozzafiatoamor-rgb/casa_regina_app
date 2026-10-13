@@ -3403,7 +3403,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-10-13d';
+    var APP_BUILD = '2026-10-13e';
 
     // ===== Supabase (login seguro del personal) =====
     // La anon key es PÚBLICA por diseño (va en el cliente); la seguridad la dan RLS + login.
@@ -9904,6 +9904,7 @@
 
     function renderReports() {
       var pills = [
+        { id: 'reservas', label: 'Reservas' },
         { id: 'ocupacion', label: 'Ocupación' },
         { id: 'ingresos', label: 'Ingresos' },
         { id: 'clientes', label: 'Top Clientes' },
@@ -9918,7 +9919,9 @@
 
       var content = '';
 
-      if (S.filterReports === 'ocupacion') {
+      if (S.filterReports === 'reservas') {
+        content = renderReportReservas();
+      } else if (S.filterReports === 'ocupacion') {
         content = renderReportOcupacion();
       } else if (S.filterReports === 'ingresos') {
         content = renderReportIngresos();
@@ -10085,6 +10088,71 @@
       h += '</div>';
 
       h += '<button class="report-export-btn" onclick="exportReportPDF(\'ingresos\')">📄 Exportar a PDF</button>';
+      return h;
+    }
+
+    // --- Reservas de la semana ---
+    function _resPaidOf(r) {
+      return (S.cobros || []).filter(function (c) { return c.reservaId === r.id; }).reduce(function (s, c) { return s + (c.monto || 0); }, 0);
+    }
+    function _resSemanaList(range, mode) {
+      return (S.reservas || []).filter(function (r) {
+        if (r.estado === 'Cancelada') return false;
+        if (mode === 'estancias') return r.fechaEntrada <= range.end && r.fechaSalida > range.start;
+        return r.fechaEntrada >= range.start && r.fechaEntrada <= range.end;
+      }).sort(function (a, b) { return String(a.fechaEntrada).localeCompare(String(b.fechaEntrada)); });
+    }
+    function renderReportReservas() {
+      if (S.reportReservasOffset == null) S.reportReservasOffset = 0;
+      if (!S.reportReservasMode) S.reportReservasMode = 'entradas';
+      var offset = S.reportReservasOffset, mode = S.reportReservasMode;
+      var range = getWeekRange(offset);
+      var list = _resSemanaList(range, mode);
+      var totalFact = list.reduce(function (s, r) { return s + (r.tarifaTotal || 0); }, 0);
+      var totalPaid = list.reduce(function (s, r) { return s + _resPaidOf(r); }, 0);
+      var saldo = totalFact - totalPaid;
+
+      var h = '';
+      h += '<div style="display:flex;gap:6px;margin-bottom:12px">';
+      h += '<div class="pill ' + (mode === 'entradas' ? 'active' : '') + '" onclick="S.reportReservasMode=\'entradas\';renderReports()">Entradas</div>';
+      h += '<div class="pill ' + (mode === 'estancias' ? 'active' : '') + '" onclick="S.reportReservasMode=\'estancias\';renderReports()">Estancias</div>';
+      h += '</div>';
+      h += '<div class="report-date-nav">';
+      h += '<button onclick="S.reportReservasOffset--;renderReports()">◀</button>';
+      h += '<span>' + range.label + '</span>';
+      h += '<button onclick="S.reportReservasOffset++;renderReports()">▶</button>';
+      h += '</div>';
+      h += '<div class="report-summary-row">';
+      h += '<div class="report-summary-card"><div class="report-summary-val" style="color:var(--accent)">' + list.length + '</div><div class="report-summary-lbl">Reservas</div></div>';
+      h += '<div class="report-summary-card"><div class="report-summary-val" style="color:var(--green)">$' + totalPaid.toLocaleString() + '</div><div class="report-summary-lbl">Cobrado</div></div>';
+      h += '<div class="report-summary-card"><div class="report-summary-val" style="color:' + (saldo > 0 ? 'var(--red)' : 'var(--green)') + '">$' + saldo.toLocaleString() + '</div><div class="report-summary-lbl">Saldo</div></div>';
+      h += '</div>';
+      h += '<div style="font-size:11px;color:var(--text2);text-align:center;margin-bottom:10px">Total facturado: $' + totalFact.toLocaleString() + ' · ' + (mode === 'entradas' ? 'reservas con ENTRADA esta semana' : 'reservas con ESTANCIA esta semana') + '</div>';
+
+      h += '<div class="report-box"><div class="report-title">Detalle</div>';
+      if (!list.length) {
+        h += '<div style="font-size:12px;color:var(--text2);text-align:center;padding:16px">Sin reservas en esta semana</div>';
+      } else {
+        list.forEach(function (r) {
+          var paid = _resPaidOf(r), bal = (r.tarifaTotal || 0) - paid;
+          var nights = Math.max(daysUntil(r.fechaEntrada, r.fechaSalida), 1);
+          var pers = (parseInt(r.adultos) || 0) + (parseInt(r['niños'] != null ? r['niños'] : r.ninos) || 0);
+          var stC = bal <= 0 ? 'var(--green)' : (paid > 0 ? 'var(--yellow)' : 'var(--red)');
+          h += '<div style="border-bottom:1px solid var(--surface3);padding:10px 0;cursor:pointer" onclick="openReservaModal(\'' + r.id + '\')">';
+          h += '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px">';
+          h += '<div style="font-weight:700;font-size:13px">' + _wbEscC(r.huesped || '') + '</div>';
+          h += '<div style="font-size:11px;color:var(--text2)">Hab. ' + (r.habitacionNum || '') + '</div>';
+          h += '</div>';
+          h += '<div style="font-size:11px;color:var(--text2);margin:2px 0">' + formatDate(r.fechaEntrada) + ' → ' + formatDate(r.fechaSalida) + ' · ' + nights + 'n · ' + pers + ' pers · ' + r.estado + '</div>';
+          h += '<div style="display:flex;justify-content:space-between;gap:6px;font-size:12px">';
+          h += '<span>Total <strong>$' + (r.tarifaTotal || 0).toLocaleString() + '</strong></span>';
+          h += '<span style="color:var(--green)">Pag. $' + paid.toLocaleString() + '</span>';
+          h += '<span style="color:' + stC + '">Saldo $' + bal.toLocaleString() + '</span>';
+          h += '</div></div>';
+        });
+      }
+      h += '</div>';
+      h += '<button class="report-export-btn" onclick="exportReportPDF(\'reservas\')">📄 Exportar a PDF</button>';
       return h;
     }
 
@@ -10604,6 +10672,29 @@
             y += 5;
           });
         }
+      } else if (type === 'reservas') {
+        var rrange = getWeekRange(S.reportReservasOffset || 0);
+        var rmode = S.reportReservasMode || 'entradas';
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(14);
+        doc.text('Reporte de Reservas', margin, y); y += 8;
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(11);
+        doc.text('Semana: ' + rrange.label + '  (' + (rmode === 'entradas' ? 'entradas' : 'estancias') + ')', margin, y); y += 9;
+        var rlist = _resSemanaList(rrange, rmode);
+        var tFact = rlist.reduce(function (s, r) { return s + (r.tarifaTotal || 0); }, 0);
+        var tPaid = rlist.reduce(function (s, r) { return s + _resPaidOf(r); }, 0);
+        doc.text('Reservas: ' + rlist.length, margin, y); y += 6;
+        doc.text('Total facturado: $' + tFact.toLocaleString(), margin, y); y += 6;
+        doc.text('Total cobrado: $' + tPaid.toLocaleString(), margin, y); y += 6;
+        doc.text('Saldo pendiente: $' + (tFact - tPaid).toLocaleString(), margin, y); y += 9;
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
+        doc.text('Detalle:', margin, y); y += 6;
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
+        rlist.forEach(function (r) {
+          if (y > 268) { doc.addPage(); y = 20; }
+          var paid = _resPaidOf(r), bal = (r.tarifaTotal || 0) - paid;
+          doc.text(r.fechaEntrada + ' → ' + r.fechaSalida + ' | Hab ' + (r.habitacionNum || '') + ' | ' + (r.huesped || '') + ' | ' + r.estado, margin, y); y += 5;
+          doc.text('   Total $' + (r.tarifaTotal || 0).toLocaleString() + '   Pagado $' + paid.toLocaleString() + '   Saldo $' + bal.toLocaleString(), margin, y); y += 6;
+        });
       }
 
       // Footer
