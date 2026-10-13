@@ -3403,7 +3403,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-10-13e';
+    var APP_BUILD = '2026-10-13f';
 
     // ===== Supabase (login seguro del personal) =====
     // La anon key es PÚBLICA por diseño (va en el cliente); la seguridad la dan RLS + login.
@@ -3772,7 +3772,12 @@
             lockApp();
           } else {
             showApp();
-            loadData();
+            // Admin (sin bloqueo): renueva el token de Supabase antes de cargar, para no caer en 401.
+            if (S.supaSession && S.supaSession.refresh_token) {
+              _supaRefreshSession().finally(function () { loadData(); });
+            } else {
+              loadData();
+            }
           }
         } else {
           showLoginScreen();
@@ -7288,6 +7293,31 @@
       '📝 Registro': { table: 'registro', cols: ['reg_id', 'res_id', 'nombre', 'habitacion_num', 'fecha', 'tipo_id', 'num_id', 'nacionalidad', 'procedencia', 'motivo', 'observaciones', 'ts', 'telefono'] },
       '💸 Gastos': { table: 'gastos', cols: ['id', 'fecha', 'categoria', 'concepto', 'monto', 'tipo', 'responsable', 'notas'] }
     };
+    // Renueva el access_token de Supabase usando el refresh_token (serializado para evitar carreras).
+    var _supaRefreshing = null;
+    function _supaRefreshSession() {
+      if (_supaRefreshing) return _supaRefreshing;
+      if (!S.supaSession || !S.supaSession.refresh_token) return Promise.resolve(false);
+      _supaRefreshing = (async function () {
+        try {
+          var r = await fetch(SUPABASE_URL + '/auth/v1/token?grant_type=refresh_token', {
+            method: 'POST',
+            headers: { apikey: SUPABASE_ANON, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refresh_token: S.supaSession.refresh_token })
+          });
+          var d = await r.json().catch(function () { return {}; });
+          if (r.ok && d.access_token) {
+            S.supaSession.access_token = d.access_token;
+            if (d.refresh_token) S.supaSession.refresh_token = d.refresh_token;
+            try { localStorage.setItem('supaSession', JSON.stringify(S.supaSession)); } catch (e) {}
+            return true;
+          }
+          return false;
+        } catch (e) { return false; }
+      })().finally(function () { _supaRefreshing = null; });
+      return _supaRefreshing;
+    }
+
     async function _supaReadRows(map) {
       var token = (S.supaSession && S.supaSession.access_token) || SUPABASE_ANON;
       var sel = map.cols.join(',');
@@ -7296,9 +7326,11 @@
       while (page <= 50) {
         var from = page * size, to = from + size - 1;
         var url = SUPABASE_URL + '/rest/v1/' + map.table + '?select=' + sel + (map.order ? ('&order=' + map.order) : '');
-        var res = await fetch(url, {
-          headers: { apikey: SUPABASE_ANON, Authorization: 'Bearer ' + token, 'Accept-Profile': SUPA_SCHEMA, 'Range-Unit': 'items', 'Range': from + '-' + to }
-        });
+        var _mkHdr = function (tk) { return { apikey: SUPABASE_ANON, Authorization: 'Bearer ' + tk, 'Accept-Profile': SUPA_SCHEMA, 'Range-Unit': 'items', 'Range': from + '-' + to }; };
+        var res = await fetch(url, { headers: _mkHdr(token) });
+        if (res.status === 401 && S.supaSession && S.supaSession.refresh_token) {
+          if (await _supaRefreshSession()) { token = S.supaSession.access_token; res = await fetch(url, { headers: _mkHdr(token) }); }
+        }
         if (!res.ok) throw new Error(map.table + ' HTTP ' + res.status);
         var rows = await res.json();
         all = all.concat(rows);
@@ -7350,20 +7382,17 @@
     };
     async function _supaWriteUpsert(table, pk, objs) {
       if (!objs || !objs.length) return;
-      var token = S.supaSession.access_token;
       var url = SUPABASE_URL + '/rest/v1/' + table + (pk ? ('?on_conflict=' + pk) : '');
-      var res = await fetch(url, {
-        method: 'POST',
-        headers: { apikey: SUPABASE_ANON, Authorization: 'Bearer ' + token, 'Content-Type': 'application/json', 'Content-Profile': SUPA_SCHEMA, Prefer: (pk ? 'resolution=merge-duplicates,' : '') + 'return=minimal' },
-        body: JSON.stringify(objs)
-      });
+      var _opt = function (tk) { return { method: 'POST', headers: { apikey: SUPABASE_ANON, Authorization: 'Bearer ' + tk, 'Content-Type': 'application/json', 'Content-Profile': SUPA_SCHEMA, Prefer: (pk ? 'resolution=merge-duplicates,' : '') + 'return=minimal' }, body: JSON.stringify(objs) }; };
+      var res = await fetch(url, _opt(S.supaSession.access_token));
+      if (res.status === 401 && S.supaSession && S.supaSession.refresh_token && await _supaRefreshSession()) { res = await fetch(url, _opt(S.supaSession.access_token)); }
       if (!res.ok) throw new Error(table + ' HTTP ' + res.status + ': ' + (await res.text()));
     }
     async function _supaWriteDelete(table, pk, id) {
-      var token = S.supaSession.access_token;
-      var res = await fetch(SUPABASE_URL + '/rest/v1/' + table + '?' + pk + '=eq.' + encodeURIComponent(id), {
-        method: 'DELETE', headers: { apikey: SUPABASE_ANON, Authorization: 'Bearer ' + token, 'Content-Profile': SUPA_SCHEMA, Prefer: 'return=minimal' }
-      });
+      var _u = SUPABASE_URL + '/rest/v1/' + table + '?' + pk + '=eq.' + encodeURIComponent(id);
+      var _opt = function (tk) { return { method: 'DELETE', headers: { apikey: SUPABASE_ANON, Authorization: 'Bearer ' + tk, 'Content-Profile': SUPA_SCHEMA, Prefer: 'return=minimal' } }; };
+      var res = await fetch(_u, _opt(S.supaSession.access_token));
+      if (res.status === 401 && S.supaSession && S.supaSession.refresh_token && await _supaRefreshSession()) { res = await fetch(_u, _opt(S.supaSession.access_token)); }
       if (!res.ok) throw new Error(table + ' DEL HTTP ' + res.status);
     }
     (function () {
