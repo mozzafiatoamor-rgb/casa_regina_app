@@ -2557,6 +2557,10 @@
             <input type="number" id="newResNinos" class="form-input" value="0" min="0" />
           </div>
         </div>
+        <div class="form-group">
+          <label class="form-label">Personas extra <span id="newResPExtraHint" style="font-size:10px;color:var(--text2);font-weight:400"></span></label>
+          <input type="number" id="newResPersonasExtra" class="form-input" value="0" min="0" onchange="calculateReservaTotal()" oninput="calculateReservaTotal()" />
+        </div>
         <div id="newResGuestsBox"></div>
         <div class="form-group">
           <label class="form-label">Tarifa Diaria</label>
@@ -3386,7 +3390,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-10-11a';
+    var APP_BUILD = '2026-10-13a';
 
     // ===== Supabase (login seguro del personal) =====
     // La anon key es PÚBLICA por diseño (va en el cliente); la seguridad la dan RLS + login.
@@ -15474,6 +15478,7 @@
       document.getElementById('newResEmail').value = '';
       document.getElementById('newResAdultos').value = '1';
       document.getElementById('newResNinos').value = '0';
+      try { var _npe = document.getElementById('newResPersonasExtra'); if (_npe) _npe.value = '0'; } catch (e) {}
       try { var _nrb = document.getElementById('newResGuestsBox'); if (_nrb) _nrb.innerHTML = ''; _renderNewResGuests(); } catch (e) {}
       document.getElementById('newResNotas').value = '';
       try { var _pmB = document.getElementById('newResPrecioMotivoBox'); if (_pmB) _pmB.style.display = 'none'; var _pmI = document.getElementById('newResPrecioMotivo'); if (_pmI) _pmI.value = ''; } catch(e) {}
@@ -15572,22 +15577,41 @@
       }
     }
 
+    // Personas extra en la reserva: cantidad (manual) y tarifa configurada ($/persona/noche)
+    function _newResPEData() {
+      var n = parseInt((document.getElementById('newResPersonasExtra') || {}).value) || 0;
+      if (n < 0) n = 0;
+      var rate = 0;
+      try { rate = parseFloat(getHotelInfo().persona_extra) || 0; } catch (e) {}
+      return { n: n, rate: rate };
+    }
+
     function calculateReservaTotal() {
       const checkin = document.getElementById('newResCheckIn').value;
       const checkout = document.getElementById('newResCheckOut').value;
       const tarifa = parseFloat(document.getElementById('newResTarifa').value) || 0;
       try { _checkPrecioEspecial(); } catch(e) {}
 
+      // Pista del cargo por persona extra configurado
+      var _peD = _newResPEData();
+      try {
+        var _hint = document.getElementById('newResPExtraHint');
+        if (_hint) _hint.textContent = _peD.rate > 0 ? ('· $' + _fmt(_peD.rate) + '/persona/noche') : '· configura la tarifa en Ajustes → Tarifas';
+      } catch(e) {}
+
       if (checkin && checkout) {
-        const days = daysUntil(checkin, checkout);
-        const subtotal = Math.max(days, 1) * tarifa;
+        const days = Math.max(daysUntil(checkin, checkout), 1);
+        const roomSub = days * tarifa;
+        const peSub = days * _peD.n * _peD.rate;
+        const subtotal = roomSub + peSub;
+        var _peLine = (peSub > 0) ? ('<span style="font-size:11px;color:var(--text2)">+ ' + _peD.n + ' persona(s) extra × $' + _fmt(_peD.rate) + ' × ' + days + 'n = $' + _fmt(peSub) + '</span><br>') : '';
         var factura = document.getElementById('newResFactura') && document.getElementById('newResFactura').checked;
         if (factura) {
           var iva = Math.round(subtotal * IVA_RATE * 100) / 100;
           var ish = Math.round(subtotal * ISH_RATE * 100) / 100;
-          document.getElementById('newResTotal').innerHTML = '<span style="font-size:11px;color:var(--text2)">Subtotal $' + _fmt(subtotal) + ' + IVA $' + _fmt(iva) + ' + ISH $' + _fmt(ish) + '</span><br>$' + _fmt(subtotal + iva + ish);
+          document.getElementById('newResTotal').innerHTML = _peLine + '<span style="font-size:11px;color:var(--text2)">Subtotal $' + _fmt(subtotal) + ' + IVA $' + _fmt(iva) + ' + ISH $' + _fmt(ish) + '</span><br>$' + _fmt(subtotal + iva + ish);
         } else {
-          document.getElementById('newResTotal').textContent = '$' + subtotal;
+          document.getElementById('newResTotal').innerHTML = _peLine + '$' + _fmt(subtotal);
         }
       }
       updateNewResIVAInfo();
@@ -15674,8 +15698,10 @@
       try { var _srBtn = document.querySelector('#newReservaModal [type="submit"], #newReservaModal .form-button'); if (_srBtn) { _srBtn.disabled = true; _srBtn.style.opacity = '0.6'; } } catch (e) {}
       await busy(async () => {
         const id = nextId('R', S.reservas);
-        const days = daysUntil(checkin, checkout);
-        const subtotal = Math.max(days, 1) * tarifa;
+        const days = Math.max(daysUntil(checkin, checkout), 1);
+        var _peSave = _newResPEData();
+        const peSubtotal = days * _peSave.n * _peSave.rate;
+        const subtotal = days * tarifa + peSubtotal;
         var _tbR = _taxBreak(subtotal, wantsFactura);
         var ivaAmount = _tbR.iva;
         var ishAmount = _tbR.ish;
@@ -15689,6 +15715,10 @@
         if (_precioMotivo) {
           var _peNote = 'Precio especial: ' + _precioMotivo + ' (estándar $' + _fmt(_stdTar) + ' → $' + _fmt(tarifa) + '/noche)';
           notas = notas ? (notas + ' | ' + _peNote) : _peNote;
+        }
+        if (_peSave.n > 0 && _peSave.rate > 0) {
+          var _persExtNote = 'Personas extra: ' + _peSave.n + ' × $' + _fmt(_peSave.rate) + '/noche × ' + days + 'n = $' + _fmt(peSubtotal);
+          notas = notas ? (notas + ' | ' + _persExtNote) : _persExtNote;
         }
         if (wantsFactura) {
           var _factFolio = nextFacturaFolio();
