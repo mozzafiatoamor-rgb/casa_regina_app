@@ -3403,7 +3403,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-10-13f';
+    var APP_BUILD = '2026-10-14a';
 
     // ===== Supabase (login seguro del personal) =====
     // La anon key es PÚBLICA por diseño (va en el cliente); la seguridad la dan RLS + login.
@@ -8976,9 +8976,11 @@
           if (estado === 'Vigente') {
             h += '<button class="form-button secondary" onclick="showCotizacionForm(\'' + cot.id + '\')" style="font-size:11px;padding:5px 10px;">✏️ Editar</button>';
             h += '<button class="form-button" onclick="aceptarCotizacion(\'' + cot.id + '\')" style="font-size:11px;padding:5px 10px;background:var(--green);">✅ Aceptar</button>';
+            h += '<button class="form-button" onclick="reservarDesdeCotizacion(\'' + cot.id + '\')" style="font-size:11px;padding:5px 10px;background:var(--blue,#5b9bd5);color:#fff;">📝 Reservar</button>';
           }
           if (estado === 'Aceptada') {
-            h += '<button class="form-button" onclick="materializarCotizacion(\'' + cot.id + '\')" style="font-size:11px;padding:5px 10px;">🏨 Crear Reservas</button>';
+            h += '<button class="form-button" onclick="reservarDesdeCotizacion(\'' + cot.id + '\')" style="font-size:11px;padding:5px 10px;background:var(--blue,#5b9bd5);color:#fff;">📝 Reservar</button>';
+            h += '<button class="form-button secondary" onclick="materializarCotizacion(\'' + cot.id + '\')" style="font-size:11px;padding:5px 10px;">🏨 Crear auto</button>';
           }
           if (estado !== 'Reservada') {
             h += '<button class="form-button secondary" onclick="eliminarCotizacion(\'' + cot.id + '\')" style="font-size:11px;padding:5px 10px;color:var(--red);">🗑️</button>';
@@ -9925,6 +9927,37 @@
         renderCotizaciones();
         toast(createdIds.length + ' reserva(s) creada(s) desde ' + cot.numero + ' ✅');
       }, 'Creando reservas...');
+    }
+
+    // Abre el formulario de Nueva Reserva PRE-LLENADO con los datos de la cotización
+    function reservarDesdeCotizacion(cotId) {
+      var cot = (S.cotizaciones || []).find(function (c) { return c.id === cotId; });
+      if (!cot) { toast('Cotización no encontrada', true); return; }
+      var rooms = cot.habitaciones || [];
+      var first = rooms[0] || {};
+      var totalHabs = rooms.reduce(function (s, r) { return s + (r.cantidad || 1); }, 0);
+      var preRoom = (first.numero != null ? String(first.numero) : '').trim() || null;
+      openNewReservaModal(preRoom, cot.checkin);
+      // Fechas reales de la cotización
+      document.getElementById('newResCheckIn').value = cot.checkin || '';
+      document.getElementById('newResCheckOut').value = cot.checkout || '';
+      // Repoblar habitaciones con las fechas correctas y reseleccionar la sugerida
+      try { updateRoomSelect(); } catch (e) {}
+      if (preRoom) { var sel = document.getElementById('newResRoomId'); if (sel) { for (var i = 0; i < sel.options.length; i++) { if (sel.options[i].value === preRoom) { sel.selectedIndex = i; break; } } } }
+      // Datos del cliente y tarifa de la cotización
+      document.getElementById('newResHuesped').value = cot.nombre || '';
+      document.getElementById('newResTel').value = cot.telefono || '';
+      document.getElementById('newResEmail').value = cot.email || '';
+      document.getElementById('newResAdultos').value = cot.adultos || '1';
+      document.getElementById('newResNinos').value = cot.ninos || '0';
+      if (first.tarifa != null && first.tarifa !== '') document.getElementById('newResTarifa').value = first.tarifa;
+      try { var _pe = document.getElementById('newResPersonasExtra'); if (_pe) _pe.value = first.personasExtra || 0; } catch (e) {}
+      document.getElementById('newResNotas').value = 'Desde cotización ' + (cot.numero || '');
+      try { _renderNewResGuests(); } catch (e) {}
+      try { calculateReservaTotal(); } catch (e) {}
+      if (totalHabs > 1) {
+        toast('Cotización con ' + totalHabs + ' habitaciones: se precargó la 1ª. Guárdala y repite, o usa "Crear Reservas" para todas.');
+      }
     }
 
     // ============ REPORTS STATE ============
