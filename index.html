@@ -3403,7 +3403,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-10-15a';
+    var APP_BUILD = '2026-10-17a';
 
     // ===== Supabase (login seguro del personal) =====
     // La anon key es PÚBLICA por diseño (va en el cliente); la seguridad la dan RLS + login.
@@ -7125,7 +7125,11 @@
     }
     document.addEventListener('visibilitychange', function () {
       if (document.hidden) { _hiddenAt = Date.now(); }
-      else { if (_hiddenAt && (Date.now() - _hiddenAt) >= LOCK_GRACE_MS) _maybeLock(); }
+      else {
+        // Al volver al frente: renovar el token de Supabase para que cobros/guardados no fallen por token vencido.
+        try { if (S.supaSession && S.supaSession.refresh_token && typeof _supaRefreshSession === 'function') _supaRefreshSession(); } catch (e) {}
+        if (_hiddenAt && (Date.now() - _hiddenAt) >= LOCK_GRACE_MS) _maybeLock();
+      }
     });
     window.addEventListener('pagehide', function () { _hiddenAt = Date.now(); });
 
@@ -7317,6 +7321,9 @@
       })().finally(function () { _supaRefreshing = null; });
       return _supaRefreshing;
     }
+
+    // Renueva el token cada 45 min mientras la app esté abierta (dura ~1h) para que cobros/guardados no fallen.
+    setInterval(function () { try { if (S.supaSession && S.supaSession.refresh_token) _supaRefreshSession(); } catch (e) {} }, 45 * 60 * 1000);
 
     async function _supaReadRows(map) {
       var token = (S.supaSession && S.supaSession.access_token) || SUPABASE_ANON;
