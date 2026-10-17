@@ -3403,7 +3403,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-10-17a';
+    var APP_BUILD = '2026-10-17b';
 
     // ===== Supabase (login seguro del personal) =====
     // La anon key es PÚBLICA por diseño (va en el cliente); la seguridad la dan RLS + login.
@@ -16705,6 +16705,73 @@
       } catch(e) {}
     }
 
+    // ====== ESCÁNER DE INE (OCR en el propio teléfono; la foto no se sube a ningún lado) ======
+    function _loadScript(src) {
+      return new Promise(function (resolve, reject) {
+        var s = document.createElement('script');
+        s.src = src; s.async = true;
+        s.onload = resolve;
+        s.onerror = function () { reject(new Error('no se pudo cargar el lector')); };
+        document.head.appendChild(s);
+      });
+    }
+    function escanearINE() { var i = document.getElementById('ineFileInput'); if (i) i.click(); }
+    async function _procesarINE(file) {
+      if (!file) return;
+      var st = document.getElementById('ineScanStatus');
+      var set = function (t) { if (st) st.textContent = t; };
+      set('📷 Procesando la foto…');
+      try {
+        if (typeof Tesseract === 'undefined') {
+          set('Descargando lector (solo la primera vez, ~unos segundos)…');
+          await _loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js');
+        }
+        set('Reconociendo texto de la INE…');
+        var r = await Tesseract.recognize(file, 'spa');
+        var text = (r && r.data && r.data.text) || '';
+        if (!text.trim()) { set('No se detectó texto. Toma la foto de frente, cerca y con buena luz.'); return; }
+        _rellenarDesdeINE(text);
+        set('✅ Datos cargados — revísalos y corrige lo que haga falta.');
+      } catch (e) {
+        set('No se pudo leer la INE (' + (e && e.message ? e.message : e) + '). Captura los datos a mano.');
+      }
+    }
+    function _ineTitle(s) {
+      return String(s || '').toLowerCase().split(/\s+/).map(function (w) { return w ? (w.charAt(0).toUpperCase() + w.slice(1)) : w; }).join(' ').trim();
+    }
+    function _ineBloque(lines, label, stops) {
+      var out = [], cap = false;
+      for (var i = 0; i < lines.length; i++) {
+        var L = lines[i];
+        if (!cap) {
+          var p = L.indexOf(label);
+          if (p >= 0) { cap = true; var after = L.substring(p + label.length).replace(/^[:\-\s]+/, ''); if (after.length >= 2) out.push(after); }
+          continue;
+        }
+        if (stops.some(function (s) { return L.indexOf(s) >= 0; })) break;
+        if (out.length >= 3) break;
+        if (L.length >= 2) out.push(L);
+      }
+      return out.join(' ').replace(/\s+/g, ' ').trim();
+    }
+    function _rellenarDesdeINE(text) {
+      var up = text.toUpperCase();
+      var lines = up.split('\n').map(function (l) { return l.trim(); }).filter(Boolean);
+      var clave = '';
+      var m = up.match(/CLAVE\s*DE\s*ELECTOR\s*[:\-]?\s*([A-Z0-9]{14,18})/);
+      if (m) clave = m[1];
+      if (!clave) { var m2 = up.match(/\b[A-Z]{6}\d{6,8}[A-Z0-9]{0,6}\b/); if (m2) clave = m2[0]; }
+      var nombre = _ineBloque(lines, 'NOMBRE', ['DOMICILIO', 'CLAVE', 'CURP', 'SEXO', 'FECHA', 'ANO', 'AÑO', 'SECCION']);
+      var domicilio = _ineBloque(lines, 'DOMICILIO', ['CLAVE', 'CURP', 'ESTADO', 'MUNICIPIO', 'SECCION', 'LOCALIDAD', 'EMISION', 'VIGENCIA', 'ANO', 'AÑO', 'FECHA', 'CURP']);
+      var setV = function (id, val) { var el = document.getElementById(id); if (el && val) el.value = val; };
+      if (nombre) setV('regNombre', _ineTitle(nombre));
+      if (clave) { setV('regNumID', clave); var t = document.getElementById('regTipoID'); if (t && !t.value) t.value = 'INE / IFE'; }
+      if (domicilio) setV('regDomicilio', _ineTitle(domicilio));
+      var raw = document.getElementById('ineRawText'); var wrap = document.getElementById('ineRawWrap');
+      if (raw) raw.value = text;
+      if (wrap) wrap.style.display = '';
+    }
+
     function showGuestRegistration(res, room) {
       // Pre-llenar con lo ya capturado en ESTA reserva (o visita anterior como respaldo)
       var prev = _prevRegForCheckin(res);
@@ -16725,6 +16792,15 @@
       h += '<form onsubmit="completeGuestRegistration(event)">';
       h += '<input type="hidden" id="regResId" value="' + res.id + '" />';
       h += '<input type="hidden" id="regRoomId" value="' + (room ? room.id : '') + '" />';
+
+      // Escáner de INE (cámara + OCR)
+      h += '<input type="file" id="ineFileInput" accept="image/*" capture="environment" style="display:none" onchange="_procesarINE(this.files && this.files[0])" />';
+      h += '<button type="button" class="form-button secondary" onclick="escanearINE()" style="width:100%;margin-bottom:6px;border-color:var(--accent);color:var(--accent);">📷 Escanear INE con la cámara</button>';
+      h += '<div id="ineScanStatus" style="font-size:11px;color:var(--text2);text-align:center;margin-bottom:12px;min-height:14px;"></div>';
+
+      // Nombre completo (editable; por defecto el de la reserva, o el que lea la INE)
+      h += '<div class="form-group"><label class="form-label">Nombre completo *</label>';
+      h += '<input type="text" id="regNombre" class="form-input" required value="' + String(res.huesped || '').replace(/"/g, '&quot;') + '" /></div>';
 
       var idTypes = ['INE / IFE', 'Pasaporte', 'Licencia de Conducir', 'Cédula Profesional', 'Otro'];
       h += '<div class="form-group"><label class="form-label">Tipo de Identificación *</label>';
@@ -16752,6 +16828,9 @@
       h += '<div class="form-group"><label class="form-label">Procedencia (Ciudad/Estado)</label>';
       h += '<input type="text" id="regProcedencia" class="form-input" placeholder="Ej: CDMX, Guadalajara..." value="' + (hasPrev ? (prev.procedencia || '') : '') + '" /></div>';
 
+      h += '<div class="form-group"><label class="form-label">Domicilio (de la INE)</label>';
+      h += '<input type="text" id="regDomicilio" class="form-input" placeholder="Calle, número, colonia, ciudad..." value="' + (hasPrev && prev.domicilio ? String(prev.domicilio).replace(/"/g, '&quot;') : '') + '" /></div>';
+
       var motivos = ['Turismo', 'Negocios', 'Familia', 'Evento', 'Otro'];
       h += '<div class="form-group"><label class="form-label">Motivo de Viaje</label>';
       h += '<select id="regMotivo" class="form-select">';
@@ -16763,6 +16842,10 @@
 
       h += '<div class="form-group"><label class="form-label">Observaciones</label>';
       h += '<textarea id="regObservaciones" class="form-textarea" placeholder="Notas adicionales..."></textarea></div>';
+
+      h += '<div id="ineRawWrap" style="display:none;margin-bottom:10px;">';
+      h += '<label class="form-label" style="font-size:11px;color:var(--text2);">Texto leído de la INE (por si falta copiar algo)</label>';
+      h += '<textarea id="ineRawText" class="form-textarea" style="font-size:11px;min-height:70px;" readonly></textarea></div>';
 
       h += '<button type="submit" class="form-button" style="width:100%;">🔑 Completar Check-in</button>';
       h += '<button type="button" class="form-button secondary" onclick="skipGuestRegistration(\'' + res.id + '\')" style="width:100%;margin-top:8px;">Omitir registro →</button>';
@@ -16780,13 +16863,20 @@
       var roomId = document.getElementById('regRoomId').value;
       var room = S.rooms.find(function(r) { return r.id === roomId; });
 
+      var _regNombreEl = document.getElementById('regNombre');
+      var _regNombre = (_regNombreEl && _regNombreEl.value.trim()) ? _regNombreEl.value.trim() : res.huesped;
+      var _domicilio = ((document.getElementById('regDomicilio') || {}).value || '').trim();
+      var _userObs = (document.getElementById('regObservaciones').value || '').trim();
+      var _obs = _domicilio ? ('Domicilio: ' + _domicilio + (_userObs ? ' | ' + _userObs : '')) : _userObs;
       var regData = {
+        nombre: _regNombre,
+        domicilio: _domicilio,
         tipoID: document.getElementById('regTipoID').value,
         numID: document.getElementById('regNumID').value,
         nacionalidad: document.getElementById('regNacionalidad').value,
         procedencia: document.getElementById('regProcedencia').value || '',
         motivo: document.getElementById('regMotivo').value || 'Turismo',
-        observaciones: document.getElementById('regObservaciones').value || ''
+        observaciones: _obs
       };
 
       // Cache registration data for future pre-fill (returning guests)
@@ -16811,11 +16901,11 @@
         var regId, regRow, regOp;
         if (_existingReg && _existingReg.regId) {
           regId = _existingReg.regId;
-          regRow = [regId, res.id, res.huesped, res.habitacionNum, _regFecha, regData.tipoID, regData.numID, regData.nacionalidad, regData.procedencia, regData.motivo, regData.observaciones, _regTs, _regTel];
+          regRow = [regId, res.id, regData.nombre, res.habitacionNum, _regFecha, regData.tipoID, regData.numID, regData.nacionalidad, regData.procedencia, regData.motivo, regData.observaciones, _regTs, _regTel];
           regOp = { type: 'updateById', sheet: '📝 Registro', id: regId, values: regRow };
         } else {
           regId = 'REG' + Date.now().toString(36).toUpperCase();
-          regRow = [regId, res.id, res.huesped, res.habitacionNum, _regFecha, regData.tipoID, regData.numID, regData.nacionalidad, regData.procedencia, regData.motivo, regData.observaciones, _regTs, _regTel];
+          regRow = [regId, res.id, regData.nombre, res.habitacionNum, _regFecha, regData.tipoID, regData.numID, regData.nacionalidad, regData.procedencia, regData.motivo, regData.observaciones, _regTs, _regTel];
           regOp = { type: 'append', sheet: '📝 Registro', values: regRow };
         }
 
@@ -16837,7 +16927,7 @@
 
         // Estado local: actualizar la fila del titular o insertarla (sin duplicar)
         S.registros = S.registros || [];
-        var _regObj = { regId: regId, resId: res.id, nombre: res.huesped, habitacionNum: res.habitacionNum, fecha: _regFecha, tipoId: regData.tipoID, numId: regData.numID, nacionalidad: regData.nacionalidad, procedencia: regData.procedencia, motivo: regData.motivo, observaciones: regData.observaciones, ts: _regTs, telefono: _regTel };
+        var _regObj = { regId: regId, resId: res.id, nombre: regData.nombre, habitacionNum: res.habitacionNum, fecha: _regFecha, tipoId: regData.tipoID, numId: regData.numID, nacionalidad: regData.nacionalidad, procedencia: regData.procedencia, motivo: regData.motivo, observaciones: regData.observaciones, ts: _regTs, telefono: _regTel };
         var _liReg = S.registros.findIndex(function(x){ return x.regId === regId; });
         if (_liReg !== -1) S.registros[_liReg] = _regObj; else S.registros.push(_regObj);
 
