@@ -3413,7 +3413,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-10-19e';
+    var APP_BUILD = '2026-10-19f';
 
     // ===== Supabase (login seguro del personal) =====
     // La anon key es PÚBLICA por diseño (va en el cliente); la seguridad la dan RLS + login.
@@ -8876,6 +8876,23 @@
       return tipos;
     }
 
+    // Ocupación base de un tipo de habitación: sencilla/individual = 1, resto = base del hotel.
+    // Nunca mayor que la capacidad máxima configurada para el tipo.
+    function _cotBaseOcc(tipo) {
+      var hi = getHotelInfo();
+      var base = parseInt(hi.ocupacionBase) || 2;
+      var t = (tipo || '').toLowerCase();
+      if (/sencill|individual|\bsingle\b/.test(t)) base = 1;
+      var mx = (typeof getMaxPersonas === 'function') ? getMaxPersonas(tipo) : 0;
+      if (mx && base > mx) base = mx;
+      return Math.max(1, base);
+    }
+    // Capacidad máxima de un tipo (0 = sin límite configurado).
+    function _cotMaxOcc(tipo) {
+      var mx = (typeof getMaxPersonas === 'function') ? getMaxPersonas(tipo) : 0;
+      return mx || 0;
+    }
+
     function _getCotEstado(cot) {
       if (cot.estado === 'Aceptada' || cot.estado === 'Reservada') return cot.estado;
       // Auto-vencida: 7 días después de la fecha de creación
@@ -8896,7 +8913,8 @@
       var tipos = _getCotRoomTypes();
       var keys = Object.keys(tipos);
       var pick = keys.find(function(k) { return !_cotRooms.some(function(r) { return r.tipo === k; }); }) || keys[0];
-      _cotRooms.push({ tipo: pick, cantidad: 1, tarifa: tipos[pick] || 0, huespedesPorHab: 2, personasExtra: 0, numero: '' });
+      var base = _cotBaseOcc(pick);
+      _cotRooms.push({ tipo: pick, cantidad: 1, tarifa: tipos[pick] || 0, huespedesPorHab: base, personasExtra: 0, numero: '' });
       renderCotizacionForm();
     }
 
@@ -8913,19 +8931,23 @@
         _cotRooms[idx].tipo = sel.value;
         _cotRooms[idx].tarifa = tipos[sel.value] || _cotRooms[idx].tarifa;
         document.getElementById('cotTarifa_' + idx).value = _cotRooms[idx].tarifa;
+        // Recalcular extras según la base del nuevo tipo; subir personas a la base si estaban por debajo.
+        var baseT = _cotBaseOcc(sel.value);
+        if ((_cotRooms[idx].huespedesPorHab || 0) < baseT) _cotRooms[idx].huespedesPorHab = baseT;
+        _cotRooms[idx].personasExtra = Math.max(0, (_cotRooms[idx].huespedesPorHab || baseT) - baseT);
+        renderCotizacionForm();
+        return;
       } else if (field === 'cantidad') {
         _cotRooms[idx].cantidad = Math.max(1, parseInt(document.getElementById('cotCant_' + idx).value) || 1);
       } else if (field === 'tarifa') {
         _cotRooms[idx].tarifa = parseFloat(document.getElementById('cotTarifa_' + idx).value) || 0;
       } else if (field === 'huespedes') {
+        var base = _cotBaseOcc(_cotRooms[idx].tipo);
         var hph = Math.max(1, parseInt(document.getElementById('cotHPH_' + idx).value) || 1);
         _cotRooms[idx].huespedesPorHab = hph;
-        var autoExtra = Math.max(0, hph - 2);
-        _cotRooms[idx].personasExtra = autoExtra;
-        var peEl = document.getElementById('cotPE_' + idx);
-        if (peEl) peEl.value = autoExtra;
-      } else if (field === 'pe') {
-        _cotRooms[idx].personasExtra = Math.max(0, parseInt(document.getElementById('cotPE_' + idx).value) || 0);
+        _cotRooms[idx].personasExtra = Math.max(0, hph - base);
+        renderCotizacionForm();
+        return;
       } else if (field === 'numero') {
         _cotRooms[idx].numero = (document.getElementById('cotNum_' + idx).value || '').trim();
       }
@@ -9051,7 +9073,7 @@
       // Init default room if empty
       if (_cotRooms.length === 0) {
         var firstType = Object.keys(tipos)[0] || '';
-        _cotRooms = [{ tipo: firstType, cantidad: 1, tarifa: tipos[firstType] || 0, huespedesPorHab: 2, personasExtra: 0, numero: '' }];
+        _cotRooms = [{ tipo: firstType, cantidad: 1, tarifa: tipos[firstType] || 0, huespedesPorHab: _cotBaseOcc(firstType), personasExtra: 0, numero: '' }];
       }
 
       var h = '';
@@ -9095,7 +9117,7 @@
       var _autoAdultos = 0;
       _cotRooms.forEach(function(rm) { _autoAdultos += (rm.huespedesPorHab || 2) * rm.cantidad; });
       h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">';
-      h += '<div class="form-group"><label class="form-label">Huéspedes (auto)</label>';
+      h += '<div class="form-group"><label class="form-label">Total personas (auto)</label>';
       h += '<div id="cotAdultosDisplay" style="background:var(--surface3);border-radius:var(--radius);padding:10px;font-size:14px;font-weight:600;text-align:center;">' + _autoAdultos + ' persona' + (_autoAdultos !== 1 ? 's' : '') + '</div></div>';
       h += '<div class="form-group"><label class="form-label">Niños</label>';
       h += '<input type="number" id="cotNinos" class="form-input" value="' + (_cotizacionData ? _cotizacionData.ninos : 0) + '" min="0" max="50" onchange="calcCotizacion()" style="padding:10px;" /></div>';
@@ -9127,17 +9149,23 @@
         h += '<div style="margin-bottom:8px;"><label class="form-label" style="font-size:11px;">N\u00fam. de habitaci\u00f3n (opcional)</label>';
         h += '<input type="text" id="cotNum_' + idx + '" class="form-input" value="' + (rm.numero || '') + '" placeholder="Ej. 101 o 101, 102" onchange="cotRoomChanged(' + idx + ',\'numero\')" style="padding:8px;font-size:12px;" /></div>';
 
-        h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">';
+        h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">';
         // Tarifa
         h += '<div><label class="form-label" style="font-size:11px;">Tarifa/noche</label>';
         h += '<input type="number" id="cotTarifa_' + idx + '" class="form-input" value="' + rm.tarifa + '" step="0.01" min="0" oninput="cotRoomChanged(' + idx + ',\'tarifa\')" style="padding:8px;font-size:12px;" /></div>';
-        // Huéspedes por hab
-        h += '<div><label class="form-label" style="font-size:11px;">Huéspedes/hab.</label>';
-        h += '<input type="number" id="cotHPH_' + idx + '" class="form-input" value="' + (rm.huespedesPorHab || 2) + '" min="1" max="10" onchange="cotRoomChanged(' + idx + ',\'huespedes\')" style="padding:8px;font-size:12px;" /></div>';
-        // PE (auto but editable)
-        h += '<div><label class="form-label" style="font-size:11px;">Extra' + (rm.personasExtra > 0 ? ' ⚡' : '') + '</label>';
-        h += '<input type="number" id="cotPE_' + idx + '" class="form-input" value="' + rm.personasExtra + '" min="0" max="10" onchange="cotRoomChanged(' + idx + ',\'pe\')" style="padding:8px;font-size:12px;' + (rm.personasExtra > 0 ? 'border-color:var(--yellow);' : '') + '" /></div>';
+        // Personas en la habitación (total). Los extras se calculan solos.
+        var _baseRm = _cotBaseOcc(rm.tipo);
+        var _maxRm = _cotMaxOcc(rm.tipo);
+        var _peRm = Math.max(0, (rm.huespedesPorHab || _baseRm) - _baseRm);
+        h += '<div><label class="form-label" style="font-size:11px;">Personas/hab.</label>';
+        h += '<input type="number" id="cotHPH_' + idx + '" class="form-input" value="' + (rm.huespedesPorHab || _baseRm) + '" min="1" max="12" onchange="cotRoomChanged(' + idx + ',\'huespedes\')" style="padding:8px;font-size:12px;' + (_peRm > 0 ? 'border-color:var(--yellow);' : '') + '" /></div>';
         h += '</div>';
+        // Nota derivada: base + extras + aviso de capacidad
+        var _noteRm = 'Base ' + _baseRm + ' pers.';
+        if (_peRm > 0) { _noteRm += ' · ⚡ ' + _peRm + ' extra' + (_peRm > 1 ? 's' : '') + (peRate > 0 ? ' ($' + _fmt(peRate) + '/noche c/u)' : ''); }
+        var _noteColor = 'var(--text2)';
+        if (_maxRm && (rm.huespedesPorHab || _baseRm) > _maxRm) { _noteRm += ' · ⚠️ supera el máx. (' + _maxRm + ')'; _noteColor = 'var(--red)'; }
+        h += '<div style="font-size:11px;color:' + _noteColor + ';margin-top:6px;">' + _noteRm + '</div>';
         h += '</div>';
       });
 
