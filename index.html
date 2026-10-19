@@ -2990,9 +2990,9 @@
       ocupacionBase: 2,
       menoresEdadLimite: 11,
       occupancyRules: [
-        { tipo: 'Doble Matrimonial', maxPersonas: 4 },
-        { tipo: 'Doble Twin', maxPersonas: 3 },
-        { tipo: 'Queen Size', maxPersonas: 3 }
+        { tipo: 'Doble Matrimonial', base: 2, maxPersonas: 4 },
+        { tipo: 'Doble Twin', base: 2, maxPersonas: 3 },
+        { tipo: 'Queen Size', base: 2, maxPersonas: 3 }
       ]
     };
 
@@ -3405,6 +3405,15 @@
       return rule ? rule.maxPersonas : 0;
     }
 
+    // Ocupación base configurada por tipo (0 = no definida, usar la global/heurística).
+    function getBasePersonas(tipo) {
+      var rules = getOccupancyRules();
+      var rule = rules.find(function(r) { return r.tipo === tipo; });
+      if (!rule) { var lower = (tipo || '').toLowerCase(); rule = rules.find(function(r) { return r.tipo.toLowerCase() === lower; }); }
+      if (!rule) { var lo = (tipo || '').toLowerCase(); rule = rules.find(function(r) { return lo.indexOf(r.tipo.toLowerCase()) !== -1 || r.tipo.toLowerCase().indexOf(lo) !== -1; }); }
+      return (rule && rule.base) ? (parseInt(rule.base) || 0) : 0;
+    }
+
     // Build occupancy summary string from config
     function getOccupancySummary() {
       var rules = getOccupancyRules();
@@ -3413,7 +3422,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-10-19h';
+    var APP_BUILD = '2026-10-19i';
 
     // ===== Supabase (login seguro del personal) =====
     // La anon key es PÚBLICA por diseño (va en el cliente); la seguridad la dan RLS + login.
@@ -8879,11 +8888,15 @@
     // Ocupación base de un tipo de habitación: sencilla/individual = 1, resto = base del hotel.
     // Nunca mayor que la capacidad máxima configurada para el tipo.
     function _cotBaseOcc(tipo) {
+      var mx = (typeof getMaxPersonas === 'function') ? getMaxPersonas(tipo) : 0;
+      // 1) Base configurada por tipo (Ajustes → Políticas de Ocupación)
+      var perType = (typeof getBasePersonas === 'function') ? getBasePersonas(tipo) : 0;
+      if (perType > 0) { if (mx && perType > mx) perType = mx; return Math.max(1, perType); }
+      // 2) Fallback: base global + heurística (sencilla/individual = 1)
       var hi = getHotelInfo();
       var base = parseInt(hi.ocupacionBase) || 2;
       var t = (tipo || '').toLowerCase();
       if (/sencill|individual|\bsingle\b/.test(t)) base = 1;
-      var mx = (typeof getMaxPersonas === 'function') ? getMaxPersonas(tipo) : 0;
       if (mx && base > mx) base = mx;
       return Math.max(1, base);
     }
@@ -13745,18 +13758,26 @@
       h += '<div style="font-size:11px;color:var(--text2);margin-top:4px">por persona, por noche</div>';
       h += '</div>';
 
-      // Capacidad máxima por tipo
+      // Ocupación por tipo (base + máximo)
       h += '<div style="background:var(--surface2);border-radius:var(--radius);padding:14px;margin-bottom:12px;">';
-      h += '<div style="font-weight:700;font-size:13px;margin-bottom:10px">Capacidad máxima por tipo de habitación</div>';
-      h += '<div style="font-size:11px;color:var(--text2);margin-bottom:10px">Define cuántas personas puede albergar cada tipo (incluye persona extra y supletorias)</div>';
+      h += '<div style="font-weight:700;font-size:13px;margin-bottom:10px">Ocupación por tipo de habitación</div>';
+      h += '<div style="font-size:11px;color:var(--text2);margin-bottom:10px"><b>Base</b> = personas incluidas en la tarifa sin cargo extra. <b>Máx</b> = cupo total (incluye extras y supletorias). Si dejas la base vacía (0), se usa la base global.</div>';
+
+      // Encabezados
+      h += '<div style="display:flex;gap:8px;align-items:center;margin-bottom:4px;padding:0 10px;">';
+      h += '<span style="flex:1;font-size:10px;color:var(--text2);">Tipo</span>';
+      h += '<span style="width:46px;font-size:10px;color:var(--text2);text-align:center;">base</span>';
+      h += '<span style="width:46px;font-size:10px;color:var(--text2);text-align:center;">máx</span>';
+      h += '<span style="width:20px;"></span>';
+      h += '</div>';
 
       rules.forEach(function(rule, i) {
+        var _b = (rule.base != null && rule.base !== '') ? rule.base : '';
         h += '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;background:var(--surface3);padding:8px 10px;border-radius:8px">';
-        h += '<input type="text" value="' + rule.tipo + '" class="ocup-rule-tipo" data-idx="' + i + '" placeholder="Tipo de habitación" style="flex:1;background:var(--bg);border:1px solid var(--surface3);border-radius:6px;padding:6px 8px;font-size:12px;color:var(--text)">';
-        h += '<span style="font-size:11px;color:var(--text2);white-space:nowrap">máx:</span>';
-        h += '<input type="number" value="' + rule.maxPersonas + '" class="ocup-rule-max" data-idx="' + i + '" min="1" max="20" style="width:50px;background:var(--bg);border:1px solid var(--surface3);border-radius:6px;padding:6px;font-size:12px;text-align:center;color:var(--text)">';
-        h += '<span style="font-size:11px;color:var(--text2)">pers.</span>';
-        h += '<button onclick="removeOcupRule(' + i + ')" style="background:none;border:none;color:var(--red);font-size:16px;cursor:pointer;padding:2px">✕</button>';
+        h += '<input type="text" value="' + rule.tipo + '" class="ocup-rule-tipo" data-idx="' + i + '" placeholder="Tipo de habitación" style="flex:1;min-width:0;background:var(--bg);border:1px solid var(--surface3);border-radius:6px;padding:6px 8px;font-size:12px;color:var(--text)">';
+        h += '<input type="number" value="' + _b + '" class="ocup-rule-base" data-idx="' + i + '" min="1" max="20" placeholder="—" style="width:46px;background:var(--bg);border:1px solid var(--surface3);border-radius:6px;padding:6px;font-size:12px;text-align:center;color:var(--text)">';
+        h += '<input type="number" value="' + rule.maxPersonas + '" class="ocup-rule-max" data-idx="' + i + '" min="1" max="20" style="width:46px;background:var(--bg);border:1px solid var(--surface3);border-radius:6px;padding:6px;font-size:12px;text-align:center;color:var(--text)">';
+        h += '<button onclick="removeOcupRule(' + i + ')" style="background:none;border:none;color:var(--red);font-size:16px;cursor:pointer;padding:2px;width:20px;">✕</button>';
         h += '</div>';
       });
 
@@ -13772,7 +13793,7 @@
         h += '👥 <strong>Persona adicional:</strong> $' + _fmt(hi.persona_extra) + ' MXN + impuestos por persona extra, por noche.<br>';
       }
       h += '👶 <strong>Menores:</strong> Niños menores de ' + menoresLimite + ' años sin costo compartiendo cama (máx. 1 por hab.).<br>';
-      h += '🚪 <strong>Capacidad máxima:</strong> ' + rules.map(function(r) { return r.tipo + ': ' + r.maxPersonas + ' pers.'; }).join(' · ');
+      h += '🚪 <strong>Por tipo:</strong> ' + rules.map(function(r) { return r.tipo + ': base ' + (r.base ? r.base : ocupBase) + ' / máx ' + r.maxPersonas; }).join(' · ');
       h += '</div></div>';
 
       // Save button
@@ -13784,7 +13805,7 @@
     function addOcupRule() {
       var hi = getHotelInfo();
       if (!hi.occupancyRules) hi.occupancyRules = [];
-      hi.occupancyRules.push({ tipo: '', maxPersonas: 2 });
+      hi.occupancyRules.push({ tipo: '', base: (parseInt(hi.ocupacionBase) || 2), maxPersonas: 2 });
       saveHotelInfo(hi);
       renderConfig();
     }
@@ -13804,11 +13825,14 @@
 
       var tipos = document.querySelectorAll('.ocup-rule-tipo');
       var maxes = document.querySelectorAll('.ocup-rule-max');
+      var bases = document.querySelectorAll('.ocup-rule-base');
       var newRules = [];
       tipos.forEach(function(el, i) {
         var tipo = el.value.trim();
         var max = parseInt(maxes[i].value) || 2;
-        if (tipo) newRules.push({ tipo: tipo, maxPersonas: max });
+        var baseVal = parseInt(bases[i] ? bases[i].value : '') || 0;
+        if (baseVal > max) baseVal = max; // la base no puede exceder el máximo
+        if (tipo) { var r = { tipo: tipo, maxPersonas: max }; if (baseVal > 0) r.base = baseVal; newRules.push(r); }
       });
       hi.occupancyRules = newRules;
       saveHotelInfo(hi);
