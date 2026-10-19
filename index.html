@@ -3403,7 +3403,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-10-17b';
+    var APP_BUILD = '2026-10-19a';
 
     // ===== Supabase (login seguro del personal) =====
     // La anon key es PÚBLICA por diseño (va en el cliente); la seguridad la dan RLS + login.
@@ -9882,6 +9882,7 @@
         var fecha = normDate(new Date());
         var hora = n.split(' ')[1];
         var createdIds = [];
+        var _grpId = (totalHabs > 1) ? ('G' + Date.now().toString(36).toUpperCase()) : '';
 
         for (var i = 0; i < habs.length; i++) {
           var hab = habs[i];
@@ -9900,12 +9901,13 @@
             var roomNum = availRoom ? availRoom.numero : '???';
             var tarifa = hab.tarifa + (hab.personasExtra * peRate);
             var total = tarifa * nights;
+            var _adRoom = hab.huespedesPorHab || cot.adultos || 1;
             var resId = nextId('R', S.reservas.concat(createdIds.map(function(id) { return { id: id }; })));
-            var notas = 'Cotización ' + cot.numero;
+            var notas = (_grpId ? '[GRUPO:' + _grpId + '] ' : '') + 'Cotización ' + cot.numero;
             if (hab.personasExtra > 0) notas += ' | ' + hab.personasExtra + ' pers. extra';
 
             var row = [resId, roomNum, cot.nombre, cot.telefono || '', cot.email || '',
-              cot.checkin, cot.checkout, cot.adultos, cot.ninos || 0,
+              cot.checkin, cot.checkout, _adRoom, cot.ninos || 0,
               tarifa, total, 'Reservada', notas, S.user.usuario, n];
             operations.push({ type: 'append', sheet: '📋 Reservas', values: row });
 
@@ -9913,7 +9915,7 @@
               id: resId, habitacionNum: roomNum, huesped: cot.nombre,
               telefono: cot.telefono || '', email: cot.email || '',
               fechaEntrada: cot.checkin, fechaSalida: cot.checkout,
-              adultos: cot.adultos, niños: cot.ninos || 0,
+              adultos: _adRoom, niños: cot.ninos || 0,
               tarifa: tarifa, tarifaTotal: total, estado: 'Reservada',
               notas: notas, creadoPor: S.user.usuario, fechaCreacion: n
             });
@@ -9943,6 +9945,8 @@
       var rooms = cot.habitaciones || [];
       var first = rooms[0] || {};
       var totalHabs = rooms.reduce(function (s, r) { return s + (r.cantidad || 1); }, 0);
+      // Si la cotización tiene varias habitaciones, crear TODAS (una por habitación, precio correcto, ligadas en grupo)
+      if (totalHabs > 1) { return materializarCotizacion(cotId); }
       var preRoom = (first.numero != null ? String(first.numero) : '').trim() || null;
       openNewReservaModal(preRoom, cot.checkin);
       // Fechas reales de la cotización
