@@ -3413,7 +3413,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-10-19c';
+    var APP_BUILD = '2026-10-19d';
 
     // ===== Supabase (login seguro del personal) =====
     // La anon key es PÚBLICA por diseño (va en el cliente); la seguridad la dan RLS + login.
@@ -19179,15 +19179,11 @@
       // Register service worker for offline caching
       if ('serviceWorker' in navigator) {
         var swCode = `
-          var CACHE_NAME = 'casa-regina-pms-v1';
-          var PRECACHE = [self.location.href.replace(/sw\\.js$/, '')];
+          var CACHE_NAME = 'casa-regina-pms-v3';
 
           self.addEventListener('install', function(e) {
-            e.waitUntil(
-              caches.open(CACHE_NAME).then(function(cache) {
-                return cache.addAll(PRECACHE);
-              }).then(function() { return self.skipWaiting(); })
-            );
+            // Activate immediately; don't pre-cache the document so updates are always fetched fresh.
+            self.skipWaiting();
           });
 
           self.addEventListener('activate', function(e) {
@@ -19202,34 +19198,62 @@
           });
 
           self.addEventListener('fetch', function(e) {
-            // Network first for API calls, cache first for the app itself
-            if (e.request.url.includes('googleapis.com') || e.request.url.includes('script.google.com')) {
-              e.respondWith(
-                fetch(e.request).catch(function() {
-                  return caches.match(e.request);
-                })
-              );
-            } else {
-              e.respondWith(
-                caches.match(e.request).then(function(cached) {
-                  var fetchPromise = fetch(e.request).then(function(response) {
-                    if (response.ok) {
-                      var clone = response.clone();
-                      caches.open(CACHE_NAME).then(function(cache) { cache.put(e.request, clone); });
-                    }
-                    return response;
-                  }).catch(function() { return cached; });
-                  return cached || fetchPromise;
-                })
-              );
+            var req = e.request;
+            if (req.method !== 'GET') return;
+            var url = req.url;
+
+            // Dynamic data (Supabase / Google): network only, cache fallback offline.
+            if (url.indexOf('supabase') !== -1 || url.indexOf('googleapis.com') !== -1 || url.indexOf('script.google.com') !== -1) {
+              e.respondWith(fetch(req).catch(function() { return caches.match(req); }));
+              return;
             }
+
+            // The app document itself: NETWORK FIRST so a new deploy is always picked up.
+            var isDoc = req.mode === 'navigate' || req.destination === 'document' ||
+                        url.indexOf('index.html') !== -1 || /\\/($|\\?)/.test(url);
+            if (isDoc) {
+              e.respondWith(
+                fetch(req).then(function(response) {
+                  if (response && response.ok) {
+                    var clone = response.clone();
+                    caches.open(CACHE_NAME).then(function(cache) { cache.put(req, clone); });
+                  }
+                  return response;
+                }).catch(function() { return caches.match(req); })
+              );
+              return;
+            }
+
+            // Static sub-resources (CDN scripts, icons): stale-while-revalidate.
+            e.respondWith(
+              caches.match(req).then(function(cached) {
+                var fetchPromise = fetch(req).then(function(response) {
+                  if (response && response.ok) {
+                    var clone = response.clone();
+                    caches.open(CACHE_NAME).then(function(cache) { cache.put(req, clone); });
+                  }
+                  return response;
+                }).catch(function() { return cached; });
+                return cached || fetchPromise;
+              })
+            );
           });
         `;
         var swBlob = new Blob([swCode], { type: 'application/javascript' });
         var swUrl = URL.createObjectURL(swBlob);
+        var _swReloaded = false;
         navigator.serviceWorker.register(swUrl, { scope: location.pathname })
-          .then(function(reg) { console.log('SW registered:', reg.scope); })
+          .then(function(reg) {
+            console.log('SW registered:', reg.scope);
+            try { reg.update(); } catch (e) {}
+          })
           .catch(function(err) { console.log('SW registration skipped:', err.message); });
+        // When a new service worker takes control, reload once so the fresh app is shown.
+        navigator.serviceWorker.addEventListener('controllerchange', function() {
+          if (_swReloaded) return;
+          _swReloaded = true;
+          location.reload();
+        });
       }
     }
 
