@@ -3413,7 +3413,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-10-19g';
+    var APP_BUILD = '2026-10-19h';
 
     // ===== Supabase (login seguro del personal) =====
     // La anon key es PÚBLICA por diseño (va en el cliente); la seguridad la dan RLS + login.
@@ -15585,6 +15585,36 @@
       });
     }
 
+    // Confirmar de un jalón todas las habitaciones "Reservada" de un grupo.
+    async function confirmarGrupo(groupId) {
+      var pend = _groupReservas(groupId).filter(function(r){ return r.estado === 'Reservada'; });
+      if (!pend.length) { toast('No hay habitaciones por confirmar en el grupo'); return; }
+      if (!confirm('¿Confirmar ' + pend.length + ' habitación(es) del grupo?')) return;
+      if (window._grpConfirmBusy) return;
+      window._grpConfirmBusy = true;
+      try {
+        await busy(async function () {
+          var n = now(), fecha = normDate(new Date()), hora = n.split(' ')[1];
+          var ops = [];
+          pend.forEach(function (res) {
+            ops.push({ type: 'updateById', sheet: '📋 Reservas', id: res.id, values: [res.id, res.habitacionNum, res.huesped, res.telefono, res.email, res.fechaEntrada, res.fechaSalida, res.adultos, res.niños, res.tarifa, res.tarifaTotal, 'Confirmada', res.notas, res.creadoPor, res.fechaCreacion] });
+          });
+          ops.push({ type: 'append', sheet: '📜 Bitácora', values: [fecha, hora, (S.user && S.user.usuario) || '', 'Grupo Confirmado', pend.length + ' hab. — ' + _groupTitular(groupId) + ' (' + groupId + ')', 'info'] });
+          await sheets.multi(ops);
+          pend.forEach(function (res) {
+            var i = S.reservas.findIndex(function (x) { return x.id === res.id; });
+            if (i !== -1) S.reservas[i].estado = 'Confirmada';
+          });
+          toast('✅ ' + pend.length + ' habitación(es) confirmada(s)');
+          closeModal();
+          render();
+          setTimeout(function () { openGroupSummary(groupId); }, 250);
+        }, 'Confirmando grupo…');
+      } finally {
+        window._grpConfirmBusy = false;
+      }
+    }
+
     // ============ CANCEL RESERVA ============
     function cancelReserva(resId) {
       var res = S.reservas.find(function(r){ return r.id === resId; });
@@ -21851,6 +21881,8 @@
       document.getElementById('taskDetailContent').innerHTML = h;
       document.getElementById('taskDetailModal').querySelector('.modal-title').textContent = '👥 Grupo';
       var acts = '';
+      var _pendConfirm = t.reservas.filter(function(r){ return r.estado === 'Reservada'; });
+      if (_pendConfirm.length) acts += '<button class="form-button" onclick="confirmarGrupo(\'' + groupId + '\')" style="width:100%;background:var(--green);color:#fff;">✅ Confirmar ' + _pendConfirm.length + ' habitación(es) del grupo</button>';
       if (t.balance > 0.01) acts += '<button class="form-button" onclick="openGroupPayment(\'' + groupId + '\')" style="width:100%;background:var(--accent);color:var(--bg);">💰 Cobrar grupo ($' + _fmt(t.balance) + ')</button>';
       else acts += '<div style="text-align:center;color:var(--green);font-weight:700;">✅ Grupo pagado completo</div>';
       acts += '<div style="display:flex;gap:8px;">';
