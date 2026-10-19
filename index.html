@@ -3413,7 +3413,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-10-19f';
+    var APP_BUILD = '2026-10-19g';
 
     // ===== Supabase (login seguro del personal) =====
     // La anon key es PÚBLICA por diseño (va en el cliente); la seguridad la dan RLS + login.
@@ -12403,6 +12403,135 @@
       var text = getReceiptText(resId).replace(/\*/g, '').replace(/_/g, '');
       var subject = 'Recibo ' + getHotelInfo().nombre + ' - ' + res.huesped;
       window.open('mailto:' + encodeURIComponent(res.email || '') + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(text));
+    }
+
+    // ============ RECIBO DE PAGO DEL GRUPO (PDF, detalle por cuarto) ============
+    function generateGroupReceiptPDF(groupId, mode) {
+      if (!(window.jspdf && window.jspdf.jsPDF)) { toast('No se pudo cargar el generador de PDF', true); return; }
+      var rs = _groupReservas(groupId);
+      if (!rs.length) { toast('Grupo no encontrado', true); return; }
+      var titular = _groupTitular(groupId);
+      var gt = _groupTotals(groupId);
+      var gtt = _groupTaxTotals(groupId);
+      var hi = getHotelInfo();
+      var methodTag = { 'Efectivo':'[EF]', 'Tarjeta':'[TC]', 'Transferencia':'[TR]', 'Depósito':'[DP]', 'Reembolso':'[RE]' };
+      var pageW = 200;
+      var jsPDF = window.jspdf.jsPDF;
+      var x = 10, lineH = 11;
+
+      function drawGroup(doc, render) {
+        var y = 14;
+        function setC(r,g,b){ if(render) doc.setTextColor(r,g,b); }
+        function fill(rx,ry,rw,rh,r,g,b){ if(render){ doc.setFillColor(r,g,b); doc.rect(rx,ry,rw,rh,'F'); } }
+        function dash(){ if(render){ doc.setDrawColor(200,200,200); doc.setLineDashPattern([2,2],0); doc.setLineWidth(0.3); doc.line(x,y,pageW-x,y); } y+=8; }
+        function row(label,val,r,g,b,bold){
+          doc.setFont('helvetica','normal'); doc.setFontSize(7); setC(102,102,102);
+          if(render) doc.text(String(label),x,y);
+          if(val){ doc.setFont('helvetica',bold?'bold':'normal'); setC(r||17,g||17,b||17); var vw=doc.getTextWidth(String(val)); if(render) doc.text(String(val),pageW-x-vw,y); }
+          y+=lineH;
+        }
+        function center(text,size,r,g,b,bold){
+          doc.setFont('helvetica',bold?'bold':'normal'); doc.setFontSize(size||7); setC(r||102,g||102,b||102);
+          var tw=doc.getTextWidth(String(text)); if(render) doc.text(String(text),(pageW-tw)/2,y); y+=lineH;
+        }
+
+        // Logo
+        var logoS=70;
+        try { if(render) doc.addImage(LOGO_V_DARK_B64||LOGO_V_DARK,'PNG',(pageW-logoS)/2,y,logoS,logoS/LOGO_V_RATIO); } catch(e){}
+        y+=Math.round(logoS/LOGO_V_RATIO)+6;
+        setC(102,102,102); doc.setFont('helvetica','normal'); doc.setFontSize(7);
+        var st='Recibo de pago — Grupo';
+        if(render) doc.text(st,(pageW-doc.getTextWidth(st))/2,y);
+        y+=10;
+        dash();
+        row('Titular', titular, 17,17,17, true);
+        row('Habitaciones', String(gt.count), 100,140,80, true);
+        if (rs[0]) { row('Entrada', formatDate(rs[0].fechaEntrada)); row('Salida', formatDate(rs[0].fechaSalida)); }
+        dash();
+
+        // Detalle por cuarto
+        rs.forEach(function(res){
+          var room = S.rooms.find(function(rr){ return String(rr.numero)===String(res.habitacionNum); });
+          var b = _resBalance(res.id, res.tarifaTotal);
+          var pays = (S.cobros||[]).filter(function(c){ return c.reservaId===res.id; });
+          var v = (typeof parseIVAData==='function') ? parseIVAData(res.notas) : null;
+          center('Hab. ' + res.habitacionNum + (room?' · '+room.tipo:''), 7, 100,140,80, true);
+          row('Huesped', res.huesped, 17,17,17, true);
+          if (v) {
+            var ish = v.ish || 0;
+            row('Subtotal', '$'+_fmt(v.subtotal));
+            row('ISH (5%)', '$'+_fmt(ish));
+            row('IVA (16%)', '$'+_fmt(v.iva));
+            row('Total c/imp.', '$'+_fmt(res.tarifaTotal), 17,17,17, true);
+            if (v.folio) row('Folio', v.folio, 100,140,80, true);
+            if (v.rfc) row('RFC', v.rfc);
+          } else {
+            row('Total hospedaje', '$'+_fmt(res.tarifaTotal), 17,17,17, true);
+          }
+          row('Pagado', '$'+_fmt(b.paid), 34,197,94, true);
+          if (b.balance > 0.01) row('Saldo', '$'+_fmt(b.balance), 239,68,68, true);
+          if (pays.length) {
+            pays.forEach(function(p){
+              var tag = methodTag[p.metodoPago] || '[$]';
+              row(tag+' '+p.metodoPago, '$'+_fmt(p.monto), 34,197,94, false);
+              doc.setFontSize(5.5); setC(153,153,153);
+              if(render) doc.text((p.concepto||'')+' - '+p.fecha, x+2, y);
+              y+=9;
+            });
+          }
+          dash();
+        });
+
+        // Totales del grupo
+        if (gtt.hasFactura) {
+          center('DESGLOSE DEL GRUPO', 6, 100,140,80, true); y+=2;
+          row('Subtotal', '$'+_fmt(gtt.subtotal));
+          row('ISH (5%)', '$'+_fmt(gtt.ish));
+          row('IVA (16%)', '$'+_fmt(gtt.iva));
+          dash();
+        }
+        row('Total del grupo', '$'+_fmt(gt.total), 17,17,17, true);
+        row('Total pagado', '$'+_fmt(gt.paid), 34,197,94, true);
+        if (gt.balance > 0.01) row('Saldo pendiente', '$'+_fmt(gt.balance), 239,68,68, true);
+        y+=6;
+
+        // Caja destacada
+        var boxH=30;
+        fill(x-4,y-2,pageW-2*x+8,boxH,240,245,235);
+        if(render){ doc.setDrawColor(139,170,106); doc.setLineWidth(0.5); doc.setLineDashPattern([],0); doc.roundedRect(x-4,y-2,pageW-2*x+8,boxH,3,3,'S'); }
+        y+=6; doc.setFontSize(6); doc.setFont('helvetica','normal'); setC(102,102,102);
+        var lbl = gt.balance<=0.01 ? 'GRUPO PAGADO COMPLETO' : 'TOTAL PAGADO';
+        if(render) doc.text(lbl,(pageW-doc.getTextWidth(lbl))/2,y);
+        y+=13; doc.setFontSize(14); doc.setFont('helvetica','bold');
+        if(gt.balance<=0.01){ setC(34,197,94); } else { setC(17,17,17); }
+        var bigT='$'+_fmt(gt.paid);
+        if(render) doc.text(bigT,(pageW-doc.getTextWidth(bigT))/2,y);
+        y+=14;
+        dash();
+        center(hi.nombre,6,153,153,153);
+        center('Gracias por su preferencia',6,153,153,153);
+        y+=2; doc.setFontSize(5); setC(180,180,180);
+        var ft=now(); if(render) doc.text(ft,(pageW-doc.getTextWidth(ft))/2,y);
+        y+=8;
+        return y;
+      }
+
+      var mDoc = new jsPDF({unit:'pt',format:[pageW,1400]});
+      var totalH = drawGroup(mDoc,false);
+      var doc = new jsPDF({unit:'pt',format:[pageW, Math.max(totalH, 200)]});
+      drawGroup(doc,true);
+
+      var fileName = 'Recibo_Grupo_' + String(titular).replace(/\s+/g,'_') + '.pdf';
+      if (mode==='share') {
+        doc.save(fileName);
+        toast('PDF descargado — abriendo WhatsApp...');
+        var waText = '🏨 *' + hi.nombre + '*\n\nHola *' + titular + '* 👋\n\nTe comparto el recibo de pago del grupo (' + gt.count + ' habitaciones) en PDF.\n\n📄 _Archivo: ' + fileName + '_\n\n_' + hi.nombre + '_ 🌿';
+        var phone = (rs[0] && typeof getGuestPhone==='function') ? getGuestPhone(rs[0]).replace(/\D/g,'') : '';
+        setTimeout(function(){ window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(waText), '_blank'); }, 500);
+      } else {
+        doc.save(fileName);
+        toast('PDF descargado: ' + fileName);
+      }
     }
 
     // ============ RESERVATION CONFIRMATION RECEIPT ============
@@ -21724,6 +21853,10 @@
       var acts = '';
       if (t.balance > 0.01) acts += '<button class="form-button" onclick="openGroupPayment(\'' + groupId + '\')" style="width:100%;background:var(--accent);color:var(--bg);">💰 Cobrar grupo ($' + _fmt(t.balance) + ')</button>';
       else acts += '<div style="text-align:center;color:var(--green);font-weight:700;">✅ Grupo pagado completo</div>';
+      acts += '<div style="display:flex;gap:8px;">';
+      acts += '<button class="form-button secondary" onclick="generateGroupReceiptPDF(\'' + groupId + '\',\'download\')" style="flex:1;">📄 Recibo PDF</button>';
+      acts += '<button class="form-button secondary" onclick="generateGroupReceiptPDF(\'' + groupId + '\',\'share\')" style="flex:1;background:rgba(37,211,102,0.12);color:#25D366;border-color:#25D366;">📱 Recibo WA</button>';
+      acts += '</div>';
       acts += '<button class="form-button secondary" onclick="openGroupFacturaModal(\'' + groupId + '\')" style="width:100%;">🧾 Factura del grupo</button>';
       acts += '<button class="form-button secondary" onclick="cancelGroup(\'' + groupId + '\')" style="width:100%;border-color:var(--red);color:var(--red);">❌ Cancelar grupo</button>';
       document.getElementById('taskDetailActions').innerHTML = acts;
