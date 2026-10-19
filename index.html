@@ -708,6 +708,44 @@
     .cobro-btn.primary{background:var(--accent);color:var(--bg);border-color:var(--accent)}
     .receipt-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.85);z-index:500;display:flex;align-items:center;justify-content:center;padding:20px}
     .receipt-box{background:#fff;color:#111;border-radius:12px;padding:24px;max-width:380px;width:100%;font-size:13px;max-height:90vh;overflow-y:auto}
+    /* Confirmación de reserva — tarjeta oscura (tema app) */
+    .conf-box{background:var(--surface2);color:var(--text);border-radius:20px;max-width:430px;width:100%;max-height:92vh;overflow-y:auto;border:1px solid var(--surface3);box-shadow:0 24px 70px rgba(0,0,0,.55);animation:slideUp .25s ease;overflow-x:hidden}
+    .conf-hdr{position:relative;padding:22px 20px 18px;text-align:center;background:linear-gradient(160deg,rgba(139,170,106,.28),rgba(139,170,106,.06));border-bottom:1px solid var(--surface3)}
+    .conf-hdr img{width:118px;max-width:60%;object-fit:contain;margin-bottom:8px}
+    .conf-title{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--text2);font-weight:700}
+    .conf-chip{display:inline-flex;align-items:center;gap:5px;margin-top:10px;padding:4px 12px;border-radius:999px;font-size:12px;font-weight:700}
+    .conf-body{padding:18px 20px 8px}
+    .conf-guest{font-size:20px;font-weight:800;line-height:1.2;margin-bottom:2px}
+    .conf-guest-sub{font-size:12px;color:var(--text2);margin-bottom:14px;word-break:break-word}
+    .conf-sec{margin:0 0 14px}
+    .conf-sec-t{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);font-weight:700;margin-bottom:8px}
+    .conf-row{display:flex;justify-content:space-between;gap:12px;align-items:baseline;padding:5px 0;font-size:13px}
+    .conf-row .k{color:var(--text2);flex:0 0 auto}
+    .conf-row .v{color:var(--text);font-weight:600;text-align:right;word-break:break-word}
+    .conf-stay{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--surface3);border-radius:14px;padding:12px 14px;margin-bottom:14px}
+    .conf-stay .dt{text-align:center;flex:1}
+    .conf-stay .dt .d{font-size:16px;font-weight:800;line-height:1.1}
+    .conf-stay .dt .l{font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.08em;margin-top:2px}
+    .conf-stay .arrow{color:var(--accent);font-size:16px;flex:0 0 auto}
+    .conf-stay .nts{flex:0 0 auto;font-size:11px;color:var(--text2);text-align:center;min-width:52px}
+    .conf-total{display:flex;justify-content:space-between;align-items:center;background:linear-gradient(135deg,rgba(139,170,106,.2),rgba(139,170,106,.05));border:1px solid var(--accent);border-radius:14px;padding:14px 16px;margin:4px 0 14px}
+    .conf-total .tl{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--text2)}
+    .conf-total .tv{font-size:22px;font-weight:800;font-family:'Space Mono',monospace;color:var(--accent)}
+    .conf-terms{font-size:10.5px;color:var(--text2);line-height:1.6;background:var(--surface);border-radius:12px;padding:12px 14px;margin-bottom:6px}
+    .conf-terms b{color:var(--text)}
+    .conf-foot{text-align:center;font-size:11px;color:var(--text2);padding:4px 0 2px}
+    .conf-btns{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px 20px 20px}
+    .conf-btn{border:none;border-radius:12px;padding:11px;font-size:12.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px}
+    @media print{
+      body * { visibility: hidden !important; }
+      .receipt-overlay, .receipt-overlay * { visibility: visible !important; }
+      .conf-box{background:#fff !important;color:#111 !important;border:none;box-shadow:none;max-width:100%;border-radius:0}
+      .conf-hdr{background:#f4f6f0 !important}
+      .conf-title,.conf-row .k,.conf-guest-sub,.conf-stay .dt .l,.conf-total .tl,.conf-terms,.conf-foot,.conf-stay .nts{color:#555 !important}
+      .conf-guest,.conf-row .v,.conf-stay .dt .d,.conf-terms b{color:#111 !important}
+      .conf-stay{background:#f4f6f0 !important}
+      .conf-btns{display:none !important}
+    }
     .receipt-header{text-align:center;margin-bottom:16px}.receipt-hotel{font-size:18px;font-weight:700}.receipt-sub{font-size:11px;color:#666}
     .receipt-div{border-top:1px dashed #ccc;margin:12px 0}
     .receipt-row{display:flex;justify-content:space-between;padding:3px 0}.receipt-label{color:#666}.receipt-value{font-weight:700;font-family:'Space Mono',monospace}
@@ -3422,7 +3460,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-10-19i';
+    var APP_BUILD = '2026-10-19j';
 
     // ===== Supabase (login seguro del personal) =====
     // La anon key es PÚBLICA por diseño (va en el cliente); la seguridad la dan RLS + login.
@@ -12559,98 +12597,120 @@
       var balance = res.tarifaTotal - totalPaid;
       var hi = getHotelInfo();
 
+      // Estado / chip
+      var estado = res.estado || 'Reservada';
+      var chipMap = {
+        'Confirmada': { bg:'rgba(107,191,123,.18)', c:'var(--green)', t:'✅ Confirmada' },
+        'Check-in':   { bg:'rgba(107,165,207,.18)', c:'var(--blue)',  t:'🔵 Hospedado' },
+        'Reservada':  { bg:'rgba(196,168,77,.18)',  c:'var(--yellow)',t:'📋 Reservada' },
+        'Check-out':  { bg:'rgba(138,154,136,.18)', c:'var(--text2)', t:'✅ Check-out' },
+        'Cancelada':  { bg:'rgba(207,107,107,.18)', c:'var(--red)',   t:'❌ Cancelada' }
+      };
+      var chip = chipMap[estado] || chipMap['Reservada'];
+      var _esc = (typeof _wbEsc === 'function') ? _wbEsc : function(s){ return String(s==null?'':s); };
+      var _ivaConf = parseIVAData(res.notas);
+
       var h = '<div class="receipt-overlay" id="receiptOverlay" onclick="if(event.target===this)closeReceipt()">';
-      h += '<div class="receipt-box">';
+      h += '<div class="conf-box">';
 
       // Header
-      h += '<div class="receipt-header"><img src="'+LOGO_V_DARK+'" style="width:120px;object-fit:contain;margin-bottom:8px" alt="Logo"><div class="receipt-sub">Confirmación de Reservación</div></div>';
-      h += '<div class="receipt-div"></div>';
+      h += '<div class="conf-hdr">';
+      h += '<img src="' + LOGO_V_LIGHT + '" alt="Logo">';
+      h += '<div class="conf-title">Confirmación de reservación</div>';
+      h += '<div class="conf-chip" style="background:' + chip.bg + ';color:' + chip.c + ';">' + chip.t + '</div>';
+      h += '</div>';
 
-      // Reservation details
-      h += '<div class="receipt-row"><span class="receipt-label">No. Reservación</span><span class="receipt-value">' + res.id + '</span></div>';
-      h += '<div class="receipt-row"><span class="receipt-label">Huésped</span><span class="receipt-value">' + res.huesped + '</span></div>';
-      if (res.telefono) h += '<div class="receipt-row"><span class="receipt-label">Teléfono</span><span class="receipt-value">' + res.telefono + '</span></div>';
-      if (res.email) h += '<div class="receipt-row"><span class="receipt-label">Email</span><span class="receipt-value">' + res.email + '</span></div>';
-      h += '<div class="receipt-div"></div>';
+      h += '<div class="conf-body">';
+      // Guest
+      h += '<div class="conf-guest">' + _esc(res.huesped) + (_ivaConf ? ' <span style="font-size:11px;background:rgba(107,191,123,.18);color:var(--green);padding:2px 7px;border-radius:6px;vertical-align:middle;">🧾 Factura</span>' : '') + '</div>';
+      var gsub = [];
+      if (res.telefono) gsub.push('📞 ' + _esc(res.telefono));
+      if (res.email) gsub.push('✉️ ' + _esc(res.email));
+      gsub.push('No. ' + _esc(res.id));
+      h += '<div class="conf-guest-sub">' + gsub.join(' · ') + '</div>';
 
-      h += '<div class="receipt-row"><span class="receipt-label">Habitación</span><span class="receipt-value">' + res.habitacionNum + ' (' + (room ? room.tipo : '') + ')</span></div>';
-      h += '<div class="receipt-row"><span class="receipt-label">Fecha entrada</span><span class="receipt-value">' + formatDate(res.fechaEntrada) + '</span></div>';
-      h += '<div class="receipt-row"><span class="receipt-label">Fecha salida</span><span class="receipt-value">' + formatDate(res.fechaSalida) + '</span></div>';
-      h += '<div class="receipt-row"><span class="receipt-label">Noches</span><span class="receipt-value">' + nights + '</span></div>';
-      h += '<div class="receipt-row"><span class="receipt-label">Huéspedes</span><span class="receipt-value">' + res.adultos + ' adulto(s)' + (parseInt(res.niños) > 0 ? ', ' + res.niños + ' niño(s)' : '') + '</span></div>';
-      h += '<div class="receipt-row"><span class="receipt-label">Hora check-in</span><span class="receipt-value">' + formatHoraDisplay(hi.checkin_hora) + '</span></div>';
-      h += '<div class="receipt-row"><span class="receipt-label">Hora check-out</span><span class="receipt-value">' + formatHoraDisplay(hi.checkout_hora) + '</span></div>';
-      if (hi.direccion) h += '<div class="receipt-row"><span class="receipt-label">Dirección</span><span class="receipt-value" style="font-size:10px;max-width:200px;text-align:right">' + hi.direccion + '</span></div>';
-      h += '<div class="receipt-div"></div>';
+      // Estancia (fechas grandes)
+      h += '<div class="conf-stay">';
+      h += '<div class="dt"><div class="d">' + formatDate(res.fechaEntrada) + '</div><div class="l">Entrada · ' + formatHoraDisplay(hi.checkin_hora) + '</div></div>';
+      h += '<div class="arrow">→</div>';
+      h += '<div class="dt"><div class="d">' + formatDate(res.fechaSalida) + '</div><div class="l">Salida · ' + formatHoraDisplay(hi.checkout_hora) + '</div></div>';
+      h += '</div>';
 
-      // Pricing
-      var _ivaConf = parseIVAData(res.notas);
-      h += '<div class="receipt-row"><span class="receipt-label">Tarifa por noche</span><span class="receipt-value">$' + res.tarifa + '</span></div>';
+      // Detalle habitación
+      h += '<div class="conf-sec">';
+      h += '<div class="conf-sec-t">Habitación</div>';
+      h += '<div class="conf-row"><span class="k">🛏 Habitación</span><span class="v">' + _esc(res.habitacionNum) + (room ? ' · ' + _esc(room.tipo) : '') + '</span></div>';
+      h += '<div class="conf-row"><span class="k">🌙 Noches</span><span class="v">' + nights + '</span></div>';
+      h += '<div class="conf-row"><span class="k">👥 Huéspedes</span><span class="v">' + res.adultos + ' adulto(s)' + (parseInt(res.niños) > 0 ? ', ' + res.niños + ' niño(s)' : '') + '</span></div>';
+      if (hi.direccion) h += '<div class="conf-row"><span class="k">📍 Dirección</span><span class="v" style="font-weight:500;font-size:12px;">' + _esc(hi.direccion) + '</span></div>';
+      h += '</div>';
+
+      // Precio
+      h += '<div class="conf-sec">';
+      h += '<div class="conf-sec-t">Precio</div>';
+      h += '<div class="conf-row"><span class="k">Tarifa por noche</span><span class="v">$' + _fmt(res.tarifa) + '</span></div>';
       if (_ivaConf) {
         var _ishConf = _ivaConf.ish || 0;
-        h += '<div class="receipt-row"><span class="receipt-label">Subtotal (' + nights + ' noches)</span><span class="receipt-value">$' + _ivaConf.subtotal.toLocaleString('es-MX') + '</span></div>';
-        h += '<div class="receipt-row"><span class="receipt-label">IVA (16%)</span><span class="receipt-value">$' + _ivaConf.iva.toLocaleString('es-MX',{minimumFractionDigits:2}) + '</span></div>';
-        h += '<div class="receipt-row"><span class="receipt-label">ISH (5%)</span><span class="receipt-value">$' + _ishConf.toLocaleString('es-MX',{minimumFractionDigits:2}) + '</span></div>';
-        h += '<div class="receipt-row"><span class="receipt-label" style="font-weight:700">Total c/impuestos</span><span class="receipt-value" style="font-weight:700;font-size:15px">$' + res.tarifaTotal.toLocaleString('es-MX',{minimumFractionDigits:2}) + '</span></div>';
-        h += '<div class="receipt-div"></div>';
-        if (_ivaConf.folio) h += '<div class="receipt-row"><span class="receipt-label">Folio Factura</span><span class="receipt-value" style="font-weight:700">' + _ivaConf.folio + '</span></div>';
-        h += '<div class="receipt-row"><span class="receipt-label">RFC</span><span class="receipt-value">' + _ivaConf.rfc + '</span></div>';
-        if (_ivaConf.razonSocial) h += '<div class="receipt-row"><span class="receipt-label">Razón Social</span><span class="receipt-value" style="font-size:10px;max-width:180px;text-align:right">' + _ivaConf.razonSocial + '</span></div>';
-      } else {
-        h += '<div class="receipt-row"><span class="receipt-label" style="font-weight:700">Total estancia</span><span class="receipt-value" style="font-weight:700;font-size:15px">$' + res.tarifaTotal + '</span></div>';
+        h += '<div class="conf-row"><span class="k">Subtotal (' + nights + ' noches)</span><span class="v">$' + _fmt(_ivaConf.subtotal) + '</span></div>';
+        h += '<div class="conf-row"><span class="k">IVA (16%)</span><span class="v">$' + _fmt(_ivaConf.iva) + '</span></div>';
+        h += '<div class="conf-row"><span class="k">ISH (5%)</span><span class="v">$' + _fmt(_ishConf) + '</span></div>';
+        if (_ivaConf.folio) h += '<div class="conf-row"><span class="k">Folio factura</span><span class="v">' + _esc(_ivaConf.folio) + '</span></div>';
+        if (_ivaConf.rfc) h += '<div class="conf-row"><span class="k">RFC</span><span class="v">' + _esc(_ivaConf.rfc) + '</span></div>';
+        if (_ivaConf.razonSocial) h += '<div class="conf-row"><span class="k">Razón social</span><span class="v" style="font-weight:500;font-size:12px;">' + _esc(_ivaConf.razonSocial) + '</span></div>';
       }
+      h += '</div>';
 
-      // Payment status
+      // Total destacado
+      h += '<div class="conf-total"><div><div class="tl">Total' + (_ivaConf ? ' c/impuestos' : ' estancia') + '</div></div><div class="tv">$' + _fmt(res.tarifaTotal) + '</div></div>';
+
+      // Pago
       if (totalPaid > 0) {
-        h += '<div class="receipt-div"></div>';
-        h += '<div class="receipt-row"><span class="receipt-label">Anticipo recibido</span><span class="receipt-value" style="color:#22c55e">$' + totalPaid + '</span></div>';
-        h += '<div class="receipt-row"><span class="receipt-label">Saldo pendiente</span><span class="receipt-value" style="color:' + (balance > 0 ? '#ef4444' : '#22c55e') + '">$' + balance + '</span></div>';
-      } else {
-        h += '<div class="receipt-div"></div>';
-        if (_aPct > 0) h += '<div class="receipt-row"><span class="receipt-label" style="color:#ef4444;font-weight:600">Anticipo requerido (' + _aPct + '%)</span><span class="receipt-value" style="color:#ef4444;font-weight:700">$' + anticipoMin + '</span></div>';
+        h += '<div class="conf-sec">';
+        h += '<div class="conf-sec-t">Pago</div>';
+        h += '<div class="conf-row"><span class="k">Anticipo recibido</span><span class="v" style="color:var(--green)">$' + _fmt(totalPaid) + '</span></div>';
+        h += '<div class="conf-row"><span class="k">Saldo pendiente</span><span class="v" style="color:' + (balance > 0.01 ? 'var(--red)' : 'var(--green)') + '">$' + _fmt(balance) + '</span></div>';
+        h += '</div>';
+      } else if (_aPct > 0) {
+        h += '<div class="conf-sec">';
+        h += '<div class="conf-sec-t">Pago</div>';
+        h += '<div class="conf-row"><span class="k" style="color:var(--yellow)">Anticipo requerido (' + _aPct + '%)</span><span class="v" style="color:var(--yellow)">$' + _fmt(anticipoMin) + '</span></div>';
+        h += '</div>';
       }
 
-      // Breakfast section
+      // Desayuno
       var _bfTicket = (S.desayunos || []).filter(function(d) { return d.reservaId === resId; });
       if (_bfTicket.length > 0) {
         var _bfPromoT = getBreakfastPromo();
-        h += '<div class="receipt-div"></div>';
-        h += '<div style="font-size:10px;font-weight:700;color:#2e7d32;margin-bottom:6px">🍳 DESAYUNO INCLUIDO</div>';
-        h += '<div style="font-size:9px;color:#555;margin-bottom:4px">' + (_bfPromoT.partner || '') + '</div>';
-        if (_bfPromoT.descripcion) h += '<div style="font-size:8px;color:#666;margin-bottom:6px;font-style:italic">' + _bfPromoT.descripcion + '</div>';
+        h += '<div class="conf-sec">';
+        h += '<div class="conf-sec-t">🍳 Desayuno incluido</div>';
+        if (_bfPromoT.partner) h += '<div style="font-size:11px;color:var(--text2);margin-bottom:6px;">' + _esc(_bfPromoT.partner) + '</div>';
         _bfTicket.forEach(function(bf) {
-          h += '<div class="receipt-row"><span class="receipt-label">' + formatDate(bf.fecha) + ' (' + bf.personas + ' pers.)</span><span class="receipt-value" style="font-family:Space Mono,monospace;color:#2e7d32;font-weight:700">' + bf.codigo + '</span></div>';
+          h += '<div class="conf-row"><span class="k">' + formatDate(bf.fecha) + ' (' + bf.personas + ' pers.)</span><span class="v" style="font-family:Space Mono,monospace;color:var(--green)">' + _esc(bf.codigo) + '</span></div>';
         });
-        var _bfValT = _bfTicket.reduce(function(s,d){return s+d.personas},0) * (_bfPromoT.precioPorPersona || 0);
-        if (_bfValT > 0) h += '<div style="font-size:8px;color:#2e7d32;text-align:right;margin-top:2px">Valor: <s>$' + _fmt(_bfValT) + '</s> → $0 Cortesía</div>';
       }
 
-      // Terms and conditions (dynamic from config)
+      // Términos
       var terms = getTerms();
-      h += '<div class="receipt-div"></div>';
-      h += '<div style="font-size:10px;font-weight:700;color:#333;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px">Términos y Condiciones</div>';
-      h += '<div style="font-size:9px;color:#555;line-height:1.6;text-align:justify">';
-      terms.forEach(function(term, i) {
-        var isLast = i === terms.length - 1;
-        h += '<div style="margin-bottom:' + (isLast ? '0' : '6') + 'px"><strong>' + (i + 1) + '. ' + term.title + ':</strong> ' + term.text + '</div>';
-      });
-      h += '</div>';
+      if (terms && terms.length) {
+        h += '<div class="conf-sec-t" style="margin-top:4px;">Términos y condiciones</div>';
+        h += '<div class="conf-terms">';
+        terms.forEach(function(term, i) {
+          h += '<div style="margin-bottom:' + (i === terms.length - 1 ? '0' : '6') + 'px"><b>' + (i + 1) + '. ' + _esc(term.title) + ':</b> ' + _esc(term.text) + '</div>';
+        });
+        h += '</div>';
+      }
 
-      h += '<div class="receipt-div"></div>';
-      h += '<div class="receipt-footer">' + hi.nombre + ' · Gracias por elegirnos</div>';
+      h += '<div class="conf-foot">' + _esc(hi.nombre) + ' · Gracias por elegirnos 🌿</div>';
+      h += '</div>'; // conf-body
 
-      // Action buttons
-      h += '<div class="receipt-btns">';
-      h += '<button onclick="closeReceipt()" style="background:#eee;border:1px solid #ddd;color:#333">✕</button>';
-      h += '<button onclick="printReceipt()" style="background:#111;border:none;color:#fff">🖨️ Imprimir</button>';
-      h += '</div>';
-      h += '<div class="receipt-btns" style="margin-top:8px">';
-      h += '<button onclick="generateReservaConfirmPDF(\'' + resId + '\',\'share\')" style="background:#25D366;border:none;color:#fff">📱 PDF WhatsApp</button>';
-      h += '<button onclick="generateReservaConfirmPDF(\'' + resId + '\',\'download\')" style="background:#8baa6a;border:none;color:#fff">📄 Descargar PDF</button>';
-      h += '</div>';
-      h += '<div class="receipt-btns" style="margin-top:8px">';
-      h += '<button onclick="shareReservaWhatsApp(\'' + resId + '\')" style="background:#333;border:1px solid #555;color:#fff">💬 Texto WhatsApp</button>';
-      h += '<button onclick="shareReservaEmail(\'' + resId + '\')" style="background:#4285f4;border:none;color:#fff">✉️ Email</button>';
+      // Botones
+      h += '<div class="conf-btns">';
+      h += '<button class="conf-btn" onclick="generateReservaConfirmPDF(\'' + resId + '\',\'download\')" style="background:var(--accent);color:var(--bg);">📄 Descargar PDF</button>';
+      h += '<button class="conf-btn" onclick="generateReservaConfirmPDF(\'' + resId + '\',\'share\')" style="background:rgba(37,211,102,.15);color:#25D366;border:1px solid #25D366;">📱 PDF WhatsApp</button>';
+      h += '<button class="conf-btn" onclick="shareReservaWhatsApp(\'' + resId + '\')" style="background:var(--surface3);color:var(--text);">💬 Texto WA</button>';
+      h += '<button class="conf-btn" onclick="shareReservaEmail(\'' + resId + '\')" style="background:var(--surface3);color:var(--text);">✉️ Email</button>';
+      h += '<button class="conf-btn" onclick="printReceipt()" style="background:var(--surface3);color:var(--text2);">🖨️ Imprimir</button>';
+      h += '<button class="conf-btn" onclick="closeReceipt()" style="background:var(--surface3);color:var(--text2);">✕ Cerrar</button>';
       h += '</div>';
 
       h += '</div></div>';
