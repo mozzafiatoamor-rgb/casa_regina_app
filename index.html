@@ -3413,7 +3413,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-10-19d';
+    var APP_BUILD = '2026-10-19e';
 
     // ===== Supabase (login seguro del personal) =====
     // La anon key es PÚBLICA por diseño (va en el cliente); la seguridad la dan RLS + login.
@@ -8443,16 +8443,42 @@
               <span class="res-group-count">${items.length}</span>
             </div>
             <div class="res-group-body ${isCollapsed ? 'collapsed' : ''}">
-              ${items.map(r => {
-                const borderColor = r.estado === 'Check-in' ? 'var(--blue)' :
-                                   r.estado === 'Confirmada' ? 'var(--green)' :
-                                   r.estado === 'Reservada' ? 'var(--yellow)' :
-                                   r.estado === 'Check-out' ? 'var(--text2)' : 'var(--red)';
-                return `
-                  <div class="reservation-item" onclick="openReservaModal('${r.id}')" style="border-left-color: ${borderColor}">
+              ${(() => {
+                const bodyBadgeBg = (est) => 'rgba(' + (est === 'Confirmada' ? '107,191,123' : est === 'Reservada' ? '196,168,77' : est === 'Check-in' ? '107,165,207' : est === 'Check-out' ? '138,154,136' : '207,107,107') + ', 0.2)';
+                const borderOf = (est) => est === 'Check-in' ? 'var(--blue)' : est === 'Confirmada' ? 'var(--green)' : est === 'Reservada' ? 'var(--yellow)' : est === 'Check-out' ? 'var(--text2)' : 'var(--red)';
+                const seenG = {};
+                let out = '';
+                items.forEach(r => {
+                  const gid = (typeof _resGroupId === 'function') ? _resGroupId(r) : '';
+                  if (gid) {
+                    if (seenG[gid]) return;
+                    seenG[gid] = true;
+                    // Reservas de este grupo dentro de este mismo estado
+                    const gm = items.filter(x => _resGroupId(x) === gid);
+                    const titular = (typeof _groupTitular === 'function') ? _groupTitular(gid) : (gm[0] ? gm[0].huesped : 'Grupo');
+                    const rooms = gm.map(x => x.habitacionNum).join(', ');
+                    const gTotal = gm.reduce((s, x) => s + (parseFloat(x.tarifaTotal) || 0), 0);
+                    const ocupantes = gm.map(x => 'Hab ' + x.habitacionNum + ': ' + x.huesped).join(' · ');
+                    out += `
+                  <div class="reservation-item" onclick="openGroupSummary('${gid}')" style="border-left-color: var(--accent); border-left-width:4px; background:linear-gradient(135deg,rgba(139,170,106,.10),rgba(139,170,106,.03));">
+                    <div class="res-header">
+                      <div class="res-guest">👥 ${titular}</div>
+                      <div class="status-badge" style="background:${bodyBadgeBg(r.estado)};">${r.estado}</div>
+                    </div>
+                    <div class="res-room">Grupo · ${gm.length} habitaciones (${rooms})</div>
+                    <div class="res-dates">${formatDate(gm[0].fechaEntrada)} → ${formatDate(gm[0].fechaSalida)}</div>
+                    <div style="font-size:11px;color:var(--text2);margin-top:4px;line-height:1.4;">${ocupantes}</div>
+                    <div class="res-footer">
+                      <div style="color:var(--accent);font-weight:600;">Ver grupo ›</div>
+                      <div class="res-tarifa">$${gTotal}</div>
+                    </div>
+                  </div>`;
+                  } else {
+                    out += `
+                  <div class="reservation-item" onclick="openReservaModal('${r.id}')" style="border-left-color: ${borderOf(r.estado)}">
                     <div class="res-header">
                       <div class="res-guest">${r.huesped}</div>
-                      <div class="status-badge" style="background: rgba(${r.estado === 'Confirmada' ? '107,191,123' : r.estado === 'Reservada' ? '196,168,77' : r.estado === 'Check-in' ? '107,165,207' : r.estado === 'Check-out' ? '138,154,136' : '207,107,107'}, 0.2);">${r.estado}</div>
+                      <div class="status-badge" style="background: ${bodyBadgeBg(r.estado)};">${r.estado}</div>
                     </div>
                     <div class="res-room">Habitación ${r.habitacionNum}</div>
                     <div class="res-dates">${formatDate(r.fechaEntrada)} → ${formatDate(r.fechaSalida)}</div>
@@ -8460,9 +8486,11 @@
                       <div>${r.adultos} adulto(s)</div>
                       <div class="res-tarifa">$${r.tarifaTotal}</div>
                     </div>
-                  </div>
-                `;
-              }).join('')}
+                  </div>`;
+                  }
+                });
+                return out;
+              })()}
             </div>
           </div>
         `;
@@ -11013,7 +11041,7 @@
         filtered.forEach(function(r){ var g=(typeof _resGroupId==='function')?_resGroupId(r):''; if(g && !_grpSeen[g]){ _grpSeen[g]=true; _grpIds.push(g); } });
         _grpIds.forEach(function(gid){
           var gt=_groupTotals(gid); if(!gt.count) return;
-          var rs=gt.reservas; var title=rs[0]?rs[0].huesped:'Grupo';
+          var rs=gt.reservas; var title=(typeof _groupTitular==='function')?_groupTitular(gid):(rs[0]?rs[0].huesped:'Grupo');
           var rooms=rs.map(function(x){return x.habitacionNum;}).join(', ');
           var gbal=gt.balance; var gsc=gbal<=0?'paid':(gt.paid>0?'partial':'unpaid');
           html+='<div class="cobro-card '+gsc+'" style="border-left:4px solid var(--accent);">';
@@ -15717,7 +15745,7 @@
 
     function getNotasWithoutIVA(notas) {
       if (!notas) return '';
-      return notas.replace(/\s*\|\s*\[IVA:\{.*?\}\]/, '').replace(/\[IVA:\{.*?\}\]/, '').replace(/\s*\|\s*\[FACT:[^\]]*\]/g, '').replace(/\[FACT:[^\]]*\]/g, '').replace(/\s*\|\s*\[GRUPO:[^\]]*\]/g, '').replace(/\[GRUPO:[^\]]*\]/g, '').replace(/\s*\|\s*\[OCUP:[^\]]*\]/g, '').replace(/\[OCUP:[^\]]*\]/g, '').trim();
+      return notas.replace(/\s*\|\s*\[IVA:\{.*?\}\]/, '').replace(/\[IVA:\{.*?\}\]/, '').replace(/\s*\|\s*\[FACT:[^\]]*\]/g, '').replace(/\[FACT:[^\]]*\]/g, '').replace(/\s*\|\s*\[GRUPO:[^\]]*\]/g, '').replace(/\[GRUPO:[^\]]*\]/g, '').replace(/\s*\|\s*\[TITULAR:[^\]]*\]/g, '').replace(/\[TITULAR:[^\]]*\]/g, '').replace(/\s*\|\s*\[OCUP:[^\]]*\]/g, '').replace(/\[OCUP:[^\]]*\]/g, '').trim();
     }
 
     // Bloqueo manual: habitación marcada "Ocupada" a mano (no por check-in).
@@ -21273,6 +21301,15 @@
       if (!groupId) return [];
       return (S.reservas || []).filter(function (r) { return _resGroupId(r) === groupId; });
     }
+    // Titular del grupo: etiqueta [TITULAR:...] en notas; si no existe, el huésped de la 1ª reserva.
+    function _resTitular(res) {
+      try { var m = String(res && res.notas || '').match(/\[TITULAR:([^\]]+)\]/); return m ? m[1].trim() : ''; } catch (e) { return ''; }
+    }
+    function _groupTitular(groupId) {
+      var rs = _groupReservas(groupId);
+      for (var i = 0; i < rs.length; i++) { var t = _resTitular(rs[i]); if (t) return t; }
+      return rs[0] ? rs[0].huesped : 'Grupo';
+    }
     function _resBalance(resId, tarifaTotal) {
       var paid = (S.cobros || []).filter(function (c) { return c.reservaId === resId; }).reduce(function (s, c) { return s + (parseFloat(c.monto) || 0); }, 0);
       paid = Math.round(paid * 100) / 100;
@@ -21326,7 +21363,7 @@
         groups.forEach(function (gid) {
           var t = _groupTotals(gid);
           var tt = _groupTaxTotals(gid);
-          var titular = t.reservas[0] ? t.reservas[0].huesped : 'Grupo';
+          var titular = _groupTitular(gid);
           var rooms = t.reservas.map(function (x) { return x.habitacionNum; }).join(', ');
           h += '<div onclick="openGroupSummary(\'' + gid + '\')" style="cursor:pointer;background:var(--surface2);border-left:4px solid var(--accent);border-radius:10px;padding:11px 12px;margin-bottom:8px;">';
           h += '<div style="display:flex;justify-content:space-between;align-items:center;">';
@@ -21614,30 +21651,36 @@
     function openGroupSummary(groupId) {
       var t = _groupTotals(groupId);
       if (!t.count) { toast('Grupo no encontrado', true); return; }
-      var titular = t.reservas[0] ? t.reservas[0].huesped : '';
+      var titular = _groupTitular(groupId);
       var h = '';
       h += '<div style="background:var(--surface3);padding:12px;border-radius:var(--radius);margin-bottom:12px;">';
       h += '<div style="font-size:12px;color:var(--text2);">GRUPO · ' + t.count + ' habitaciones</div>';
-      h += '<div style="font-weight:700;">' + _wbEsc(titular) + '</div>';
-      h += '<div style="font-size:12px;color:var(--text2);">' + formatDate(t.reservas[0].fechaEntrada) + ' → ' + formatDate(t.reservas[0].fechaSalida) + '</div>';
+      h += '<label style="font-size:10px;color:var(--text2);display:block;margin-top:6px;">Titular del grupo (para cobro y factura)</label>';
+      h += '<input id="grpTitularEdit" value="' + _wbEscC(titular) + '" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--surface3);border-radius:6px;padding:7px 9px;font-size:13px;font-weight:700;color:var(--text);margin-top:2px;">';
+      h += '<div style="font-size:12px;color:var(--text2);margin-top:6px;">' + formatDate(t.reservas[0].fechaEntrada) + ' → ' + formatDate(t.reservas[0].fechaSalida) + '</div>';
       h += '</div>';
+      h += '<div style="font-size:11px;color:var(--text2);margin-bottom:6px;">✏️ Escribe el nombre del huésped que se queda en cada cuarto y toca <b>Guardar nombres</b>.</div>';
       t.reservas.forEach(function (r) {
         var b = _resBalance(r.id, r.tarifaTotal);
         var v = (typeof parseIVAData === 'function') ? parseIVAData(r.notas) : null;
         h += '<div style="padding:9px 10px;background:var(--surface2);border-radius:8px;margin-bottom:6px;">';
-        h += '<div style="display:flex;justify-content:space-between;align-items:center;">';
-        h += '<div style="flex:1;min-width:0;cursor:pointer;" onclick="closeModal();openReservaModal(\'' + r.id + '\')"><div style="font-size:13px;font-weight:600;">Hab. ' + r.habitacionNum + ' · ' + _wbEsc(r.huesped) + (v ? ' <span style="font-size:9px;background:#e8f5e9;color:#2e7d32;padding:1px 5px;border-radius:4px;">🧾</span>' : '') + '</div><div style="font-size:11px;color:var(--text2);">' + r.estado + ' · Total $' + _fmt(r.tarifaTotal) + '</div></div>';
+        h += '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">';
+        h += '<div style="flex:1;min-width:0;"><div style="font-size:12px;font-weight:700;color:var(--accent);">🛏️ Hab. ' + r.habitacionNum + (v ? ' <span style="font-size:9px;background:#e8f5e9;color:#2e7d32;padding:1px 5px;border-radius:4px;">🧾</span>' : '') + '</div><input id="grpGuest_' + r.id + '" value="' + _wbEscC(r.huesped) + '" placeholder="Huésped de este cuarto" style="width:100%;box-sizing:border-box;background:var(--surface3);border:1px solid var(--surface3);border-radius:6px;padding:6px 8px;font-size:13px;color:var(--text);margin-top:4px;"><div style="font-size:11px;color:var(--text2);margin-top:3px;">' + r.estado + ' · Total $' + _fmt(r.tarifaTotal) + '</div></div>';
         h += '<div style="text-align:right;font-size:12px;"><div style="color:var(--green);">Pagado $' + _fmt(b.paid) + '</div><div style="color:' + (b.balance > 0 ? 'var(--red)' : 'var(--green)') + ';font-weight:700;">Saldo $' + _fmt(b.balance) + '</div></div>';
         h += '</div>';
+        h += '<div style="display:flex;gap:6px;margin-top:8px;">';
+        h += '<button onclick="closeModal();openReservaModal(\'' + r.id + '\')" style="flex:1;background:var(--surface3);border:1px solid var(--surface3);color:var(--text2);border-radius:8px;padding:7px;font-size:11px;font-weight:700;cursor:pointer;">🔎 Ver reserva</button>';
         if (b.balance > 0.01) {
-          h += '<button onclick="closeModal();openPaymentModal(\'' + r.id + '\')" style="width:100%;margin-top:8px;background:var(--surface3);border:1px solid var(--accent);color:var(--accent);border-radius:8px;padding:7px;font-size:11px;font-weight:700;cursor:pointer;">💵 Cobrar solo esta habitación ($' + _fmt(b.balance) + ')</button>';
+          h += '<button onclick="closeModal();openPaymentModal(\'' + r.id + '\')" style="flex:1;background:var(--surface3);border:1px solid var(--accent);color:var(--accent);border-radius:8px;padding:7px;font-size:11px;font-weight:700;cursor:pointer;">💵 Cobrar este cuarto</button>';
         }
+        h += '</div>';
         if (v) {
           var _ish = v.ish || 0;
           h += '<div style="font-size:10px;color:var(--text2);margin-top:4px;border-top:1px dashed var(--surface3);padding-top:4px;">Sub $' + _fmt(v.subtotal) + ' · ISH $' + _fmt(_ish) + ' · IVA $' + _fmt(v.iva) + (v.rfc ? ' · RFC ' + _wbEsc(v.rfc) : '') + '</div>';
         }
         h += '</div>';
       });
+      h += '<button class="form-button" onclick="saveGroupGuestNames(\'' + groupId + '\')" style="width:100%;margin-top:4px;background:var(--accent);color:var(--bg);">💾 Guardar nombres</button>';
       // Desglose combinado del grupo (si hay facturas)
       var _gtt = _groupTaxTotals(groupId);
       if (_gtt.hasFactura) {
@@ -21657,6 +21700,49 @@
       acts += '<button class="form-button secondary" onclick="cancelGroup(\'' + groupId + '\')" style="width:100%;border-color:var(--red);color:var(--red);">❌ Cancelar grupo</button>';
       document.getElementById('taskDetailActions').innerHTML = acts;
       openModal('taskDetailModal');
+    }
+
+    // Inserta/actualiza la etiqueta [TITULAR:...] en las notas (justo tras [GRUPO:...] si existe).
+    function _setTitularTag(notas, titular) {
+      var n = String(notas || '').replace(/\s*\|\s*\[TITULAR:[^\]]*\]/g, '').replace(/\[TITULAR:[^\]]*\]\s*/g, '').trim();
+      if (!titular) return n;
+      var tag = '[TITULAR:' + titular + ']';
+      var gm = n.match(/^(\[GRUPO:[^\]]+\])\s*/);
+      if (gm) { return gm[1] + ' ' + tag + (n.slice(gm[0].length) ? ' ' + n.slice(gm[0].length) : ''); }
+      return tag + (n ? ' ' + n : '');
+    }
+
+    async function saveGroupGuestNames(groupId) {
+      var rs = _groupReservas(groupId);
+      if (!rs.length) { toast('Grupo no encontrado', true); return; }
+      var titEl = document.getElementById('grpTitularEdit');
+      var titular = titEl ? titEl.value.trim() : _groupTitular(groupId);
+      if (!titular) titular = _groupTitular(groupId);
+      var ops = [], changes = [];
+      rs.forEach(function (r) {
+        var inp = document.getElementById('grpGuest_' + r.id);
+        var nuevo = inp ? inp.value.trim() : r.huesped;
+        if (!nuevo) nuevo = r.huesped;
+        var newNotas = _setTitularTag(r.notas, titular);
+        if (nuevo === r.huesped && newNotas === String(r.notas || '')) return; // sin cambios
+        var merged = Object.assign({}, r, { huesped: nuevo, notas: newNotas });
+        ops.push({ type: 'updateById', sheet: '📋 Reservas', id: r.id, values: _reservaRow(merged) });
+        changes.push({ id: r.id, huesped: nuevo, notas: newNotas });
+      });
+      if (!ops.length) { toast('No hay cambios que guardar'); return; }
+      var n = now(), fecha = normDate(new Date()), hora = n.split(' ')[1];
+      ops.push({ type: 'append', sheet: '📜 Bitácora', values: [fecha, hora, (S.user && S.user.usuario) || '', 'Nombres de grupo', titular + ' · ' + changes.length + ' cuarto(s) (' + groupId + ')', 'info'] });
+      await busy(async function () {
+        await sheets.multi(ops);
+        changes.forEach(function (ch) {
+          var i = S.reservas.findIndex(function (x) { return x.id === ch.id; });
+          if (i !== -1) { S.reservas[i].huesped = ch.huesped; S.reservas[i].notas = ch.notas; }
+        });
+        toast('✅ Nombres guardados');
+        closeModal();
+        render();
+        setTimeout(function () { openGroupSummary(groupId); }, 250);
+      }, 'Guardando nombres…');
     }
 
     function cancelGroup(groupId) {
