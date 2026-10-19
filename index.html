@@ -2763,6 +2763,16 @@
   </div>
 
   <!-- Payment Modal -->
+  <div class="modal" id="cotReservaModal">
+    <div class="modal-header">
+      <div class="modal-title">Revisar y reservar</div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="cotReservaBody"></div>
+    </div>
+  </div>
+
   <div class="modal" id="paymentModal">
     <div class="modal-header">
       <div class="modal-title">Registrar Pago</div>
@@ -3403,7 +3413,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-10-19a';
+    var APP_BUILD = '2026-10-19b';
 
     // ===== Supabase (login seguro del personal) =====
     // La anon key es PÚBLICA por diseño (va en el cliente); la seguridad la dan RLS + login.
@@ -9938,6 +9948,140 @@
       }, 'Creando reservas...');
     }
 
+    // ====== REVISIÓN de cotización antes de crear las reservas (respeta impuestos y personas extra) ======
+    var _cotRev = null;
+    function _cotAvailRooms(tipo, ci, co, excludeNums) {
+      return (S.rooms || []).filter(function (r) {
+        if (r.tipo !== tipo || r.estado === 'Mantenimiento') return false;
+        if (excludeNums && excludeNums.indexOf(r.numero) >= 0) return false;
+        return !(S.reservas || []).some(function (res) {
+          if (res.habitacionNum !== r.numero) return false;
+          if (res.estado === 'Cancelada' || res.estado === 'Check-out' || res.estado === 'Completada') return false;
+          return !(co <= res.fechaEntrada || ci >= res.fechaSalida);
+        });
+      });
+    }
+    function openReservarCotizacionReview(cotId) {
+      var cot = (S.cotizaciones || []).find(function (c) { return c.id === cotId; });
+      if (!cot) { toast('Cotización no encontrada', true); return; }
+      var nights = Math.max(daysUntil(cot.checkin, cot.checkout), 1);
+      var peRate = getHotelInfo().persona_extra || 0;
+      var chosen = [], rows = [];
+      (cot.habitaciones || []).forEach(function (h) {
+        var cant = parseInt(h.cantidad) || 1;
+        for (var k = 0; k < cant; k++) {
+          var pre = (h.numero != null ? String(h.numero) : '').trim();
+          var av = _cotAvailRooms(h.tipo, cot.checkin, cot.checkout, chosen);
+          var roomNum = pre || (av[0] ? av[0].numero : '');
+          if (roomNum) chosen.push(roomNum);
+          rows.push({ tipo: h.tipo, tarifa: Number(h.tarifa) || 0, personasExtra: parseInt(h.personasExtra) || 0, huespedesPorHab: parseInt(h.huespedesPorHab) || 2, roomNum: roomNum });
+        }
+      });
+      _cotRev = { cotId: cotId, cot: cot, nights: nights, peRate: peRate, rows: rows, conIVA: (Number(cot.iva) || 0) > 0 };
+      _renderCotRev();
+      openModal('cotReservaModal');
+    }
+    function _renderCotRev() {
+      var S0 = _cotRev; if (!S0) return;
+      var cot = S0.cot, h = '';
+      h += '<div style="background:var(--surface3);padding:10px 12px;border-radius:var(--radius);margin-bottom:12px;">';
+      h += '<div style="font-weight:700;">' + _wbEscC(cot.nombre || 'Sin nombre') + '</div>';
+      h += '<div style="font-size:12px;color:var(--text2);">' + formatDate(cot.checkin) + ' → ' + formatDate(cot.checkout) + ' · ' + S0.nights + ' noche(s) · ' + S0.rows.length + ' habitación(es)</div>';
+      h += '</div>';
+      h += '<div style="font-size:12px;color:var(--text2);margin-bottom:8px;">Revisa cada habitación (puedes cambiar la asignada, la tarifa o las personas extra). Al confirmar se crean todas, ligadas como grupo.</div>';
+      S0.rows.forEach(function (rw, idx) {
+        var excl = S0.rows.filter(function (x, i) { return i !== idx; }).map(function (x) { return x.roomNum; });
+        var av = _cotAvailRooms(rw.tipo, cot.checkin, cot.checkout, excl);
+        var opts = '', has = false;
+        av.forEach(function (r) { opts += '<option value="' + r.numero + '"' + (r.numero === rw.roomNum ? ' selected' : '') + '>Hab. ' + r.numero + '</option>'; if (r.numero === rw.roomNum) has = true; });
+        if (rw.roomNum && !has) opts = '<option value="' + rw.roomNum + '" selected>Hab. ' + rw.roomNum + '</option>' + opts;
+        if (!rw.roomNum) opts = '<option value="">⚠️ Sin disponibles</option>' + opts;
+        var rt = (rw.tarifa + rw.personasExtra * S0.peRate) * S0.nights;
+        h += '<div style="border:1px solid var(--surface3);border-radius:var(--radius);padding:10px;margin-bottom:8px;">';
+        h += '<div style="font-weight:700;font-size:13px;margin-bottom:6px;">' + _wbEscC(rw.tipo) + '</div>';
+        h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">';
+        h += '<div><label style="font-size:10px;color:var(--text2);">Habitación</label><select class="form-input" style="padding:8px;font-size:13px;" onchange="_cotRevSet(' + idx + ',\'roomNum\',this.value)">' + opts + '</select></div>';
+        h += '<div><label style="font-size:10px;color:var(--text2);">Tarifa/noche</label><input type="number" class="form-input" style="padding:8px;font-size:13px;" value="' + rw.tarifa + '" min="0" onchange="_cotRevSet(' + idx + ',\'tarifa\',this.value)" /></div>';
+        h += '<div><label style="font-size:10px;color:var(--text2);">Personas extra</label><input type="number" class="form-input" style="padding:8px;font-size:13px;" value="' + rw.personasExtra + '" min="0" onchange="_cotRevSet(' + idx + ',\'personasExtra\',this.value)" /></div>';
+        h += '<div><label style="font-size:10px;color:var(--text2);">Subtotal</label><div style="padding:8px;font-weight:700;font-family:Space Mono,monospace;color:var(--accent);">$' + _fmt(rt) + '</div></div>';
+        h += '</div></div>';
+      });
+      h += '<label style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--surface2);border-radius:var(--radius);margin-bottom:10px;cursor:pointer;">';
+      h += '<input type="checkbox" id="cotRevFactura" ' + (S0.conIVA ? 'checked' : '') + ' onchange="_cotRevSet(-1,\'conIVA\',this.checked)" style="accent-color:var(--accent);width:18px;height:18px;" />';
+      h += '<span style="font-size:13px;">Con factura (agrega IVA 16% + ISH 5%)</span></label>';
+      h += '<div id="cotRevTotals"></div>';
+      h += '<div style="display:flex;gap:8px;margin-top:12px;">';
+      h += '<button class="form-button secondary" onclick="closeModal()" style="flex:1;">Cancelar</button>';
+      h += '<button class="form-button" onclick="_confirmCotReserva()" style="flex:2;background:var(--green);color:#fff;">✅ Confirmar y crear</button>';
+      h += '</div>';
+      document.getElementById('cotReservaBody').innerHTML = h;
+      _cotRevTotals();
+    }
+    function _cotRevSet(idx, key, val) {
+      if (!_cotRev) return;
+      if (idx === -1) { _cotRev[key] = val; }
+      else { var rw = _cotRev.rows[idx]; if (!rw) return; if (key === 'tarifa') rw.tarifa = parseFloat(val) || 0; else if (key === 'personasExtra') rw.personasExtra = parseInt(val) || 0; else rw.roomNum = val; }
+      _renderCotRev();
+    }
+    function _cotRevTotals() {
+      var S0 = _cotRev; if (!S0) return;
+      var subtotal = S0.rows.reduce(function (s, rw) { return s + (rw.tarifa + rw.personasExtra * S0.peRate) * S0.nights; }, 0);
+      var tb = _taxBreak(subtotal, !!S0.conIVA);
+      var total = subtotal + tb.iva + tb.ish;
+      var h = '<div style="background:var(--surface3);border-radius:var(--radius);padding:12px;">';
+      h += '<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;"><span>Subtotal</span><span>$' + _fmt(subtotal) + '</span></div>';
+      if (S0.conIVA) {
+        h += '<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text2);"><span>IVA (16%)</span><span>$' + _fmt(tb.iva) + '</span></div>';
+        h += '<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text2);margin-bottom:4px;"><span>ISH (5%)</span><span>$' + _fmt(tb.ish) + '</span></div>';
+      }
+      h += '<div style="display:flex;justify-content:space-between;font-size:16px;font-weight:800;color:var(--accent);border-top:1px solid var(--surface2);padding-top:6px;margin-top:4px;"><span>Total</span><span>$' + _fmt(total) + '</span></div>';
+      h += '<div style="font-size:10px;color:var(--text2);text-align:right;margin-top:4px;">Total de la cotización: $' + _fmt(S0.cot.total || 0) + '</div>';
+      h += '</div>';
+      var el = document.getElementById('cotRevTotals'); if (el) el.innerHTML = h;
+    }
+    async function _confirmCotReserva() {
+      var S0 = _cotRev; if (!S0) return;
+      var cot = S0.cot, nights = S0.nights, peRate = S0.peRate, conIVA = !!S0.conIVA;
+      var nums = S0.rows.map(function (r) { return r.roomNum; });
+      if (nums.some(function (n) { return !n; })) { toast('Asigna una habitación a cada renglón', true); return; }
+      var seen = {}; for (var i = 0; i < nums.length; i++) { if (seen[nums[i]]) { toast('La habitación ' + nums[i] + ' está repetida', true); return; } seen[nums[i]] = 1; }
+      if (window._resBusy) return; window._resBusy = true;
+      try {
+        await busy(async function () {
+          var ops = [], createdIds = [], n = now(), fecha = normDate(new Date()), hora = n.split(' ')[1];
+          var grpId = (S0.rows.length > 1) ? ('G' + Date.now().toString(36).toUpperCase()) : '';
+          S0.rows.forEach(function (rw) {
+            var tarifaDiaria = rw.tarifa + rw.personasExtra * peRate;
+            var sub = tarifaDiaria * nights;
+            var tb = _taxBreak(sub, conIVA);
+            var total = sub + tb.iva + tb.ish;
+            var resId = nextId('R', S.reservas.concat(createdIds.map(function (id) { return { id: id }; })));
+            var notas = (grpId ? '[GRUPO:' + grpId + '] ' : '') + 'Cotización ' + (cot.numero || '');
+            if (rw.personasExtra > 0) notas += ' | ' + rw.personasExtra + ' pers. extra';
+            if (conIVA) {
+              var _hi = getHotelInfo();
+              var ivaData = JSON.stringify({ factura: true, folio: nextFacturaFolio(), hotel: _hi.nombre, rfc: '', razonSocial: '', subtotal: sub, iva: tb.iva, ish: tb.ish });
+              notas += ' | [IVA:' + ivaData + ']';
+            }
+            var _ad = rw.huespedesPorHab || cot.adultos || 1;
+            var row = [resId, rw.roomNum, cot.nombre, cot.telefono || '', cot.email || '', cot.checkin, cot.checkout, _ad, cot.ninos || 0, tarifaDiaria, total, 'Reservada', notas, S.user.usuario, n];
+            ops.push({ type: 'append', sheet: '📋 Reservas', values: row });
+            S.reservas.push({ id: resId, habitacionNum: rw.roomNum, huesped: cot.nombre, telefono: cot.telefono || '', email: cot.email || '', fechaEntrada: cot.checkin, fechaSalida: cot.checkout, adultos: _ad, 'niños': cot.ninos || 0, tarifa: tarifaDiaria, tarifaTotal: total, estado: 'Reservada', notas: notas, creadoPor: S.user.usuario, fechaCreacion: n });
+            createdIds.push(resId);
+          });
+          var cotRow = [cot.id, cot.numero, cot.fecha, cot.nombre, cot.telefono, cot.email, cot.checkin, cot.checkout, cot.adultos, cot.ninos, JSON.stringify(cot.habitaciones), JSON.stringify(cot.opciones || {}), cot.subtotal, cot.iva, cot.total, 'Reservada'];
+          ops.push({ type: 'updateById', sheet: '📝 Cotizaciones', id: cot.id, values: cotRow });
+          ops.push({ type: 'append', sheet: '📜 Bitácora', values: [fecha, hora, S.user.usuario, 'Cotización → Reservas', (cot.numero || '') + ' → ' + createdIds.join(', '), 'info'] });
+          await sheets.multi(ops);
+          cot.estado = 'Reservada';
+          _cotRev = null;
+          closeModal();
+          try { render(); } catch (e) {}
+          toast(createdIds.length + ' reserva(s) creada(s) ✅');
+        }, 'Creando reservas...');
+      } finally { window._resBusy = false; }
+    }
+
     // Abre el formulario de Nueva Reserva PRE-LLENADO con los datos de la cotización
     function reservarDesdeCotizacion(cotId) {
       var cot = (S.cotizaciones || []).find(function (c) { return c.id === cotId; });
@@ -9945,8 +10089,8 @@
       var rooms = cot.habitaciones || [];
       var first = rooms[0] || {};
       var totalHabs = rooms.reduce(function (s, r) { return s + (r.cantidad || 1); }, 0);
-      // Si la cotización tiene varias habitaciones, crear TODAS (una por habitación, precio correcto, ligadas en grupo)
-      if (totalHabs > 1) { return materializarCotizacion(cotId); }
+      // Si la cotización tiene varias habitaciones, abrir la revisión (ajustar y confirmar antes de crear)
+      if (totalHabs > 1) { return openReservarCotizacionReview(cotId); }
       var preRoom = (first.numero != null ? String(first.numero) : '').trim() || null;
       openNewReservaModal(preRoom, cot.checkin);
       // Fechas reales de la cotización
