@@ -2591,11 +2591,11 @@
         <div class="form-row">
           <div class="form-group">
             <label class="form-label">Check-in</label>
-            <input type="date" id="newResCheckIn" class="form-input" required />
+            <input type="date" id="newResCheckIn" class="form-input" onchange="updateRoomSelect()" required />
           </div>
           <div class="form-group">
             <label class="form-label">Check-out</label>
-            <input type="date" id="newResCheckOut" class="form-input" required />
+            <input type="date" id="newResCheckOut" class="form-input" onchange="updateRoomSelect()" required />
           </div>
         </div>
         <div class="form-row">
@@ -3460,7 +3460,70 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-10-20a';
+    var APP_BUILD = '2026-10-20b';
+
+    // ===== Selectores de fecha entrada→salida: la salida siempre mínimo el día siguiente =====
+    function _nextDayStr(ymd) {
+      try {
+        var p = String(ymd).split('-');
+        var d = new Date(parseInt(p[0], 10), parseInt(p[1], 10) - 1, parseInt(p[2], 10));
+        d.setDate(d.getDate() + 1);
+        var mm = ('0' + (d.getMonth() + 1)).slice(-2), dd = ('0' + d.getDate()).slice(-2);
+        return d.getFullYear() + '-' + mm + '-' + dd;
+      } catch (e) { return ymd; }
+    }
+    // Pares entrada → salida en toda la app (NO incluye rangos de reportes/historial/promoción).
+    var _DATE_PAIRS = {
+      'dashAvailIn': 'dashAvailOut',
+      'newResCheckIn': 'newResCheckOut',
+      'b_checkin': 'b_checkout',
+      'cotCheckin': 'cotCheckout',
+      'grp_checkin': 'grp_checkout'
+    };
+    (function _initDatePairGuards() {
+      if (typeof document === 'undefined') return;
+      // Al cambiar la ENTRADA: fija el mínimo de salida (día siguiente) y la corre si quedó inválida.
+      document.addEventListener('change', function (e) {
+        var t = e.target;
+        if (!t || !t.id || t.type !== 'date' || t.getAttribute('data-nodatepair') === '1') return;
+        // Entrada cambiada
+        if (_DATE_PAIRS[t.id]) {
+          var out = document.getElementById(_DATE_PAIRS[t.id]);
+          if (out && t.value) {
+            var nd = _nextDayStr(t.value);
+            out.min = nd;
+            if (!out.value || out.value <= t.value) {
+              out.value = nd;
+              out.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+          }
+          return;
+        }
+        // Salida cambiada a algo inválido (≤ entrada) → corregir al día siguiente
+        for (var ci in _DATE_PAIRS) {
+          if (_DATE_PAIRS[ci] === t.id) {
+            var inp = document.getElementById(ci);
+            if (inp && inp.value && t.value && t.value <= inp.value) {
+              t.value = _nextDayStr(inp.value);
+              t.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+            break;
+          }
+        }
+      });
+      // Al enfocar la SALIDA: fija su mínimo según la entrada actual (por si la tocan primero).
+      document.addEventListener('focusin', function (e) {
+        var t = e.target;
+        if (!t || !t.id || t.type !== 'date') return;
+        for (var ci in _DATE_PAIRS) {
+          if (_DATE_PAIRS[ci] === t.id) {
+            var inp = document.getElementById(ci);
+            if (inp && inp.value) t.min = _nextDayStr(inp.value);
+            break;
+          }
+        }
+      });
+    })();
 
     // ===== Supabase (login seguro del personal) =====
     // La anon key es PÚBLICA por diseño (va en el cliente); la seguridad la dan RLS + login.
