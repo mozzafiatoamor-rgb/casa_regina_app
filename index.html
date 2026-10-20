@@ -3460,7 +3460,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-10-19j';
+    var APP_BUILD = '2026-10-20a';
 
     // ===== Supabase (login seguro del personal) =====
     // La anon key es PÚBLICA por diseño (va en el cliente); la seguridad la dan RLS + login.
@@ -12193,58 +12193,68 @@
       var nights=daysUntil(res.fechaEntrada,res.fechaSalida);
       var methodIcons={'Efectivo':'💵','Tarjeta':'💳','Transferencia':'🏦','Depósito':'📥'};
 
-      var h='<div class="receipt-overlay" id="receiptOverlay" onclick="if(event.target===this)closeReceipt()">';
-      h+='<div class="receipt-box">';
       var hi=getHotelInfo();
-      h+='<div class="receipt-header"><img src="'+LOGO_V_DARK+'" style="width:120px;object-fit:contain;margin-bottom:8px" alt="Logo"><div class="receipt-sub">Recibo de hospedaje</div></div>';
-      h+='<div class="receipt-div"></div>';
-      h+='<div class="receipt-row"><span class="receipt-label">Huésped</span><span class="receipt-value">'+res.huesped+'</span></div>';
-      h+='<div class="receipt-row"><span class="receipt-label">Habitación</span><span class="receipt-value">'+res.habitacionNum+' ('+(room?room.tipo:'')+')</span></div>';
-      h+='<div class="receipt-row"><span class="receipt-label">Entrada</span><span class="receipt-value">'+formatDate(res.fechaEntrada)+'</span></div>';
-      h+='<div class="receipt-row"><span class="receipt-label">Salida</span><span class="receipt-value">'+formatDate(res.fechaSalida)+'</span></div>';
-      h+='<div class="receipt-row"><span class="receipt-label">Noches</span><span class="receipt-value">'+nights+'</span></div>';
-      h+='<div class="receipt-row"><span class="receipt-label">Tarifa/noche</span><span class="receipt-value">$'+res.tarifa+'</span></div>';
-      h+='<div class="receipt-div"></div>';
       var _ivaRec = parseIVAData(res.notas);
+      var _esc = (typeof _wbEsc === 'function') ? _wbEsc : function(s){ return String(s==null?'':s); };
+      var sc = balance<=0.01 ? { bg:'rgba(107,191,123,.18)', c:'var(--green)', t:'✅ Pagado' } : (totalPaid>0 ? { bg:'rgba(196,168,77,.18)', c:'var(--yellow)', t:'⚠️ Saldo pendiente' } : { bg:'rgba(207,107,107,.18)', c:'var(--red)', t:'❌ Sin pago' });
+
+      var h='<div class="receipt-overlay" id="receiptOverlay" onclick="if(event.target===this)closeReceipt()">';
+      h+='<div class="conf-box">';
+      // Header
+      h+='<div class="conf-hdr"><img src="'+LOGO_V_LIGHT+'" alt="Logo"><div class="conf-title">Recibo de hospedaje</div>';
+      h+='<div class="conf-chip" style="background:'+sc.bg+';color:'+sc.c+';">'+sc.t+'</div></div>';
+      h+='<div class="conf-body">';
+      // Huésped
+      h+='<div class="conf-guest">'+_esc(res.huesped)+(_ivaRec?' <span style="font-size:11px;background:rgba(107,191,123,.18);color:var(--green);padding:2px 7px;border-radius:6px;vertical-align:middle;">🧾 Factura</span>':'')+'</div>';
+      h+='<div class="conf-guest-sub">No. '+_esc(res.id)+'</div>';
+      // Estancia
+      h+='<div class="conf-stay">';
+      h+='<div class="dt"><div class="d">'+formatDate(res.fechaEntrada)+'</div><div class="l">Entrada</div></div>';
+      h+='<div class="arrow">→</div>';
+      h+='<div class="dt"><div class="d">'+formatDate(res.fechaSalida)+'</div><div class="l">Salida</div></div>';
+      h+='<div class="nts">'+nights+' noche'+(nights!==1?'s':'')+'</div>';
+      h+='</div>';
+      // Hospedaje
+      h+='<div class="conf-sec"><div class="conf-sec-t">Habitación</div>';
+      h+='<div class="conf-row"><span class="k">🛏 Habitación</span><span class="v">'+_esc(res.habitacionNum)+(room?' · '+_esc(room.tipo):'')+'</span></div>';
+      h+='<div class="conf-row"><span class="k">Tarifa por noche</span><span class="v">$'+_fmt(res.tarifa)+'</span></div>';
+      h+='</div>';
+      // Importe / impuestos
+      h+='<div class="conf-sec"><div class="conf-sec-t">Importe</div>';
       if (_ivaRec) {
         var _ishRec = _ivaRec.ish || 0;
-        h+='<div class="receipt-row"><span class="receipt-label">Subtotal hospedaje</span><span class="receipt-value">$'+_ivaRec.subtotal.toLocaleString('es-MX')+'</span></div>';
-        h+='<div class="receipt-row"><span class="receipt-label">IVA (16%)</span><span class="receipt-value">$'+_ivaRec.iva.toLocaleString('es-MX',{minimumFractionDigits:2})+'</span></div>';
-        h+='<div class="receipt-row"><span class="receipt-label">ISH (5%)</span><span class="receipt-value">$'+_ishRec.toLocaleString('es-MX',{minimumFractionDigits:2})+'</span></div>';
-        h+='<div class="receipt-row"><span class="receipt-label" style="font-weight:700">Total c/impuestos</span><span class="receipt-value" style="font-weight:700">$'+res.tarifaTotal.toLocaleString('es-MX',{minimumFractionDigits:2})+'</span></div>';
-        h+='<div class="receipt-div"></div>';
-        if(_ivaRec.folio) h+='<div class="receipt-row"><span class="receipt-label">Folio Factura</span><span class="receipt-value" style="font-weight:700">'+_ivaRec.folio+'</span></div>';
-        h+='<div class="receipt-row"><span class="receipt-label">RFC</span><span class="receipt-value">'+_ivaRec.rfc+'</span></div>';
-        if(_ivaRec.razonSocial) h+='<div class="receipt-row"><span class="receipt-label">Razón Social</span><span class="receipt-value" style="font-size:10px;max-width:160px;text-align:right">'+_ivaRec.razonSocial+'</span></div>';
-      } else {
-        h+='<div class="receipt-row"><span class="receipt-label">Total hospedaje</span><span class="receipt-value">$'+res.tarifaTotal+'</span></div>';
+        h+='<div class="conf-row"><span class="k">Subtotal hospedaje</span><span class="v">$'+_fmt(_ivaRec.subtotal)+'</span></div>';
+        h+='<div class="conf-row"><span class="k">IVA (16%)</span><span class="v">$'+_fmt(_ivaRec.iva)+'</span></div>';
+        h+='<div class="conf-row"><span class="k">ISH (5%)</span><span class="v">$'+_fmt(_ishRec)+'</span></div>';
+        if(_ivaRec.folio) h+='<div class="conf-row"><span class="k">Folio factura</span><span class="v">'+_esc(_ivaRec.folio)+'</span></div>';
+        if(_ivaRec.rfc) h+='<div class="conf-row"><span class="k">RFC</span><span class="v">'+_esc(_ivaRec.rfc)+'</span></div>';
+        if(_ivaRec.razonSocial) h+='<div class="conf-row"><span class="k">Razón social</span><span class="v" style="font-weight:500;font-size:12px;">'+_esc(_ivaRec.razonSocial)+'</span></div>';
       }
-
+      h+='<div class="conf-row"><span class="k" style="font-weight:700;color:var(--text)">Total'+(_ivaRec?' c/impuestos':' hospedaje')+'</span><span class="v">$'+_fmt(res.tarifaTotal)+'</span></div>';
+      h+='</div>';
+      // Pagos
       if(payments.length>0){
-        h+='<div class="receipt-div"></div>';
-        h+='<div style="font-size:11px;font-weight:700;color:#666;margin-bottom:6px;text-transform:uppercase">Pagos recibidos</div>';
+        var methodIc={'Efectivo':'💵','Tarjeta':'💳','Transferencia':'🏦','Depósito':'📥','Reembolso':'↩️'};
+        h+='<div class="conf-sec"><div class="conf-sec-t">Pagos recibidos</div>';
         payments.forEach(function(p){
-          var icon=methodIcons[p.metodoPago]||'💰';
-          h+='<div class="receipt-row"><span class="receipt-label">'+icon+' '+p.metodoPago+' ('+p.concepto+')<br><span style="font-size:10px">'+p.fecha+' '+p.hora+'</span></span><span class="receipt-value">$'+p.monto+'</span></div>';
+          var icon=methodIc[p.metodoPago]||'💰';
+          h+='<div class="conf-row"><span class="k">'+icon+' '+_esc(p.metodoPago)+' · '+_esc(p.concepto||'')+'<br><span style="font-size:10px;opacity:.7">'+_esc(p.fecha)+' '+_esc(p.hora||'')+'</span></span><span class="v" style="color:var(--green)">$'+_fmt(p.monto)+'</span></div>';
         });
+        h+='</div>';
       }
-
-      h+='<div class="receipt-div"></div>';
-      h+='<div class="receipt-row"><span class="receipt-label">Total pagado</span><span class="receipt-value" style="color:#22c55e">$'+totalPaid+'</span></div>';
-      if(balance>0) h+='<div class="receipt-row"><span class="receipt-label">Saldo pendiente</span><span class="receipt-value" style="color:#ef4444">$'+balance+'</span></div>';
-      h+='<div class="receipt-total"><div style="font-size:11px;color:#666">TOTAL PAGADO</div><div class="receipt-total-val">$'+totalPaid+'</div></div>';
-      h+='<div class="receipt-footer">'+hi.nombre+' · Gracias por su preferencia</div>';
-      h+='<div class="receipt-btns">';
-      h+='<button onclick="closeReceipt()" style="background:#eee;border:1px solid #ddd;color:#333">✕</button>';
-      h+='<button onclick="printReceipt()" style="background:#111;border:none;color:#fff">🖨️ Imprimir</button>';
-      h+='</div>';
-      h+='<div class="receipt-btns" style="margin-top:8px">';
-      h+='<button onclick="generateReceiptPDF(\'' + resId + '\',\'share\')" style="background:#25D366;border:none;color:#fff">📱 PDF WhatsApp</button>';
-      h+='<button onclick="generateReceiptPDF(\'' + resId + '\',\'download\')" style="background:#8baa6a;border:none;color:#fff">📄 Descargar PDF</button>';
-      h+='</div>';
-      h+='<div class="receipt-btns" style="margin-top:8px">';
-      h+='<button onclick="shareReceiptWhatsApp(\'' + resId + '\')" style="background:#333;border:1px solid #555;color:#fff">💬 Texto WhatsApp</button>';
-      h+='<button onclick="shareReceiptEmail(\'' + resId + '\')" style="background:#4285f4;border:none;color:#fff">✉️ Email</button>';
+      // Total pagado destacado
+      h+='<div class="conf-total"><div><div class="tl">'+(balance<=0.01?'Pagado completo':'Total pagado')+'</div></div><div class="tv" style="color:'+(balance<=0.01?'var(--green)':'var(--accent)')+'">$'+_fmt(totalPaid)+'</div></div>';
+      if(balance>0.01) h+='<div class="conf-row" style="margin-top:-6px"><span class="k">Saldo pendiente</span><span class="v" style="color:var(--red)">$'+_fmt(balance)+'</span></div>';
+      h+='<div class="conf-foot">'+_esc(hi.nombre)+' · Gracias por su preferencia 🌿</div>';
+      h+='</div>'; // conf-body
+      // Botones
+      h+='<div class="conf-btns">';
+      h+='<button class="conf-btn" onclick="generateReceiptPDF(\''+resId+'\',\'download\')" style="background:var(--accent);color:var(--bg);">📄 Descargar PDF</button>';
+      h+='<button class="conf-btn" onclick="generateReceiptPDF(\''+resId+'\',\'share\')" style="background:rgba(37,211,102,.15);color:#25D366;border:1px solid #25D366;">📱 PDF WhatsApp</button>';
+      h+='<button class="conf-btn" onclick="shareReceiptWhatsApp(\''+resId+'\')" style="background:var(--surface3);color:var(--text);">💬 Texto WA</button>';
+      h+='<button class="conf-btn" onclick="shareReceiptEmail(\''+resId+'\')" style="background:var(--surface3);color:var(--text);">✉️ Email</button>';
+      h+='<button class="conf-btn" onclick="printReceipt()" style="background:var(--surface3);color:var(--text2);">🖨️ Imprimir</button>';
+      h+='<button class="conf-btn" onclick="closeReceipt()" style="background:var(--surface3);color:var(--text2);">✕ Cerrar</button>';
       h+='</div>';
       h+='</div></div>';
       document.body.insertAdjacentHTML('beforeend',h);
@@ -12293,7 +12303,160 @@
       return text;
     }
 
+    // ===== Kit de PDF con estilo (encabezado de marca, secciones, totales) =====
+    function _pdfNA(s){ return String(s==null?'':s).normalize('NFD').replace(/[̀-ͯ]/g,''); }
+    function _pdfChipColor(estado){
+      var m = { 'Confirmada':[107,191,123], 'Check-in':[91,155,213], 'Reservada':[196,168,77], 'Check-out':[138,154,136], 'Cancelada':[207,107,107] };
+      return m[estado] || [139,170,106];
+    }
+    function _pdfBrandKit(doc, pageW, render) {
+      var x = 24, W = pageW;
+      var A = [107,138,74], AT = [240,244,233], INK = [26,26,24], GRY = [120,120,120], LINE = [224,224,216];
+      var k = { y: 0, x: x, W: W, A: A, INK: INK, GRY: GRY };
+      function sc(c){ if(render) doc.setTextColor(c[0],c[1],c[2]); }
+      function fr(rx,ry,rw,rh,c){ if(render){ doc.setFillColor(c[0],c[1],c[2]); doc.rect(rx,ry,rw,rh,'F'); } }
+      k.sc = sc;
+      k.header = function(logo, ratio, title, chipText, chipC){
+        fr(0,0,W,6,A);                           // barra de acento superior
+        k.y = 22;
+        var logoW = 92;
+        try { if(render) doc.addImage(logo,'PNG',(W-logoW)/2,k.y,logoW,logoW/(ratio||2.2)); } catch(e){}
+        k.y += Math.round(logoW/(ratio||2.2)) + 14;
+        doc.setFont('helvetica','bold'); doc.setFontSize(10); sc(INK);
+        if(render) doc.text(String(title).toUpperCase(), W/2, k.y, { align:'center', charSpace:1.2 });
+        k.y += 15;
+        if(chipText){
+          doc.setFont('helvetica','bold'); doc.setFontSize(8);
+          var tw = doc.getTextWidth(String(chipText)) + 20;
+          if(render){ doc.setFillColor(chipC[0],chipC[1],chipC[2]); doc.roundedRect((W-tw)/2, k.y-9, tw, 15, 7.5, 7.5, 'F'); }
+          sc([255,255,255]);
+          if(render) doc.text(String(chipText), W/2, k.y+1, { align:'center' });
+          k.y += 16;
+        }
+        k.y += 6;
+      };
+      k.rule = function(){ if(render){ doc.setDrawColor(LINE[0],LINE[1],LINE[2]); doc.setLineWidth(0.6); doc.setLineDashPattern([],0); doc.line(x,k.y,W-x,k.y); } k.y += 12; };
+      k.section = function(t){
+        k.y += 3;
+        doc.setFont('helvetica','bold'); doc.setFontSize(7.5); sc(A);
+        if(render) doc.text(String(t).toUpperCase(), x, k.y, { charSpace:1 });
+        k.y += 4;
+        if(render){ doc.setDrawColor(A[0],A[1],A[2]); doc.setLineWidth(0.6); doc.line(x, k.y, x+26, k.y); }
+        k.y += 11;
+      };
+      k.row = function(label,val,color,bold){
+        doc.setFont('helvetica','normal'); doc.setFontSize(8.5); sc(GRY);
+        if(render) doc.text(String(label), x, k.y);
+        if(val!=null && val!==''){
+          doc.setFont('helvetica', bold?'bold':'normal'); sc(color||INK);
+          if(render) doc.text(String(val), W-x, k.y, { align:'right' });
+        }
+        k.y += 13;
+      };
+      k.totalBox = function(label, amount, accent){
+        var c = accent || A;
+        k.y += 4; var h = 36;
+        if(render){ doc.setFillColor(AT[0],AT[1],AT[2]); doc.setDrawColor(c[0],c[1],c[2]); doc.setLineWidth(0.9); doc.roundedRect(x, k.y, W-2*x, h, 7, 7, 'FD'); }
+        doc.setFont('helvetica','bold'); doc.setFontSize(7.5); sc(GRY);
+        if(render) doc.text(String(label).toUpperCase(), x+14, k.y+15, { charSpace:1 });
+        doc.setFont('helvetica','bold'); doc.setFontSize(17); sc(c);
+        if(render) doc.text(String(amount), W-x-14, k.y+26, { align:'right' });
+        k.y += h + 12;
+      };
+      k.paragraph = function(text,size,color){
+        var s = size||7;
+        doc.setFont('helvetica','normal'); doc.setFontSize(s); sc(color||GRY);
+        var lines = doc.splitTextToSize(_pdfNA(text), W-2*x);
+        lines.forEach(function(ln){ if(render) doc.text(ln, x, k.y); k.y += s+2.5; });
+      };
+      k.center = function(text,size,color,bold){
+        var s = size||7;
+        doc.setFont('helvetica', bold?'bold':'normal'); doc.setFontSize(s); sc(color||GRY);
+        if(render) doc.text(String(text), W/2, k.y, { align:'center' });
+        k.y += s+3;
+      };
+      k.space = function(n){ k.y += (n||6); };
+      k.footer = function(name){
+        k.rule();
+        k.center(name, 9, INK, true);
+        k.center('Gracias por su preferencia', 7, GRY);
+        k.space(2);
+        k.center(now(), 6, [175,175,175]);
+        k.space(8);
+      };
+      return k;
+    }
+
     function generateReceiptPDF(resId, mode) {
+      var res = S.reservas.find(function(r){return r.id===resId});
+      var room = S.rooms.find(function(r){return r.numero===res.habitacionNum});
+      var payments = S.cobros.filter(function(c){return c.reservaId===resId});
+      var totalPaid = payments.reduce(function(s,c){return s+c.monto},0);
+      var balance = res.tarifaTotal - totalPaid;
+      var nights = daysUntil(res.fechaEntrada, res.fechaSalida);
+      var hi = getHotelInfo();
+      var _ivaRecPdf = parseIVAData(res.notas);
+      var methodTag = { 'Efectivo':'Efectivo', 'Tarjeta':'Tarjeta', 'Transferencia':'Transferencia', 'Deposito':'Deposito', 'Depósito':'Deposito', 'Reembolso':'Reembolso' };
+
+      if (!(window.jspdf && window.jspdf.jsPDF)) { toast('No se pudo cargar el generador de PDF', true); return; }
+      var jsPDF = window.jspdf.jsPDF;
+      var pageW = 320;
+
+      function draw(doc, render){
+        var k = _pdfBrandKit(doc, pageW, render);
+        k.header(LOGO_V_DARK_B64 || LOGO_V_DARK, LOGO_V_RATIO, 'Recibo de pago', (balance<=0.01?'Pagado completo':'Recibo'), (balance<=0.01?[107,191,123]:[139,170,106]));
+        k.section('Huésped');
+        k.row('Nombre', res.huesped, k.INK, true);
+        k.row('Habitación', res.habitacionNum + (room ? ' · ' + room.tipo : ''), [107,138,74], true);
+        k.row('Entrada', formatDate(res.fechaEntrada));
+        k.row('Salida', formatDate(res.fechaSalida));
+        k.row('Noches', String(nights));
+        k.section('Hospedaje');
+        k.row('Tarifa/noche', '$'+_fmt(res.tarifa));
+        if (_ivaRecPdf) {
+          k.row('Subtotal', '$'+_fmt(_ivaRecPdf.subtotal));
+          k.row('ISH (5%)', '$'+_fmt(_ivaRecPdf.ish||0));
+          k.row('IVA (16%)', '$'+_fmt(_ivaRecPdf.iva));
+          k.row('Total c/impuestos', '$'+_fmt(res.tarifaTotal), k.INK, true);
+          if (_ivaRecPdf.folio) k.row('Folio factura', _ivaRecPdf.folio, [107,138,74], true);
+          if (_ivaRecPdf.rfc) k.row('RFC', _ivaRecPdf.rfc);
+          if (_ivaRecPdf.razonSocial) k.row('Razón social', _ivaRecPdf.razonSocial);
+        } else {
+          k.row('Total hospedaje', '$'+_fmt(res.tarifaTotal), k.INK, true);
+        }
+        if (payments.length) {
+          k.section('Pagos recibidos');
+          payments.forEach(function(p){
+            k.row((methodTag[p.metodoPago]||p.metodoPago) + ' · ' + (p.concepto||''), '$'+_fmt(p.monto), [40,160,90], false);
+            doc.setFont('helvetica','normal'); doc.setFontSize(6); k.sc(k.GRY);
+            if(render) doc.text(String(p.fecha + (p.hora?(' '+p.hora):'')), k.x, k.y-7);
+            k.space(5);
+          });
+        }
+        k.space(4);
+        k.row('Total pagado', '$'+_fmt(totalPaid), [40,160,90], true);
+        if (balance > 0.01) k.row('Saldo pendiente', '$'+_fmt(balance), [210,70,70], true);
+        k.totalBox(balance<=0.01?'Pagado completo':'Total pagado', '$'+_fmt(totalPaid), balance<=0.01?[40,160,90]:[107,138,74]);
+        k.footer(hi.nombre);
+        return k.y;
+      }
+
+      var mDoc = new jsPDF({unit:'pt',format:[pageW,1200]});
+      var totalH = draw(mDoc, false);
+      var doc = new jsPDF({unit:'pt',format:[pageW, Math.max(totalH,220)]});
+      draw(doc, true);
+
+      var fileName = 'Recibo_' + res.huesped.replace(/\s+/g,'_') + '_Hab' + res.habitacionNum + '.pdf';
+      var phone = getGuestPhone(res).replace(/\D/g, '');
+      if (mode==='share') {
+        doc.save(fileName);
+        toast('PDF descargado — abriendo WhatsApp...');
+        var waText = '🏨 *' + hi.nombre + '*\n\nHola *' + res.huesped + '* 👋\n\nTe comparto tu recibo de hospedaje en PDF.\n\n📄 _Archivo: ' + fileName + '_\n\n_' + hi.nombre + '_ 🌿';
+        setTimeout(function(){ window.open('https://wa.me/' + (phone||'') + '?text=' + encodeURIComponent(waText), '_blank'); }, 500);
+      } else { doc.save(fileName); toast('PDF descargado: '+fileName); }
+    }
+
+    function _generateReceiptPDF_OLD(resId, mode) {
       var res = S.reservas.find(function(r){return r.id===resId});
       var room = S.rooms.find(function(r){return r.numero===res.habitacionNum});
       var payments = S.cobros.filter(function(c){return c.reservaId===resId});
@@ -12792,218 +12955,90 @@
       var balance = res.tarifaTotal - totalPaid;
       var _aPct = getAnticipoPct();
       var anticipoMin = Math.round(res.tarifaTotal * getAnticipoFraction() * 100) / 100;
-
-      var pageW = 164;
-      var { jsPDF } = window.jspdf;
-      var x = 10, lineH = 11;
-
       var hi = getHotelInfo();
-      function drawConfirm(doc, render) {
-        var y = 14;
-        function setC(r,g,b){if(render)doc.setTextColor(r,g,b)}
-        function fill(rx,ry,rw,rh,r,g,b){if(render){doc.setFillColor(r,g,b);doc.rect(rx,ry,rw,rh,'F')}}
+      var _ivaPdf = parseIVAData(res.notas);
+      var _bfPdf = (S.desayunos || []).filter(function(d){ return d.reservaId === resId; });
 
-        // Logo (ya incluye nombre y subtítulo)
-        var logoS=70;
-        try { if(render) doc.addImage(LOGO_V_DARK_B64||LOGO_V_DARK,'PNG',(pageW-logoS)/2,y,logoS,logoS/LOGO_V_RATIO); } catch(e){}
-        y+=Math.round(logoS/LOGO_V_RATIO)+6;
+      if (!(window.jspdf && window.jspdf.jsPDF)) { toast('No se pudo cargar el generador de PDF', true); return; }
+      var jsPDF = window.jspdf.jsPDF;
+      var pageW = 320;
+      var estado = res.estado || 'Reservada';
+      var chipText = estado==='Confirmada'?'Confirmada':estado==='Check-in'?'Hospedado':estado==='Reservada'?'Reservada':estado;
 
-        // Sub-header
-        setC(102,102,102);
-        doc.setFont('helvetica','normal');doc.setFontSize(7);
-        var st='Confirmacion de Reservacion';
-        if(render)doc.text(st,(pageW-doc.getTextWidth(st))/2,y);
-        y+=10;
+      function draw(doc, render){
+        var k = _pdfBrandKit(doc, pageW, render);
+        k.header(LOGO_V_DARK_B64 || LOGO_V_DARK, LOGO_V_RATIO, 'Confirmación de reservación', chipText, _pdfChipColor(estado));
 
-        function dash(){
-          if(render){doc.setDrawColor(200,200,200);doc.setLineDashPattern([2,2],0);doc.setLineWidth(0.3);doc.line(x,y,pageW-x,y)}
-          y+=8;
-        }
+        k.section('Huésped');
+        k.row('Nombre', res.huesped, k.INK, true);
+        k.row('No. reservación', res.id, [107,138,74], true);
+        if (res.telefono) k.row('Teléfono', res.telefono);
+        if (res.email) k.row('Email', res.email);
 
-        function row(label,val,valR,valG,valB,bold){
-          doc.setFont('helvetica','normal');doc.setFontSize(7);
-          setC(102,102,102);
-          if(render)doc.text(label,x,y);
-          if(val){
-            doc.setFont('helvetica',bold?'bold':'normal');
-            setC(valR||17,valG||17,valB||17);
-            var vw=doc.getTextWidth(val);
-            if(render)doc.text(val,pageW-x-vw,y);
-          }
-          y+=lineH;
-        }
+        k.section('Estancia');
+        k.row('Habitación', res.habitacionNum + (room ? ' · ' + room.tipo : ''), [107,138,74], true);
+        k.row('Entrada', formatDate(res.fechaEntrada) + ' · ' + formatHoraDisplay(hi.checkin_hora));
+        k.row('Salida', formatDate(res.fechaSalida) + ' · ' + formatHoraDisplay(hi.checkout_hora));
+        k.row('Noches', String(nights));
+        k.row('Huéspedes', res.adultos + ' adulto(s)' + (parseInt(res.niños)>0 ? ', ' + res.niños + ' niño(s)' : ''));
 
-        function center(text,size,r,g,b,bold){
-          doc.setFont('helvetica',bold?'bold':'normal');doc.setFontSize(size||7);
-          setC(r||102,g||102,b||102);
-          var tw=doc.getTextWidth(text);
-          if(render)doc.text(tw < pageW ? text : text.substring(0,40)+'...',(pageW-Math.min(tw,pageW-20))/2,y);
-          y+=lineH;
-        }
-
-        dash();
-        row('No. Reservacion',res.id,100,140,80,true);
-        row('Huesped',res.huesped,17,17,17,true);
-        if(res.telefono) row('Telefono',res.telefono);
-        if(res.email) row('Email',res.email);
-        dash();
-
-        row('Habitacion',res.habitacionNum+' ('+(room?room.tipo:'')+')',100,140,80,true);
-        row('Entrada',formatDate(res.fechaEntrada)+' ('+formatHoraDisplay(hi.checkin_hora)+')');
-        row('Salida',formatDate(res.fechaSalida)+' ('+formatHoraDisplay(hi.checkout_hora)+')');
-        row('Noches',String(nights));
-        row('Huespedes',res.adultos+' adulto(s)'+(parseInt(res.niños)>0?', '+res.niños+' nino(s)':''));
-        dash();
-
-        var _ivaPdf = parseIVAData(res.notas);
-        row('Tarifa/noche','$'+res.tarifa);
+        k.section('Precio');
+        k.row('Tarifa/noche', '$'+_fmt(res.tarifa));
         if (_ivaPdf) {
-          var _ishPdf = _ivaPdf.ish || 0;
-          row('Subtotal ('+nights+' noches)','$'+_ivaPdf.subtotal.toLocaleString('es-MX'));
-          row('IVA (16%)','$'+_ivaPdf.iva.toLocaleString('es-MX',{minimumFractionDigits:2}));
-          row('ISH (5%)','$'+_ishPdf.toLocaleString('es-MX',{minimumFractionDigits:2}));
-          row('Total c/impuestos','$'+res.tarifaTotal.toLocaleString('es-MX',{minimumFractionDigits:2}),17,17,17,true);
-          dash();
-          if(_ivaPdf.folio) row('Folio factura',_ivaPdf.folio,100,140,80,true);
-          if(_ivaPdf.hotel) row('Establecimiento',_ivaPdf.hotel);
-          row('RFC',_ivaPdf.rfc,100,140,80,true);
-          if(_ivaPdf.razonSocial) row('Razon Social',_ivaPdf.razonSocial);
-        } else {
-          row('Total estancia','$'+res.tarifaTotal,17,17,17,true);
+          k.row('Subtotal ('+nights+' noches)', '$'+_fmt(_ivaPdf.subtotal));
+          k.row('IVA (16%)', '$'+_fmt(_ivaPdf.iva));
+          k.row('ISH (5%)', '$'+_fmt(_ivaPdf.ish||0));
+          if (_ivaPdf.folio) k.row('Folio factura', _ivaPdf.folio, [107,138,74], true);
+          if (_ivaPdf.rfc) k.row('RFC', _ivaPdf.rfc);
+          if (_ivaPdf.razonSocial) k.row('Razón social', _ivaPdf.razonSocial);
+        }
+        k.totalBox('Total' + (_ivaPdf ? ' c/impuestos' : ' estancia'), '$'+_fmt(res.tarifaTotal));
+
+        if (totalPaid > 0) {
+          k.section('Pago');
+          k.row('Anticipo recibido', '$'+_fmt(totalPaid), [40,160,90], true);
+          k.row('Saldo pendiente', '$'+_fmt(balance), balance>0.01?[210,70,70]:[40,160,90], true);
+        } else if (_aPct > 0) {
+          k.section('Pago');
+          k.row('Anticipo requerido ('+_aPct+'%)', '$'+_fmt(anticipoMin), [196,150,40], true);
         }
 
-        if(totalPaid>0){
-          dash();
-          row('Anticipo recibido','$'+totalPaid,34,197,94,true);
-          row('Saldo pendiente','$'+balance,balance>0?239:34,balance>0?68:197,balance>0?68:94,true);
-        } else {
-          dash();
-          if(_aPct>0)row('Anticipo requerido ('+_aPct+'%)','$'+anticipoMin,239,68,68,true);
+        if (_bfPdf.length) {
+          var bp = getBreakfastPromo();
+          k.section('Desayuno incluido');
+          if (bp.partner) k.row(bp.partner, '', k.GRY, false);
+          _bfPdf.forEach(function(bf){ k.row(formatDate(bf.fecha) + ' (' + bf.personas + ' pers.)', bf.codigo, [40,160,90], true); });
         }
 
-        // Breakfast codes in PDF
-        var _bfPdf = (S.desayunos || []).filter(function(d) { return d.reservaId === resId; });
-        if (_bfPdf.length > 0) {
-          var _bfPPdf = getBreakfastPromo();
-          dash();
-          doc.setFont('helvetica','bold');doc.setFontSize(7);
-          setC(46,125,50);
-          if(render)doc.text('DESAYUNO INCLUIDO',x,y);
-          y+=8;
-          doc.setFont('helvetica','normal');doc.setFontSize(6);
-          setC(80,80,80);
-          if(render)doc.text((_bfPPdf.partner||'').normalize('NFD').replace(/[̀-ͯ]/g,''),x,y);
-          y+=7;
-          if(_bfPPdf.descripcion){
-            doc.setFont('helvetica','italic');doc.setFontSize(5.5);
-            var _bfDescL=doc.splitTextToSize(_bfPPdf.descripcion.normalize('NFD').replace(/[̀-ͯ]/g,''),pageW-2*x);
-            _bfDescL.forEach(function(ln){if(render)doc.text(ln,x,y);y+=6;});
-            y+=2;
-          }
-          _bfPdf.forEach(function(bf){
-            doc.setFont('helvetica','normal');doc.setFontSize(6);setC(80,80,80);
-            if(render)doc.text(formatDate(bf.fecha)+' ('+bf.personas+' pers.)',x,y);
-            doc.setFont('helvetica','bold');setC(46,125,50);
-            var cw=doc.getTextWidth(bf.codigo);
-            if(render)doc.text(bf.codigo,pageW-x-cw,y);
-            y+=lineH;
-          });
-          var _bfVPdf=_bfPdf.reduce(function(s,d){return s+d.personas},0)*(_bfPPdf.precioPorPersona||0);
-          if(_bfVPdf>0){
-            doc.setFont('helvetica','normal');doc.setFontSize(5.5);setC(46,125,50);
-            var valT='Valor: $'+_fmt(_bfVPdf)+' → $0 Cortesia';
-            if(render)doc.text(valT,pageW-x-doc.getTextWidth(valT),y);
-            y+=8;
-          }
+        if (hi.direccion) {
+          k.section('Dirección');
+          k.paragraph(hi.direccion, 8, k.INK);
+          k.space(2);
         }
 
-        // Address
-        if(hi.direccion){
-          dash();
-          doc.setFont('helvetica','bold');doc.setFontSize(6);
-          setC(17,17,17);
-          if(render)doc.text('Direccion:',x,y);
-          y+=8;
-          doc.setFont('helvetica','normal');doc.setFontSize(5.5);
-          setC(80,80,80);
-          var addrLines=doc.splitTextToSize(hi.direccion.normalize('NFD').replace(/[̀-ͯ]/g,''),pageW-2*x);
-          addrLines.forEach(function(line){if(render)doc.text(line,x,y);y+=7;});
+        var terms = getTerms();
+        if (terms && terms.length) {
+          k.section('Términos y condiciones');
+          terms.forEach(function(t,i){ k.paragraph((i+1)+'. ' + t.title + ': ' + t.text, 6.5, k.GRY); k.space(2); });
         }
 
-        // Confirmation box
-        y+=4;
-        var boxH=26;
-        fill(x-4,y-2,pageW-2*x+8,boxH,240,245,235);
-        if(render){doc.setDrawColor(139,170,106);doc.setLineWidth(0.5);doc.setLineDashPattern([],0);doc.roundedRect(x-4,y-2,pageW-2*x+8,boxH,3,3,'S')}
-        y+=6;
-        doc.setFontSize(6);doc.setFont('helvetica','bold');
-        setC(100,140,80);
-        var cStat = res.estado==='Confirmada'?'RESERVACION CONFIRMADA':res.estado==='Check-in'?'HUESPED HOSPEDADO':res.estado==='Reservada'?'RESERVADA — PENDIENTE CONFIRMACION':'ESTADO: '+res.estado.toUpperCase();
-        if(render)doc.text(cStat,(pageW-doc.getTextWidth(cStat))/2,y);
-        y+=11;
-        doc.setFontSize(5.5);doc.setFont('helvetica','normal');
-        setC(153,153,153);
-        var idLine='ID: '+res.id;
-        if(render)doc.text(idLine,(pageW-doc.getTextWidth(idLine))/2,y);
-        y+=14;
-
-        // Terms
-        dash();
-        doc.setFont('helvetica','bold');doc.setFontSize(6.5);
-        setC(17,17,17);
-        if(render)doc.text('Terminos y Condiciones',x,y);
-        y+=10;
-
-        // Dynamic terms from config
-        var termsData = getTerms();
-        var terms = termsData.map(function(t, i) {
-          // Remove accents for PDF compatibility
-          var title = t.title.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-          var text = t.text.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-          return (i + 1) + '. ' + title + ': ' + text;
-        });
-
-        doc.setFont('helvetica','normal');doc.setFontSize(5);
-        setC(80,80,80);
-        terms.forEach(function(term){
-          var lines = doc.splitTextToSize(term, pageW - 2*x);
-          lines.forEach(function(line){
-            if(render)doc.text(line,x,y);
-            y+=7;
-          });
-          y+=2;
-        });
-
-        dash();
-        center(hi.nombre,6,153,153,153);
-        center('Gracias por elegirnos',6,153,153,153);
-        y+=2;
-        doc.setFontSize(5);setC(180,180,180);
-        var ft=now();
-        if(render)doc.text(ft,(pageW-doc.getTextWidth(ft))/2,y);
-        y+=8;
-        return y;
+        k.footer(hi.nombre);
+        return k.y;
       }
 
-      // Pass 1: measure
-      var mDoc = new jsPDF({unit:'pt',format:[pageW,1200]});
-      var totalH = drawConfirm(mDoc, false);
-      // Pass 2: render exact size
-      var doc = new jsPDF({unit:'pt',format:[pageW,totalH]});
-      drawConfirm(doc, true);
+      var mDoc = new jsPDF({unit:'pt',format:[pageW,1600]});
+      var totalH = draw(mDoc, false);
+      var doc = new jsPDF({unit:'pt',format:[pageW, Math.max(totalH,260)]});
+      draw(doc, true);
 
-      var fileName='Confirmacion_'+res.huesped.replace(/\s+/g,'_')+'_Hab'+res.habitacionNum+'.pdf';
+      var fileName = 'Confirmacion_' + res.huesped.replace(/\s+/g,'_') + '_Hab' + res.habitacionNum + '.pdf';
       var phone = getGuestPhone(res).replace(/\D/g, '');
-
-      if(mode==='share'){
-        // Download PDF then open WhatsApp to client's number
+      if (mode==='share') {
         doc.save(fileName);
         toast('PDF descargado — abriendo WhatsApp...');
         var waText = '🏨 *' + hi.nombre + '*\n\nHola *' + res.huesped + '* 👋\n\nTe comparto tu confirmación de reservación en PDF.\n\n📄 _Archivo: ' + fileName + '_\n\n_' + hi.nombre + '_ 🌿';
-        setTimeout(function(){
-          window.open('https://wa.me/' + (phone ? phone : '') + '?text=' + encodeURIComponent(waText), '_blank');
-        }, 500);
-      }else{doc.save(fileName);toast('PDF descargado: '+fileName)}
+        setTimeout(function(){ window.open('https://wa.me/' + (phone||'') + '?text=' + encodeURIComponent(waText), '_blank'); }, 500);
+      } else { doc.save(fileName); toast('PDF descargado: '+fileName); }
     }
 
     function shareReservaWhatsApp(resId) {
