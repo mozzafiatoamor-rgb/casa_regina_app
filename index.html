@@ -3054,6 +3054,14 @@
     // Compat helpers (used in links/cfg)
     function getHotelWhatsApp() { return getHotelInfo().whatsapp; }
     function getReviewLink() { return getHotelInfo().reviewLink; }
+    // Normaliza un teléfono para wa.me: solo dígitos y antepone 52 (México) si son 10 dígitos locales.
+    function _waPhone(raw) {
+      var p = String(raw == null ? '' : raw).replace(/\D/g, '');
+      if (!p) return '';
+      if (p.length === 10) p = '52' + p;                 // local MX → +52
+      else if (p.length === 11 && p.charAt(0) === '1') p = '52' + p.slice(1);
+      return p;
+    }
 
     // Format 24h time to display (e.g. "15:00" -> "3:00 PM")
     function formatHoraDisplay(t) {
@@ -3460,7 +3468,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-10-20b';
+    var APP_BUILD = '2026-10-20c';
 
     // ===== Selectores de fecha entrada→salida: la salida siempre mínimo el día siguiente =====
     function _nextDayStr(ymd) {
@@ -9836,8 +9844,8 @@
       var fileName = 'Cotizacion_' + d.nombre.replace(/\s+/g, '_') + '_' + cotNum + '.pdf';
 
       if (mode === 'whatsapp') {
-        var pdfBlob = doc.output('blob');
-        window.open(URL.createObjectURL(pdfBlob), '_blank');
+        // Descarga el PDF (para adjuntarlo en el chat) y luego abre WhatsApp del cliente.
+        doc.save(fileName);
 
         var msg = '📝 *COTIZACIÓN ' + cotNum + '*\n\n🏨 *' + hi.nombre + '*\n\nHola *' + d.nombre + '* 👋\n\nAquí tienes tu cotización:\n\n';
         msg += '📅 ' + formatDate(d.checkin) + ' → ' + formatDate(d.checkout) + '\n';
@@ -9896,8 +9904,11 @@
         msg += '_Términos completos en el PDF adjunto._\n';
         msg += '\n¿Deseas reservar? ¡Con gusto te ayudamos! 😊\n\n_' + hi.nombre + '_ 🌿';
 
-        var phone = (d.telefono || '').replace(/\D/g, '');
-        window.open('https://wa.me/' + (phone || '') + '?text=' + encodeURIComponent(msg), '_blank');
+        var phone = _waPhone(d.telefono);
+        if (!phone) toast('La cotización no tiene teléfono del cliente — abriendo WhatsApp sin número', true);
+        setTimeout(function () {
+          window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(msg), '_blank');
+        }, 500);
       } else {
         doc.save(fileName);
       }
