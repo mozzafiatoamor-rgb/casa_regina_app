@@ -3460,7 +3460,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-10-21a';
+    var APP_BUILD = '2026-10-21b';
 
     // ===== Selectores de fecha entrada→salida: la salida siempre mínimo el día siguiente =====
     function _nextDayStr(ymd) {
@@ -14778,6 +14778,17 @@
         return;
       }
 
+      // Lista de tipos: primero los tipos REALES del hotel (habitaciones + reglas de ocupación),
+      // luego genéricos comunes, garantizando que el tipo actual siempre esté presente.
+      var _tipoOpts = (function() {
+        var set = [];
+        function add(t) { t = String(t == null ? '' : t).trim(); if (t && set.indexOf(t) === -1) set.push(t); }
+        (S.rooms || []).forEach(function(r) { add(r.tipo); });
+        try { (getOccupancyRules() || []).forEach(function(r) { add(r.tipo); }); } catch (e) {}
+        ['Sencilla', 'Doble', 'Doble Matrimonial', 'Doble Twin', 'Queen Size', 'Suite', 'Junior Suite', 'King', 'Queen', 'Twin', 'Familiar', 'Penthouse'].forEach(add);
+        return set;
+      })();
+
       S.rooms.forEach(function(room) {
         var statusColor = room.estado === 'Disponible' ? 'var(--green)' : room.estado === 'Ocupada' ? 'var(--blue)' : room.estado === 'Limpieza' ? 'var(--yellow)' : 'var(--text2)';
         h += '<div style="background:var(--surface2);border-radius:var(--radius);padding:14px;margin-bottom:10px;border-left:4px solid ' + statusColor + '">';
@@ -14787,11 +14798,13 @@
         h += '</div>';
         h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
         h += '<div class="form-group" style="margin-bottom:0"><label class="form-label">Tipo</label>';
-        h += '<select class="form-input tarifa-tipo" data-roomid="' + room.id + '">';
-        var tipos = ['Sencilla', 'Doble', 'Suite', 'Junior Suite', 'King', 'Queen', 'Twin', 'Familiar', 'Penthouse'];
-        tipos.forEach(function(t) {
-          h += '<option value="' + t + '"' + (room.tipo === t ? ' selected' : '') + '>' + t + '</option>';
+        h += '<select class="form-input tarifa-tipo" data-roomid="' + room.id + '" data-current="' + escapeAttr(room.tipo || '') + '" onchange="_tarifaTipoCustom(this)">';
+        var _opts = _tipoOpts.slice();
+        if (room.tipo && _opts.indexOf(room.tipo) === -1) _opts.unshift(room.tipo); // por si el tipo actual no estaba
+        _opts.forEach(function(t) {
+          h += '<option value="' + escapeAttr(t) + '"' + (room.tipo === t ? ' selected' : '') + '>' + t + '</option>';
         });
+        h += '<option value="__custom__">➕ Otro tipo…</option>';
         h += '</select></div>';
         h += '<div class="form-group" style="margin-bottom:0"><label class="form-label">Tarifa / Noche</label>';
         h += '<input type="number" class="form-input tarifa-precio" data-roomid="' + room.id + '" value="' + room.tarifa + '" min="0" step="50" style="font-family:Space Mono,monospace"></div>';
@@ -14806,6 +14819,24 @@
       document.getElementById('configContent').innerHTML = h;
     }
 
+    // Permite escribir un tipo de habitación personalizado desde el menú.
+    function _tarifaTipoCustom(sel) {
+      if (sel.value !== '__custom__') return;
+      var optionEls = Array.prototype.slice.call(sel.querySelectorAll('option'));
+      var nuevo = prompt('Escribe el nuevo tipo de habitación:', '');
+      nuevo = (nuevo || '').trim();
+      if (!nuevo) { sel.value = sel.getAttribute('data-current') || (optionEls[0] && optionEls[0].value) || ''; return; }
+      // ¿ya existe esa opción? úsala; si no, créala antes de "Otro…"
+      var existe = optionEls.some(function(o) { return o.value === nuevo; });
+      if (!existe) {
+        var opt = document.createElement('option');
+        opt.value = nuevo; opt.textContent = nuevo;
+        var customOpt = optionEls.filter(function(o) { return o.value === '__custom__'; })[0];
+        if (customOpt) sel.insertBefore(opt, customOpt); else sel.appendChild(opt);
+      }
+      sel.value = nuevo;
+    }
+
     async function saveTarifas() {
       var tipos = document.querySelectorAll('.tarifa-tipo');
       var precios = document.querySelectorAll('.tarifa-precio');
@@ -14817,6 +14848,7 @@
       tipos.forEach(function(sel, i) {
         var roomId = sel.getAttribute('data-roomid');
         var newTipo = sel.value;
+        if (newTipo === '__custom__') newTipo = sel.getAttribute('data-current') || ''; // nunca guardar el placeholder
         var newTarifa = parseFloat(precios[i].value) || 0;
         var newNotas = notasEls[i].value.trim();
         var room = S.rooms.find(function(r){return r.id === roomId});
