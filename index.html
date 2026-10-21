@@ -3460,7 +3460,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-10-20d';
+    var APP_BUILD = '2026-10-21a';
 
     // ===== Selectores de fecha entrada→salida: la salida siempre mínimo el día siguiente =====
     function _nextDayStr(ymd) {
@@ -8316,7 +8316,7 @@
             </div>
             <div class="room-type">${room.tipo} · $${room.tarifa}</div>
             ${room.estado === 'Limpieza' && S.user && (S.user.rol === 'admin' || S.user.rol === 'recepcion') ? `<button class="room-clean-done" onclick="event.stopPropagation();marcarLimpiezaHecha('${room.id}')">✅ Limpieza hecha</button>` : ''}
-            ${room.estado === 'Mantenimiento' && room.notas && room.notas.includes('[MANT]') ? `<div class="room-maint-note">🛠️ ${room.notas.match(/\[MANT\] ([^|]*)/)?.[1] || ''}</div>` : ''}
+            ${room.estado === 'Mantenimiento' ? `<div class="room-maint-note">🛠️ ${_maintReason(room) || 'Mantenimiento'}${_maintUntil(room) ? ' · hasta ' + formatDate(_maintUntil(room)) : ''}</div>` : ''}
             ${currentRes ? `<div class="room-guest">👤 ${guestName}</div>` : ''}
             ${futureRes.length > 0 ? '<div class="room-timeline">' + timelineHtml + '</div>' : ''}
           </div>
@@ -10090,7 +10090,7 @@
           for (var j = 0; j < hab.cantidad; j++) {
             // Find available room of this type
             var availRoom = S.rooms.find(function(r) {
-              if (r.tipo !== hab.tipo || r.estado === 'Mantenimiento') return false;
+              if (r.tipo !== hab.tipo || _maintBlocks(r, cot.checkin)) return false;
               // Check no conflicting reservation
               return !S.reservas.some(function(res) {
                 if (res.habitacionNum !== r.numero) return false;
@@ -10143,7 +10143,7 @@
     var _cotRev = null;
     function _cotAvailRooms(tipo, ci, co, excludeNums) {
       return (S.rooms || []).filter(function (r) {
-        if (r.tipo !== tipo || r.estado === 'Mantenimiento') return false;
+        if (r.tipo !== tipo || _maintBlocks(r, ci)) return false;
         if (excludeNums && excludeNums.indexOf(r.numero) >= 0) return false;
         return !(S.reservas || []).some(function (res) {
           if (res.habitacionNum !== r.numero) return false;
@@ -15162,10 +15162,12 @@
 
       // Maintenance info block
       if (room.estado === 'Mantenimiento') {
-        var maintNote = (room.notas || '').match(/\[MANT\] ([^|]*)/);
+        var _mReason = _maintReason(room);
+        var _mUntil2 = _maintUntil(room);
         content += `<div style="background:rgba(239,68,68,.12);padding:12px;border-radius:var(--radius);margin-bottom:16px;border-left:4px solid var(--red)">
           <div style="font-size:12px;font-weight:700;color:var(--red);margin-bottom:4px">🛠️ EN MANTENIMIENTO</div>
-          ${maintNote ? '<div style="font-size:13px;color:var(--text)">' + maintNote[1].trim() + '</div>' : '<div style="font-size:12px;color:var(--text2)">Sin motivo especificado</div>'}
+          ${_mReason ? '<div style="font-size:13px;color:var(--text)">' + _mReason + '</div>' : '<div style="font-size:12px;color:var(--text2)">Sin motivo especificado</div>'}
+          ${_mUntil2 ? '<div style="font-size:12px;color:var(--accent);margin-top:6px;font-weight:600">📅 Lista el ' + formatDate(_mUntil2) + ' · reservable a partir de esa fecha</div>' : '<div style="font-size:11px;color:var(--text2);margin-top:6px">Sin fecha de liberación (indefinido)</div>'}
         </div>`;
       }
 
@@ -16098,10 +16100,11 @@
       }
       S.rooms.forEach(function(room) {
         var blocked = (checkin && checkout) ? hasOverlap(room.numero, checkin, checkout, _editResId) : false;
-        var inMaint = room.estado === 'Mantenimiento';
+        var inMaint = _maintBlocks(room, checkin || normDate(new Date()));
+        var _mUntil = _maintUntil(room);
         var manualBlock = checkin ? _ocupManualBlocksRange(room, checkin) : (room.estado === 'Ocupada' && _ocupManualBlocksRange(room, normDate(new Date())));
         if (blocked || inMaint || manualBlock) {
-          select.innerHTML += '<option value="" disabled>Hab. ' + room.numero + ' - ' + room.tipo + (inMaint ? ' 🔧 Mantenimiento' : manualBlock ? ' 🔒 Ocupada (bloqueada)' : ' ⛔ Ocupada en esas fechas') + '</option>';
+          select.innerHTML += '<option value="" disabled>Hab. ' + room.numero + ' - ' + room.tipo + (inMaint ? ' 🔧 Mantenimiento' + (_mUntil ? ' (hasta ' + formatDate(_mUntil) + ')' : '') : manualBlock ? ' 🔒 Ocupada (bloqueada)' : ' ⛔ Ocupada en esas fechas') + '</option>';
         } else {
           select.innerHTML += '<option value="' + room.numero + '" data-tarifa="' + room.tarifa + '">Hab. ' + room.numero + ' - ' + room.tipo + ' ($' + room.tarifa + ')</option>';
         }
@@ -16131,6 +16134,31 @@
       var hasCheckin = list.some(function(r){ return String(r.habitacionNum) === String(room.numero) && r.estado === 'Check-in'; });
       return !hasCheckin;
     }
+    // ===== Mantenimiento con fecha de liberación (reservable para fechas posteriores) =====
+    // Fecha hasta la que la habitación está en mantenimiento (null = indefinido / formato viejo).
+    function _maintUntil(room) {
+      if (!room || room.estado !== 'Mantenimiento') return null;
+      var m = String(room.notas || '').match(/\[MANT:hasta=(\d{4}-\d{2}-\d{2})\]/);
+      return m ? m[1] : null;
+    }
+    // ¿El mantenimiento bloquea una estancia que entra en checkinStr? Reservable si la entrada es >= fecha de liberación.
+    function _maintBlocks(room, checkinStr) {
+      if (!room || room.estado !== 'Mantenimiento') return false;
+      var until = _maintUntil(room);
+      if (!until) return true;                         // indefinido / formato viejo → bloquea siempre
+      var ci = String(checkinStr || '').substring(0, 10);
+      if (!ci) return true;
+      return ci < until;                               // antes de la fecha → bloquea; en/después → libre
+    }
+    // Motivo del mantenimiento (soporta formato nuevo [MANT:...] y viejo [MANT] ).
+    function _maintReason(room) {
+      var n = String(room && room.notas || '');
+      var m = n.match(/\[MANT:(?:hasta=\d{4}-\d{2}-\d{2}|indef)\]\s*([^|]*)/);
+      if (m) return m[1].trim();
+      var m2 = n.match(/\[MANT\]\s*([^|]*)/);
+      return m2 ? m2[1].trim() : '';
+    }
+
     // Al cargar: liberar automáticamente las habitaciones cuyo bloqueo manual con fecha ya venció.
     async function _autoFreeExpiredOcup() {
       try {
@@ -16138,13 +16166,20 @@
         var today = normDate(new Date());
         var ops = [];
         S.rooms.forEach(function(room){
-          if (room.estado !== 'Ocupada') return;
-          var m = String(room.notas || '').match(/\[OCUP:hasta=(\d{4}-\d{2}-\d{2})\]/);
-          if (!m) return;
-          if (today >= m[1]) {
-            var clean = String(room.notas || '').replace(/\[OCUP:[^\]]*\]\s*\|?\s*/g, '').replace(/^\s*\|\s*/, '').trim();
-            room.estado = 'Disponible'; room.notas = clean;
-            ops.push({ type: 'updateById', sheet: '🏨 Habitaciones', id: room.id, values: [room.id, room.numero, room.tipo, room.tarifa, 'Disponible', clean] });
+          if (room.estado === 'Ocupada') {
+            var m = String(room.notas || '').match(/\[OCUP:hasta=(\d{4}-\d{2}-\d{2})\]/);
+            if (m && today >= m[1]) {
+              var clean = String(room.notas || '').replace(/\[OCUP:[^\]]*\]\s*\|?\s*/g, '').replace(/^\s*\|\s*/, '').trim();
+              room.estado = 'Disponible'; room.notas = clean;
+              ops.push({ type: 'updateById', sheet: '🏨 Habitaciones', id: room.id, values: [room.id, room.numero, room.tipo, room.tarifa, 'Disponible', clean] });
+            }
+          } else if (room.estado === 'Mantenimiento') {
+            var mm = String(room.notas || '').match(/\[MANT:hasta=(\d{4}-\d{2}-\d{2})\]/);
+            if (mm && today >= mm[1]) {
+              var cl = String(room.notas || '').replace(/\[MANT:[^\]]*\]\s*[^|]*/g, '').replace(/^\s*\|\s*/, '').trim();
+              room.estado = 'Disponible'; room.notas = cl;
+              ops.push({ type: 'updateById', sheet: '🏨 Habitaciones', id: room.id, values: [room.id, room.numero, room.tipo, room.tarifa, 'Disponible', cl] });
+            }
           }
         });
         if (ops.length && S.scriptUrl) { await sheets.multi(ops).catch(function(){}); }
@@ -16438,10 +16473,11 @@
         return;
       }
 
-      // Validar mantenimiento
+      // Validar mantenimiento (respeta fecha de liberación: reservable si la entrada es posterior)
       var _maintRoom = S.rooms.find(function(r){return r.numero === roomNum});
-      if (_maintRoom && _maintRoom.estado === 'Mantenimiento') {
-        toast('Hab. ' + roomNum + ' está en mantenimiento', true);
+      if (_maintRoom && _maintBlocks(_maintRoom, checkin)) {
+        var _mu = _maintUntil(_maintRoom);
+        toast('Hab. ' + roomNum + ' está en mantenimiento' + (_mu ? ' hasta ' + formatDate(_mu) + ' (reserva a partir de esa fecha)' : ''), true);
         return;
       }
 
@@ -16747,7 +16783,7 @@
       var tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate()+1);
       var tomorrowStr = normDate(tomorrow);
       var avail = S.rooms.filter(function(r) {
-        if (r.estado === 'Mantenimiento' || r.estado === 'Fuera de servicio' || r.estado === 'Ocupada') return false;
+        if (_maintBlocks(r, today) || r.estado === 'Fuera de servicio' || r.estado === 'Ocupada') return false;
         var overlap = S.reservas.some(function(res) {
           return res.habitacionNum === r.numero && res.estado !== 'Cancelada' && res.estado !== 'Completada' && res.estado !== 'Check-out' && res.fechaEntrada < tomorrowStr && res.fechaSalida > today;
         });
@@ -19309,18 +19345,31 @@
       var room = S.rooms.find(r => r.id === roomId);
       if (room.estado === newStatus) { closeModal(); return; }
 
-      // If switching to Mantenimiento, prompt for reason
+      // If switching to Mantenimiento, prompt for reason + optional end date
       if (newStatus === 'Mantenimiento') {
         var reason = prompt('Motivo del mantenimiento (opcional):');
         if (reason === null) return; // cancelled
-        var notePrefix = '[MANT] ';
-        var oldNotesClean = (room.notas || '').replace(/\[MANT\] .*/g, '').trim();
-        var newNotas = reason ? notePrefix + reason + (oldNotesClean ? ' | ' + oldNotesClean : '') : oldNotesClean;
+        var hastaStr = prompt('¿Hasta qué fecha estará en mantenimiento?\n\nFormato: AAAA-MM-DD (ej. 2026-12-01)\nDéjalo vacío = indefinido.\n\nLa habitación se podrá RESERVAR para fechas a partir de ese día.');
+        if (hastaStr === null) return; // cancelled
+        hastaStr = (hastaStr || '').trim();
+        var mTag;
+        if (hastaStr) {
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(hastaStr) || isNaN(new Date(hastaStr + 'T12:00:00').getTime())) {
+            toast('Fecha inválida. Usa el formato AAAA-MM-DD', true); return;
+          }
+          if (hastaStr <= normDate(new Date())) { toast('La fecha de liberación debe ser futura', true); return; }
+          mTag = '[MANT:hasta=' + hastaStr + ']';
+        } else {
+          mTag = '[MANT:indef]';
+        }
+        var oldNotesClean = (room.notas || '').replace(/\[MANT:[^\]]*\]\s*[^|]*/g, '').replace(/\[MANT\] [^|]*/g, '').replace(/^\s*\|\s*/, '').trim();
+        var newNotas = mTag + (reason ? ' ' + reason : '') + (oldNotesClean ? ' | ' + oldNotesClean : '');
 
         await busy(async () => {
           var n = now();
           var roomRow = [room.id, room.numero, room.tipo, room.tarifa, newStatus, newNotas];
-          var logRow = [normDate(new Date()), n.split(' ')[1], S.user.usuario, 'Mantenimiento', 'Hab. ' + room.numero + ' bloqueada' + (reason ? ': ' + reason : ''), 'warning'];
+          var _detalle = 'Hab. ' + room.numero + ' en mantenimiento' + (hastaStr ? ' hasta ' + hastaStr : ' (indefinido)') + (reason ? ': ' + reason : '');
+          var logRow = [normDate(new Date()), n.split(' ')[1], S.user.usuario, 'Mantenimiento', _detalle, 'warning'];
 
           await sheets.multi([
             { type: 'updateById', sheet: '🏨 Habitaciones', id: room.id, values: roomRow },
@@ -19330,7 +19379,7 @@
           var roomIdx = S.rooms.findIndex(r => r.id === roomId);
           S.rooms[roomIdx].estado = newStatus;
           S.rooms[roomIdx].notas = newNotas;
-          toast('Hab. ' + room.numero + ' en mantenimiento');
+          toast('Hab. ' + room.numero + ' en mantenimiento' + (hastaStr ? ' hasta ' + formatDate(hastaStr) : ''));
           closeModal();
           render();
         }, 'Bloqueando habitación...');
@@ -19375,7 +19424,7 @@
       // Al salir de OCUPADA manual, limpiar la etiqueta de bloqueo
       finalNotas = finalNotas.replace(/\[OCUP:[^\]]*\]\s*\|?\s*/g, '').replace(/^\s*\|\s*/, '').trim();
       if (room.estado === 'Mantenimiento') {
-        finalNotas = finalNotas.replace(/\[MANT\] [^|]*/g, '').replace(/^\s*\|\s*/, '').trim();
+        finalNotas = finalNotas.replace(/\[MANT:[^\]]*\]\s*[^|]*/g, '').replace(/\[MANT\] [^|]*/g, '').replace(/^\s*\|\s*/, '').trim();
       }
 
       await busy(async () => {
@@ -20527,7 +20576,7 @@
       var tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
       var tomorrowStr = normDate(tomorrow);
       var avail = S.rooms.filter(function(r) {
-        if (r.estado === 'Mantenimiento' || r.estado === 'Fuera de servicio' || r.estado === 'Ocupada') return false;
+        if (_maintBlocks(r, today) || r.estado === 'Fuera de servicio' || r.estado === 'Ocupada') return false;
         var overlap = S.reservas.some(function(res) {
           return res.habitacionNum === r.numero && res.estado !== 'Cancelada' && res.estado !== 'Completada' && res.estado !== 'Check-out' && res.fechaEntrada < tomorrowStr && res.fechaSalida > today;
         });
@@ -21844,7 +21893,7 @@
       var checkin = document.getElementById('grp_checkin').value;
       var checkout = document.getElementById('grp_checkout').value;
       var el = document.getElementById('groupRoomsList');
-      var rooms = (S.rooms || []).filter(function (rm) { return rm.estado !== 'Mantenimiento' && rm.estado !== 'Fuera de servicio'; });
+      var rooms = (S.rooms || []).filter(function (rm) { return !_maintBlocks(rm, checkin || normDate(new Date())) && rm.estado !== 'Fuera de servicio'; });
       var h = '';
       rooms.forEach(function (rm) {
         // Disponible = sin traslape de reservas Y sin bloqueo manual por estado "Ocupada"
