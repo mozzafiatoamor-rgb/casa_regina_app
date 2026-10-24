@@ -3493,7 +3493,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-10-21e';
+    var APP_BUILD = '2026-10-24a';
 
     // ===== Selectores de fecha entrada→salida: la salida siempre mínimo el día siguiente =====
     function _nextDayStr(ymd) {
@@ -21313,6 +21313,75 @@
       _sendCodesArrayToRestaurant(codes);
     }
 
+    // ===== GRUPO: avisar al restaurante con TODOS los huéspedes de un jalón =====
+    function sendGroupCodesToRestaurant(groupId) {
+      var rs = (typeof _groupReservas === 'function') ? _groupReservas(groupId) : [];
+      if (!rs.length) { toast('Grupo no encontrado', true); return; }
+      var ids = {}; rs.forEach(function(r) { ids[r.id] = 1; });
+      var codes = (S.desayunos || []).filter(function(d) { return ids[d.reservaId] && d.estado === 'Pendiente'; });
+      if (!codes.length) { toast('El grupo no tiene desayunos pendientes. Genera los desayunos en las reservas primero.', true); return; }
+      _sendCodesArrayToRestaurant(codes);
+    }
+
+    // ===== GRUPO: mensaje "difusión" a los huéspedes (un toque por número distinto) =====
+    function openGroupBroadcast(groupId) {
+      var rs = (typeof _groupReservas === 'function') ? _groupReservas(groupId) : [];
+      if (!rs.length) { toast('Grupo no encontrado', true); return; }
+      var hi = getHotelInfo();
+      var ci = rs[0] ? rs[0].fechaEntrada : '';
+      var co = rs[0] ? rs[0].fechaSalida : '';
+      var rooms = rs.map(function(r) { return r.habitacionNum; }).join(', ');
+
+      var msg = '🏨 *' + hi.nombre + '*\n\n';
+      msg += 'Hola 👋 Les compartimos la información de su estancia con nosotros:\n\n';
+      msg += '📅 Entrada: ' + formatDate(ci) + ' · ' + formatHoraDisplay(hi.checkin_hora) + '\n';
+      msg += '📅 Salida: ' + formatDate(co) + ' · ' + formatHoraDisplay(hi.checkout_hora) + '\n';
+      msg += '🛏️ Habitaciones: ' + rooms + '\n';
+      if (hi.direccion) msg += '\n📍 ' + hi.direccion + '\n';
+      if (hi.wifi_red) msg += '📶 WiFi: ' + hi.wifi_red + (hi.wifi_pass ? ' · ' + hi.wifi_pass : '') + '\n';
+      msg += '\nCualquier cosa que necesiten, estamos a sus órdenes 😊\n_' + hi.nombre + '_ 🌿';
+
+      // recipientes únicos por número de teléfono
+      var byPhone = {};
+      rs.forEach(function(r) {
+        var ph = _waNormMX((typeof getGuestPhone === 'function' ? getGuestPhone(r) : '') || r.telefono || '');
+        if (!ph) return;
+        (byPhone[ph] = byPhone[ph] || []).push(r);
+      });
+      var phones = Object.keys(byPhone);
+
+      var h = '';
+      h += '<div style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.5;">WhatsApp no deja enviar a varios de un solo toque. Aquí preparas <b>un</b> mensaje y lo mandas a cada número con un toque. Si todo el grupo está bajo el número del titular, es <b>un solo envío</b>.</div>';
+      h += '<label class="form-label" style="font-size:12px;">Mensaje (editable)</label>';
+      h += '<textarea id="grpBcastMsg" style="width:100%;box-sizing:border-box;min-height:190px;background:var(--surface2);border:1px solid var(--surface3);border-radius:10px;padding:10px;font-size:12px;color:var(--text);resize:vertical;line-height:1.5;">' + _wbEsc(msg) + '</textarea>';
+      h += '<div style="margin:12px 0 6px;font-size:12px;font-weight:700;">Enviar a (' + phones.length + ' número' + (phones.length === 1 ? '' : 's') + '):</div>';
+      if (!phones.length) {
+        h += '<div style="color:var(--text2);font-size:12px;background:var(--surface2);border-radius:10px;padding:10px;">Las reservas del grupo no tienen teléfono registrado. Agrégalo en cada reserva o en el grupo.</div>';
+      } else {
+        phones.forEach(function(ph) {
+          var who = byPhone[ph].map(function(r) { return _wbEscC(r.huesped) + ' (Hab ' + _wbEscC(r.habitacionNum) + ')'; }).join(', ');
+          h += '<div style="display:flex;align-items:center;gap:8px;background:var(--surface2);border-radius:10px;padding:9px 10px;margin-bottom:6px;">';
+          h += '<div style="flex:1;min-width:0;"><div style="font-size:12px;font-weight:600;">+' + ph + '</div><div style="font-size:11px;color:var(--text2);word-break:break-word;">' + who + '</div></div>';
+          h += '<button class="form-button" onclick="_groupBcastSend(\'' + ph + '\')" style="margin:0;background:#25D366;color:#fff;font-size:12px;padding:8px 12px;white-space:nowrap;flex-shrink:0;">📲 Enviar</button>';
+          h += '</div>';
+        });
+      }
+      h += '<button class="form-button secondary" onclick="_groupBcastCopy()" style="width:100%;margin-top:8px;">📋 Copiar mensaje</button>';
+      document.getElementById('taskDetailContent').innerHTML = h;
+      document.getElementById('taskDetailModal').querySelector('.modal-title').textContent = '📣 Mensaje al grupo';
+      document.getElementById('taskDetailActions').innerHTML = '';
+      openModal('taskDetailModal');
+    }
+    function _groupBcastSend(phone) {
+      var m = (document.getElementById('grpBcastMsg') || {}).value || '';
+      window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(m), '_blank');
+    }
+    function _groupBcastCopy() {
+      var m = (document.getElementById('grpBcastMsg') || {}).value || '';
+      try { navigator.clipboard.writeText(m).then(function(){ toast('Mensaje copiado'); }, function(){ toast('No se pudo copiar', true); }); }
+      catch (e) { toast('No se pudo copiar', true); }
+    }
+
     // Selector: filtrar por fecha y elegir qué códigos mandar al restaurante.
     function openRestaurantCodesSelector() {
       var today = normDate(new Date());
@@ -22196,6 +22265,8 @@
       acts += '<button class="form-button secondary" onclick="generateGroupReceiptPDF(\'' + groupId + '\',\'download\')" style="flex:1;">📄 Recibo PDF</button>';
       acts += '<button class="form-button secondary" onclick="generateGroupReceiptPDF(\'' + groupId + '\',\'share\')" style="flex:1;background:rgba(37,211,102,0.12);color:#25D366;border-color:#25D366;">📱 Recibo WA</button>';
       acts += '</div>';
+      acts += '<button class="form-button secondary" onclick="openGroupBroadcast(\'' + groupId + '\')" style="width:100%;">📣 Mensaje al grupo</button>';
+      acts += '<button class="form-button secondary" onclick="sendGroupCodesToRestaurant(\'' + groupId + '\')" style="width:100%;">☕ Avisar al restaurante (desayunos)</button>';
       acts += '<button class="form-button secondary" onclick="openGroupFacturaModal(\'' + groupId + '\')" style="width:100%;">🧾 Factura del grupo</button>';
       acts += '<button class="form-button secondary" onclick="cancelGroup(\'' + groupId + '\')" style="width:100%;border-color:var(--red);color:var(--red);">❌ Cancelar grupo</button>';
       document.getElementById('taskDetailActions').innerHTML = acts;
