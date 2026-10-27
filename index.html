@@ -3511,7 +3511,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-10-27d';
+    var APP_BUILD = '2026-10-27e';
 
     // ===== Selectores de fecha entrada→salida: la salida siempre mínimo el día siguiente =====
     function _nextDayStr(ymd) {
@@ -17460,29 +17460,30 @@
       if (mc) clave = mc[1];
       if (!clave) { var mc2 = up.match(/\b[A-Z]{6}\d{6,8}[A-Z0-9]{0,6}\b/); if (mc2) clave = mc2[0]; }
 
-      // ¿la línea parece una parte de nombre? (solo letras y espacios, ≥3, sin etiquetas ni dígitos)
-      function esNombreParte(L) { return /^[A-ZÁÉÍÓÚÑ ]{3,40}$/.test(L) && !LBL.test(L); }
-
-      // NOMBRE: líneas tras "NOMBRE" (tolera errores de OCR: NONBRE, NOMERE…), puras letras, máx 3
       var reNombre = /NO[MN][BE]RES?/;   // NOMBRE / NONBRE / NOMERE
       var reDom = /DOMICIL[A-Z]*/;       // DOMICILIO / DOMICILLO…
-      var reStopName = /DOMICIL|CLAVE|CURP|SEXO|FECHA|REGISTRO|SECCI|VIGENCIA|ELECTOR/;
-      var nombreParts = [], capN = false;
+      var reStopName = /DOMICIL|CLAVE|CURP|SEXO|FECHA|REGISTRO|SECCI|VIGENCIA|ELECTOR|NACIMIENTO/;
+      // Palabras que son etiqueta/lugar, nunca parte del nombre
+      var LBLWORD = /^(MEXICO|MÉXICO|INSTITUTO|NACIONAL|ELECTORAL|CREDENCIAL|PARA|VOTAR|VOT|DOMICILIO|CLAVE|ELECTOR|CURP|SEXO|FECHA|REGISTRO|ESTADO|MUNICIPIO|SECCION|SECCIÓN|LOCALIDAD|EMISION|EMISIÓN|VIGENCIA|ANO|AÑO|FIRMA|NOMBRE|NOMBRES|COL|CALLE|AVENIDA|PUERTO|ROO)$/;
+      // NOMBRE: tras la etiqueta, junta PALABRAS de ≥3 letras (apellidos + nombres).
+      // Corta en la primera línea con dígitos (ahí empieza el domicilio) o con etiqueta.
+      function _nameWords(str) {
+        return (String(str).match(/[A-ZÁÉÍÓÚÑ]{3,}/g) || []).filter(function (w) { return !LBLWORD.test(w); });
+      }
+      var nombreWords = [], capN = false;
       for (var i = 0; i < lines.length; i++) {
         var L = lines[i];
         if (!capN) {
-          var mN = L.match(new RegExp(reNombre.source + '[:\\-\\s]*(.*)$'));
-          // Texto en la MISMA línea de la etiqueta: solo si es sustancial (≥6 o varias palabras),
-          // para no capturar ruido corto del OCR pegado a la etiqueta (ej. "seo").
-          if (mN) { capN = true; var after = (mN[1] || '').trim(); if (esNombreParte(after) && (after.length >= 6 || after.indexOf(' ') >= 0)) nombreParts.push(after); }
+          var mi = L.search(reNombre);
+          if (mi >= 0) { capN = true; _nameWords(L.slice(mi).replace(reNombre, '')).forEach(function (w) { nombreWords.push(w); }); }
           continue;
         }
         if (reStopName.test(L)) break;
-        if (nombreParts.length >= 3) break;
-        if (esNombreParte(L)) nombreParts.push(L);
-        else if (nombreParts.length > 0) break; // ya tomó algo y llegó ruido → corta
+        if (/\d/.test(L)) break;           // línea con dígitos = domicilio/otros → fin del nombre
+        _nameWords(L).forEach(function (w) { nombreWords.push(w); });
+        if (nombreWords.length >= 4) break;
       }
-      var nombre = nombreParts.join(' ').replace(/\s+/g, ' ').trim();
+      var nombre = nombreWords.slice(0, 4).join(' ').replace(/\s+/g, ' ').trim();
 
       // DOMICILIO: líneas tras "DOMICILIO" hasta una etiqueta, máx 4
       var domParts = [], capD = false;
