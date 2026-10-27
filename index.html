@@ -2603,24 +2603,6 @@
           </select>
         </div>
         <div class="form-group">
-          <input type="file" id="ineFileInputRes" accept="image/*" capture="environment" style="display:none" onchange="_procesarINERes(this.files && this.files[0])" />
-          <input type="file" id="ineFileUploadRes" accept="image/*" style="display:none" onchange="_procesarINERes(this.files && this.files[0])" />
-          <input type="hidden" id="newResINEClave" value="" />
-          <input type="hidden" id="newResINEDomicilio" value="" />
-          <div style="display:flex;gap:8px;">
-            <button type="button" class="form-button secondary" onclick="escanearINERes()" style="flex:1;border-color:var(--accent);color:var(--accent);margin-top:0;font-size:12px;">📷 Escanear INE</button>
-            <button type="button" class="form-button secondary" onclick="subirINERes()" style="flex:1;border-color:var(--accent);color:var(--accent);margin-top:0;font-size:12px;">🖼️ Subir foto</button>
-          </div>
-          <div id="ineScanStatusRes" style="font-size:11px;color:var(--text2);margin-top:5px;min-height:14px;line-height:1.4;"></div>
-          <div id="ineRawWrapRes" style="display:none;margin-top:6px;">
-            <button type="button" onclick="var w=document.getElementById('ineRawBoxRes');w.style.display=w.style.display==='none'?'block':'none';" style="background:none;border:none;color:var(--text2);font-size:11px;cursor:pointer;padding:2px 0;text-decoration:underline;">📄 Ver / copiar texto leído</button>
-            <div id="ineRawBoxRes" style="display:none;margin-top:4px;">
-              <textarea id="ineRawTextRes" readonly style="width:100%;box-sizing:border-box;min-height:90px;background:var(--surface2);border:1px solid var(--surface3);border-radius:8px;padding:8px;font-size:10px;color:var(--text2);font-family:monospace;"></textarea>
-              <button type="button" onclick="try{navigator.clipboard.writeText(document.getElementById('ineRawTextRes').value);toast('Texto copiado');}catch(e){}" style="margin-top:4px;background:var(--surface3);border:none;color:var(--text);font-size:11px;padding:6px 10px;border-radius:8px;cursor:pointer;">📋 Copiar texto</button>
-            </div>
-          </div>
-        </div>
-        <div class="form-group">
           <label class="form-label">Huésped</label>
           <div class="ac-wrapper">
             <input type="text" id="newResHuesped" class="form-input" placeholder="Nombre completo" required autocomplete="off" oninput="onGuestInput()" onfocus="onGuestInput()" />
@@ -3511,7 +3493,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-10-27e';
+    var APP_BUILD = '2026-10-27g';
 
     // ===== Selectores de fecha entrada→salida: la salida siempre mínimo el día siguiente =====
     function _nextDayStr(ymd) {
@@ -16347,7 +16329,6 @@
       document.getElementById('newResTotal').textContent = '$0';
       document.getElementById('newResHuesped').value = '';
       document.getElementById('newResTel').value = '';
-      try { var _iss = document.getElementById('ineScanStatusRes'); if (_iss) _iss.textContent = ''; var _ifi = document.getElementById('ineFileInputRes'); if (_ifi) _ifi.value = ''; var _ifu = document.getElementById('ineFileUploadRes'); if (_ifu) _ifu.value = ''; var _ic = document.getElementById('newResINEClave'); if (_ic) _ic.value = ''; var _id = document.getElementById('newResINEDomicilio'); if (_id) _id.value = ''; var _irw = document.getElementById('ineRawWrapRes'); if (_irw) _irw.style.display = 'none'; var _irt = document.getElementById('ineRawTextRes'); if (_irt) _irt.value = ''; var _irb = document.getElementById('ineRawBoxRes'); if (_irb) _irb.style.display = 'none'; } catch (e) {}
       document.getElementById('newResEmail').value = '';
       document.getElementById('newResAdultos').value = '1';
       document.getElementById('newResNinos').value = '0';
@@ -16616,13 +16597,11 @@
 
         var _titRegId = 'REG-' + Date.now();
         // Datos de INE escaneados en la reserva: fluyen al registro (y de ahí al check-in)
-        var _ineClave = ((document.getElementById('newResINEClave') || {}).value || '').trim();
-        var _regTipoId = _ineClave ? 'INE / IFE' : '';
         var _extraGuests = (typeof _collectNewResGuests === 'function') ? _collectNewResGuests().filter(function(g){ return g.nombre; }) : [];
         var _extraRegOps = _extraGuests.map(function(g, gi){ var _gRegId = 'REG-' + Date.now() + '-' + (gi+1); g._regId = _gRegId; return { type: 'append', sheet: '📝 Registro', values: [_gRegId, id, g.nombre, roomNum, fecha, g.tipoId||'', g.numId||'', '', '', '', '', n, g.telefono||''] }; });
         var operations = [
           { type: 'append', sheet: '📋 Reservas', values: row },
-          { type: 'append', sheet: '📝 Registro', values: [_titRegId, id, huesped, roomNum, fecha, _regTipoId, _ineClave, '', '', '', notasText || '', n, tel] },
+          { type: 'append', sheet: '📝 Registro', values: [_titRegId, id, huesped, roomNum, fecha, '', '', '', '', '', notasText || '', n, tel] },
           { type: 'append', sheet: '📜 Bitácora', values: logRow }
         ].concat(_extraRegOps);
 
@@ -16644,7 +16623,7 @@
           adultos, niños, tarifa, tarifaTotal: total, estado: _initEstado, notas, creadoPor: S.user.usuario, fechaCreacion: n
         });
         S.registros = S.registros || [];
-        S.registros.push({ regId: _titRegId, resId: id, nombre: huesped, habitacionNum: roomNum, fecha: fecha, tipoId: _regTipoId, numId: _ineClave, nacionalidad: '', procedencia: '', motivo: '', observaciones: notasText || '', ts: n, telefono: tel });
+        S.registros.push({ regId: _titRegId, resId: id, nombre: huesped, habitacionNum: roomNum, fecha: fecha, tipoId: '', numId: '', nacionalidad: '', procedencia: '', motivo: '', observaciones: notasText || '', ts: n, telefono: tel });
         (_extraGuests || []).forEach(function(g){ S.registros.push({ regId: g._regId, resId: id, nombre: g.nombre, habitacionNum: roomNum, fecha: fecha, tipoId: g.tipoId||'', numId: g.numId||'', nacionalidad: '', procedencia: '', motivo: '', observaciones: '', ts: n, telefono: g.telefono||'' }); });
 
         // Add payment to local state
@@ -17408,19 +17387,56 @@
       });
     }
     function escanearINE() { var i = document.getElementById('ineFileInput'); if (i) i.click(); }
+    // Mejora la foto antes del OCR: escala a ~1700px, escala de grises y sube contraste.
+    function _preprocessINEImage(file) {
+      return new Promise(function (resolve) {
+        try {
+          var img = new Image();
+          img.onload = function () {
+            try {
+              var tw = 1700;
+              var scale = img.width > 0 ? (tw / img.width) : 1;
+              if (scale > 3) scale = 3; if (scale < 0.3) scale = 0.3;
+              var w = Math.max(1, Math.round(img.width * scale)), h = Math.max(1, Math.round(img.height * scale));
+              var c = document.createElement('canvas'); c.width = w; c.height = h;
+              var ctx = c.getContext('2d');
+              ctx.drawImage(img, 0, 0, w, h);
+              var id = ctx.getImageData(0, 0, w, h); var d = id.data;
+              var contrast = 1.5, intercept = 128 * (1 - contrast);
+              for (var i = 0; i < d.length; i += 4) {
+                var g = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+                g = g * contrast + intercept;
+                g = g < 0 ? 0 : (g > 255 ? 255 : g);
+                d[i] = d[i + 1] = d[i + 2] = g;
+              }
+              ctx.putImageData(id, 0, 0);
+              resolve(c);
+            } catch (e) { resolve(file); }
+          };
+          img.onerror = function () { resolve(file); };
+          img.src = URL.createObjectURL(file);
+        } catch (e) { resolve(file); }
+      });
+    }
+    // OCR compartido (reserva + check-in): descarga lector, mejora imagen y reconoce.
+    async function _ineOCR(file, set) {
+      if (typeof Tesseract === 'undefined') {
+        if (set) set('Descargando lector (solo la primera vez, ~unos segundos)…');
+        await _loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js');
+      }
+      if (set) set('Mejorando la imagen…');
+      var img = await _preprocessINEImage(file);
+      if (set) set('Reconociendo texto de la INE…');
+      var r = await Tesseract.recognize(img, 'spa');
+      return (r && r.data && r.data.text) || '';
+    }
     async function _procesarINE(file) {
       if (!file) return;
       var st = document.getElementById('ineScanStatus');
       var set = function (t) { if (st) st.textContent = t; };
       set('📷 Procesando la foto…');
       try {
-        if (typeof Tesseract === 'undefined') {
-          set('Descargando lector (solo la primera vez, ~unos segundos)…');
-          await _loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js');
-        }
-        set('Reconociendo texto de la INE…');
-        var r = await Tesseract.recognize(file, 'spa');
-        var text = (r && r.data && r.data.text) || '';
+        var text = await _ineOCR(file, set);
         if (!text.trim()) { set('No se detectó texto. Toma la foto de frente, cerca y con buena luz.'); return; }
         _rellenarDesdeINE(text);
         set('✅ Datos cargados — revísalos y corrige lo que haga falta.');
@@ -17522,13 +17538,7 @@
       var set = function (t) { if (st) st.innerHTML = t; };
       set('📷 Procesando la foto…');
       try {
-        if (typeof Tesseract === 'undefined') {
-          set('Descargando lector (solo la primera vez, ~unos segundos)…');
-          await _loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js');
-        }
-        set('Reconociendo texto de la INE…');
-        var r = await Tesseract.recognize(file, 'spa');
-        var text = (r && r.data && r.data.text) || '';
+        var text = await _ineOCR(file, set);
         if (!text.trim()) { set('⚠️ No se detectó texto. Toma la foto de frente, cerca y con buena luz, o escribe el nombre a mano.'); return; }
         var d = _rellenarDesdeINEReserva(text);
         var _esc = function (s) { return String(s || '').replace(/</g, '&lt;'); };
@@ -17589,10 +17599,6 @@
       h += '<input type="hidden" id="regResId" value="' + res.id + '" />';
       h += '<input type="hidden" id="regRoomId" value="' + (room ? room.id : '') + '" />';
 
-      // Escáner de INE (cámara + OCR)
-      h += '<input type="file" id="ineFileInput" accept="image/*" capture="environment" style="display:none" onchange="_procesarINE(this.files && this.files[0])" />';
-      h += '<button type="button" class="form-button secondary" onclick="escanearINE()" style="width:100%;margin-bottom:6px;border-color:var(--accent);color:var(--accent);">📷 Escanear INE con la cámara</button>';
-      h += '<div id="ineScanStatus" style="font-size:11px;color:var(--text2);text-align:center;margin-bottom:12px;min-height:14px;"></div>';
 
       // Nombre completo (editable; por defecto el de la reserva, o el que lea la INE)
       h += '<div class="form-group"><label class="form-label">Nombre completo *</label>';
@@ -17639,9 +17645,6 @@
       h += '<div class="form-group"><label class="form-label">Observaciones</label>';
       h += '<textarea id="regObservaciones" class="form-textarea" placeholder="Notas adicionales..."></textarea></div>';
 
-      h += '<div id="ineRawWrap" style="display:none;margin-bottom:10px;">';
-      h += '<label class="form-label" style="font-size:11px;color:var(--text2);">Texto leído de la INE (por si falta copiar algo)</label>';
-      h += '<textarea id="ineRawText" class="form-textarea" style="font-size:11px;min-height:70px;" readonly></textarea></div>';
 
       h += '<button type="submit" class="form-button" style="width:100%;">🔑 Completar Check-in</button>';
       h += '<button type="button" class="form-button secondary" onclick="skipGuestRegistration(\'' + res.id + '\')" style="width:100%;margin-top:8px;">Omitir registro →</button>';
