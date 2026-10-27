@@ -3511,7 +3511,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-10-27c';
+    var APP_BUILD = '2026-10-27d';
 
     // ===== Selectores de fecha entrada→salida: la salida siempre mínimo el día siguiente =====
     function _nextDayStr(ymd) {
@@ -17460,19 +17460,24 @@
       if (mc) clave = mc[1];
       if (!clave) { var mc2 = up.match(/\b[A-Z]{6}\d{6,8}[A-Z0-9]{0,6}\b/); if (mc2) clave = mc2[0]; }
 
-      // ¿la línea parece una parte de nombre? (solo letras y espacios, sin etiquetas ni dígitos)
-      function esNombreParte(L) { return /^[A-ZÁÉÍÓÚÑ ]{2,40}$/.test(L) && !LBL.test(L); }
+      // ¿la línea parece una parte de nombre? (solo letras y espacios, ≥3, sin etiquetas ni dígitos)
+      function esNombreParte(L) { return /^[A-ZÁÉÍÓÚÑ ]{3,40}$/.test(L) && !LBL.test(L); }
 
-      // NOMBRE: líneas tras "NOMBRE" que sean puras letras (apellidos + nombres), máx 3
+      // NOMBRE: líneas tras "NOMBRE" (tolera errores de OCR: NONBRE, NOMERE…), puras letras, máx 3
+      var reNombre = /NO[MN][BE]RES?/;   // NOMBRE / NONBRE / NOMERE
+      var reDom = /DOMICIL[A-Z]*/;       // DOMICILIO / DOMICILLO…
+      var reStopName = /DOMICIL|CLAVE|CURP|SEXO|FECHA|REGISTRO|SECCI|VIGENCIA|ELECTOR/;
       var nombreParts = [], capN = false;
       for (var i = 0; i < lines.length; i++) {
         var L = lines[i];
         if (!capN) {
-          var mN = L.match(/\bNOMBRE\b[:\-\s]*(.*)$/);
-          if (mN) { capN = true; var after = (mN[1] || '').trim(); if (esNombreParte(after)) nombreParts.push(after); }
+          var mN = L.match(new RegExp(reNombre.source + '[:\\-\\s]*(.*)$'));
+          // Texto en la MISMA línea de la etiqueta: solo si es sustancial (≥6 o varias palabras),
+          // para no capturar ruido corto del OCR pegado a la etiqueta (ej. "seo").
+          if (mN) { capN = true; var after = (mN[1] || '').trim(); if (esNombreParte(after) && (after.length >= 6 || after.indexOf(' ') >= 0)) nombreParts.push(after); }
           continue;
         }
-        if (/DOMICILIO|CLAVE|CURP|SEXO|FECHA|REGISTRO|SECCI/.test(L)) break;
+        if (reStopName.test(L)) break;
         if (nombreParts.length >= 3) break;
         if (esNombreParte(L)) nombreParts.push(L);
         else if (nombreParts.length > 0) break; // ya tomó algo y llegó ruido → corta
@@ -17484,11 +17489,11 @@
       for (var j = 0; j < lines.length; j++) {
         var D = lines[j];
         if (!capD) {
-          var mD = D.match(/\bDOMICILIO\b[:\-\s]*(.*)$/);
+          var mD = D.match(new RegExp(reDom.source + '[:\\-\\s]*(.*)$'));
           if (mD) { capD = true; var ad = (mD[1] || '').trim(); if (ad.length >= 2 && !/CLAVE|CURP/.test(ad)) domParts.push(ad); }
           continue;
         }
-        if (/CLAVE|CURP|SECCI[OÓ]N|\bESTADO\b|MUNICIPIO|LOCALIDAD|EMISI[OÓ]N|VIGENCIA|A[NÑ]O|FECHA|REGISTRO|SEXO/.test(D)) break;
+        if (/CLAVE|CURP|SECCI[OÓ]N|\bESTADO\b|MUNICIPIO|LOCALIDAD|EMISI[OÓ]N|VIGENCIA|A[NÑ]O|FECHA|REGISTRO|SEXO|ELECTOR/.test(D)) break;
         if (domParts.length >= 4) break;
         if (D.length >= 2) domParts.push(D);
       }
@@ -17525,12 +17530,12 @@
         var text = (r && r.data && r.data.text) || '';
         if (!text.trim()) { set('⚠️ No se detectó texto. Toma la foto de frente, cerca y con buena luz, o escribe el nombre a mano.'); return; }
         var d = _rellenarDesdeINEReserva(text);
-        var parts = [];
-        if (d.nombre) parts.push('nombre'); else parts.push('<b>nombre no detectado — escríbelo a mano</b>');
-        if (d.domicilio) parts.push('domicilio');
-        if (d.clave) parts.push('clave INE');
-        if (d.nombre) set('✅ Cargado: ' + parts.join(', ') + '. Revísalo y corrige lo que falte.');
-        else set('⚠️ ' + parts.join(', ') + '. (El domicilio/clave, si se leyeron, quedaron en las notas.)');
+        var _esc = function (s) { return String(s || '').replace(/</g, '&lt;'); };
+        if (d.nombre) {
+          set('✅ Nombre leído: <b>' + _esc(d.nombre) + '</b> — revísalo y <b>complétalo</b> si quedó incompleto.' + (d.clave ? ' (Clave y domicilio guardados.)' : ''));
+        } else {
+          set('⚠️ La foto salió con ruido y no pude leer el nombre — <b>escríbelo a mano</b>.' + (d.clave ? ' (Clave/domicilio sí se leyeron y quedaron en las notas.)' : ' Toma la foto de frente, cerca, plana y con buena luz.'));
+        }
       } catch (e) {
         set('❌ No se pudo leer la INE (' + (e && e.message ? e.message : e) + '). Captura los datos a mano.');
       }
