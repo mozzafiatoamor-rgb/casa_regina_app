@@ -2604,8 +2604,14 @@
         </div>
         <div class="form-group">
           <input type="file" id="ineFileInputRes" accept="image/*" capture="environment" style="display:none" onchange="_procesarINERes(this.files && this.files[0])" />
-          <button type="button" class="form-button secondary" onclick="escanearINERes()" style="width:100%;border-color:var(--accent);color:var(--accent);margin-top:0;">📷 Escanear INE con la cámara</button>
-          <div id="ineScanStatusRes" style="font-size:11px;color:var(--text2);margin-top:5px;min-height:14px;"></div>
+          <input type="file" id="ineFileUploadRes" accept="image/*" style="display:none" onchange="_procesarINERes(this.files && this.files[0])" />
+          <input type="hidden" id="newResINEClave" value="" />
+          <input type="hidden" id="newResINEDomicilio" value="" />
+          <div style="display:flex;gap:8px;">
+            <button type="button" class="form-button secondary" onclick="escanearINERes()" style="flex:1;border-color:var(--accent);color:var(--accent);margin-top:0;font-size:12px;">📷 Escanear INE</button>
+            <button type="button" class="form-button secondary" onclick="subirINERes()" style="flex:1;border-color:var(--accent);color:var(--accent);margin-top:0;font-size:12px;">🖼️ Subir foto</button>
+          </div>
+          <div id="ineScanStatusRes" style="font-size:11px;color:var(--text2);margin-top:5px;min-height:14px;line-height:1.4;"></div>
         </div>
         <div class="form-group">
           <label class="form-label">Huésped</label>
@@ -3498,7 +3504,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-10-27a';
+    var APP_BUILD = '2026-10-27b';
 
     // ===== Selectores de fecha entrada→salida: la salida siempre mínimo el día siguiente =====
     function _nextDayStr(ymd) {
@@ -16334,7 +16340,7 @@
       document.getElementById('newResTotal').textContent = '$0';
       document.getElementById('newResHuesped').value = '';
       document.getElementById('newResTel').value = '';
-      try { var _iss = document.getElementById('ineScanStatusRes'); if (_iss) _iss.textContent = ''; var _ifi = document.getElementById('ineFileInputRes'); if (_ifi) _ifi.value = ''; } catch (e) {}
+      try { var _iss = document.getElementById('ineScanStatusRes'); if (_iss) _iss.textContent = ''; var _ifi = document.getElementById('ineFileInputRes'); if (_ifi) _ifi.value = ''; var _ifu = document.getElementById('ineFileUploadRes'); if (_ifu) _ifu.value = ''; var _ic = document.getElementById('newResINEClave'); if (_ic) _ic.value = ''; var _id = document.getElementById('newResINEDomicilio'); if (_id) _id.value = ''; } catch (e) {}
       document.getElementById('newResEmail').value = '';
       document.getElementById('newResAdultos').value = '1';
       document.getElementById('newResNinos').value = '0';
@@ -16602,11 +16608,14 @@
         const logRow = [fecha, hora, S.user.usuario, 'Nueva Reserva', huesped + ' en Hab. ' + roomNum + (wantsFactura ? ' (Factura)' : '') + (_precioMotivo ? ' · Precio especial: ' + _precioMotivo : ''), 'info'];
 
         var _titRegId = 'REG-' + Date.now();
+        // Datos de INE escaneados en la reserva: fluyen al registro (y de ahí al check-in)
+        var _ineClave = ((document.getElementById('newResINEClave') || {}).value || '').trim();
+        var _regTipoId = _ineClave ? 'INE / IFE' : '';
         var _extraGuests = (typeof _collectNewResGuests === 'function') ? _collectNewResGuests().filter(function(g){ return g.nombre; }) : [];
         var _extraRegOps = _extraGuests.map(function(g, gi){ var _gRegId = 'REG-' + Date.now() + '-' + (gi+1); g._regId = _gRegId; return { type: 'append', sheet: '📝 Registro', values: [_gRegId, id, g.nombre, roomNum, fecha, g.tipoId||'', g.numId||'', '', '', '', '', n, g.telefono||''] }; });
         var operations = [
           { type: 'append', sheet: '📋 Reservas', values: row },
-          { type: 'append', sheet: '📝 Registro', values: [_titRegId, id, huesped, roomNum, fecha, '', '', '', '', '', notasText || '', n, tel] },
+          { type: 'append', sheet: '📝 Registro', values: [_titRegId, id, huesped, roomNum, fecha, _regTipoId, _ineClave, '', '', '', notasText || '', n, tel] },
           { type: 'append', sheet: '📜 Bitácora', values: logRow }
         ].concat(_extraRegOps);
 
@@ -16628,7 +16637,7 @@
           adultos, niños, tarifa, tarifaTotal: total, estado: _initEstado, notas, creadoPor: S.user.usuario, fechaCreacion: n
         });
         S.registros = S.registros || [];
-        S.registros.push({ regId: _titRegId, resId: id, nombre: huesped, habitacionNum: roomNum, fecha: fecha, tipoId: '', numId: '', nacionalidad: '', procedencia: '', motivo: '', observaciones: notasText || '', ts: n, telefono: tel });
+        S.registros.push({ regId: _titRegId, resId: id, nombre: huesped, habitacionNum: roomNum, fecha: fecha, tipoId: _regTipoId, numId: _ineClave, nacionalidad: '', procedencia: '', motivo: '', observaciones: notasText || '', ts: n, telefono: tel });
         (_extraGuests || []).forEach(function(g){ S.registros.push({ regId: g._regId, resId: id, nombre: g.nombre, habitacionNum: roomNum, fecha: fecha, tipoId: g.tipoId||'', numId: g.numId||'', nacionalidad: '', procedencia: '', motivo: '', observaciones: '', ts: n, telefono: g.telefono||'' }); });
 
         // Add payment to local state
@@ -17455,10 +17464,11 @@
     }
     // ===== Escáner de INE en la RESERVA (cámara + OCR) =====
     function escanearINERes() { var i = document.getElementById('ineFileInputRes'); if (i) i.click(); }
+    function subirINERes() { var i = document.getElementById('ineFileUploadRes'); if (i) i.click(); }
     async function _procesarINERes(file) {
       if (!file) return;
       var st = document.getElementById('ineScanStatusRes');
-      var set = function (t) { if (st) st.textContent = t; };
+      var set = function (t) { if (st) st.innerHTML = t; };
       set('📷 Procesando la foto…');
       try {
         if (typeof Tesseract === 'undefined') {
@@ -17468,18 +17478,28 @@
         set('Reconociendo texto de la INE…');
         var r = await Tesseract.recognize(file, 'spa');
         var text = (r && r.data && r.data.text) || '';
-        if (!text.trim()) { set('No se detectó texto. Toma la foto de frente, cerca y con buena luz.'); return; }
-        _rellenarDesdeINEReserva(text);
-        set('✅ Datos cargados — revísalos y corrige lo que haga falta.');
+        if (!text.trim()) { set('⚠️ No se detectó texto. Toma la foto de frente, cerca y con buena luz, o escribe el nombre a mano.'); return; }
+        var d = _rellenarDesdeINEReserva(text);
+        var parts = [];
+        if (d.nombre) parts.push('nombre'); else parts.push('<b>nombre no detectado — escríbelo a mano</b>');
+        if (d.domicilio) parts.push('domicilio');
+        if (d.clave) parts.push('clave INE');
+        if (d.nombre) set('✅ Cargado: ' + parts.join(', ') + '. Revísalo y corrige lo que falte.');
+        else set('⚠️ ' + parts.join(', ') + '. (El domicilio/clave, si se leyeron, quedaron en las notas.)');
       } catch (e) {
-        set('No se pudo leer la INE (' + (e && e.message ? e.message : e) + '). Captura los datos a mano.');
+        set('❌ No se pudo leer la INE (' + (e && e.message ? e.message : e) + '). Captura los datos a mano.');
       }
     }
-    // Rellena el formulario de RESERVA: nombre en el campo, domicilio/clave en las notas.
+    // Rellena el formulario de RESERVA: nombre en el campo, clave/domicilio en campos ocultos y notas.
+    // Devuelve { nombre, domicilio, clave } para reportar qué se cargó.
     function _rellenarDesdeINEReserva(text) {
       var d = _parseINE(text);
       var nombreEl = document.getElementById('newResHuesped');
       if (nombreEl && d.nombre) { nombreEl.value = d.nombre; }
+      // Campos ocultos para que fluyan al registro y al check-in
+      var cEl = document.getElementById('newResINEClave'); if (cEl && d.clave) cEl.value = d.clave;
+      var dEl = document.getElementById('newResINEDomicilio'); if (dEl && d.domicilio) dEl.value = d.domicilio;
+      // También visibles en notas
       var extra = [];
       if (d.domicilio) extra.push('Domicilio: ' + d.domicilio);
       if (d.clave) extra.push('INE: ' + d.clave);
@@ -17491,6 +17511,7 @@
           if (cur.indexOf(add) === -1) notasEl.value = cur ? (cur + '\n' + add) : add;
         }
       }
+      return d;
     }
 
     function showGuestRegistration(res, room) {
@@ -17550,7 +17571,7 @@
       h += '<input type="text" id="regProcedencia" class="form-input" placeholder="Ej: CDMX, Guadalajara..." value="' + (hasPrev ? (prev.procedencia || '') : '') + '" /></div>';
 
       h += '<div class="form-group"><label class="form-label">Domicilio (de la INE)</label>';
-      h += '<input type="text" id="regDomicilio" class="form-input" placeholder="Calle, número, colonia, ciudad..." value="' + (hasPrev && prev.domicilio ? String(prev.domicilio).replace(/"/g, '&quot;') : '') + '" /></div>';
+      h += '<input type="text" id="regDomicilio" class="form-input" placeholder="Calle, número, colonia, ciudad..." value="' + ((prev && prev.domicilio) ? String(prev.domicilio).replace(/"/g, '&quot;') : '') + '" /></div>';
 
       var motivos = ['Turismo', 'Negocios', 'Familia', 'Evento', 'Otro'];
       h += '<div class="form-group"><label class="form-label">Motivo de Viaje</label>';
@@ -22761,12 +22782,19 @@
           if (pick.nacionalidad) out.nacionalidad = pick.nacionalidad;
           if (pick.procedencia) out.procedencia = pick.procedencia;
           if (pick.motivo) out.motivo = pick.motivo;
+          var _dm = _extractDomicilioObs(pick.observaciones);
+          if (_dm) out.domicilio = _dm;
           src = 'reserva';
         }
       } catch (e) {}
 
       out._source = src;
       return out;
+    }
+    // Extrae "Domicilio: ..." de las observaciones (lo guarda el escáner de INE en la reserva).
+    function _extractDomicilioObs(obs) {
+      var m = String(obs || '').match(/Domicilio:\s*([^\n·|]+)/i);
+      return m ? m[1].trim() : '';
     }
 
     // Override: activar desayunos al check-in ahora genera UN código por huésped por noche.
