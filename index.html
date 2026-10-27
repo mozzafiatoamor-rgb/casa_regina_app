@@ -2603,6 +2603,11 @@
           </select>
         </div>
         <div class="form-group">
+          <input type="file" id="ineFileInputRes" accept="image/*" capture="environment" style="display:none" onchange="_procesarINERes(this.files && this.files[0])" />
+          <button type="button" class="form-button secondary" onclick="escanearINERes()" style="width:100%;border-color:var(--accent);color:var(--accent);margin-top:0;">📷 Escanear INE con la cámara</button>
+          <div id="ineScanStatusRes" style="font-size:11px;color:var(--text2);margin-top:5px;min-height:14px;"></div>
+        </div>
+        <div class="form-group">
           <label class="form-label">Huésped</label>
           <div class="ac-wrapper">
             <input type="text" id="newResHuesped" class="form-input" placeholder="Nombre completo" required autocomplete="off" oninput="onGuestInput()" onfocus="onGuestInput()" />
@@ -3493,7 +3498,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-10-24a';
+    var APP_BUILD = '2026-10-27a';
 
     // ===== Selectores de fecha entrada→salida: la salida siempre mínimo el día siguiente =====
     function _nextDayStr(ymd) {
@@ -16329,6 +16334,7 @@
       document.getElementById('newResTotal').textContent = '$0';
       document.getElementById('newResHuesped').value = '';
       document.getElementById('newResTel').value = '';
+      try { var _iss = document.getElementById('ineScanStatusRes'); if (_iss) _iss.textContent = ''; var _ifi = document.getElementById('ineFileInputRes'); if (_ifi) _ifi.value = ''; } catch (e) {}
       document.getElementById('newResEmail').value = '';
       document.getElementById('newResAdultos').value = '1';
       document.getElementById('newResNinos').value = '0';
@@ -17424,7 +17430,8 @@
       }
       return out.join(' ').replace(/\s+/g, ' ').trim();
     }
-    function _rellenarDesdeINE(text) {
+    // Parser reutilizable de la INE: devuelve { nombre, domicilio, clave }.
+    function _parseINE(text) {
       var up = text.toUpperCase();
       var lines = up.split('\n').map(function (l) { return l.trim(); }).filter(Boolean);
       var clave = '';
@@ -17433,13 +17440,57 @@
       if (!clave) { var m2 = up.match(/\b[A-Z]{6}\d{6,8}[A-Z0-9]{0,6}\b/); if (m2) clave = m2[0]; }
       var nombre = _ineBloque(lines, 'NOMBRE', ['DOMICILIO', 'CLAVE', 'CURP', 'SEXO', 'FECHA', 'ANO', 'AÑO', 'SECCION']);
       var domicilio = _ineBloque(lines, 'DOMICILIO', ['CLAVE', 'CURP', 'ESTADO', 'MUNICIPIO', 'SECCION', 'LOCALIDAD', 'EMISION', 'VIGENCIA', 'ANO', 'AÑO', 'FECHA', 'CURP']);
+      return { nombre: nombre ? _ineTitle(nombre) : '', domicilio: domicilio ? _ineTitle(domicilio) : '', clave: clave };
+    }
+    // Rellena el formulario de CHECK-IN con los datos de la INE.
+    function _rellenarDesdeINE(text) {
+      var d = _parseINE(text);
       var setV = function (id, val) { var el = document.getElementById(id); if (el && val) el.value = val; };
-      if (nombre) setV('regNombre', _ineTitle(nombre));
-      if (clave) { setV('regNumID', clave); var t = document.getElementById('regTipoID'); if (t && !t.value) t.value = 'INE / IFE'; }
-      if (domicilio) setV('regDomicilio', _ineTitle(domicilio));
+      if (d.nombre) setV('regNombre', d.nombre);
+      if (d.clave) { setV('regNumID', d.clave); var t = document.getElementById('regTipoID'); if (t && !t.value) t.value = 'INE / IFE'; }
+      if (d.domicilio) setV('regDomicilio', d.domicilio);
       var raw = document.getElementById('ineRawText'); var wrap = document.getElementById('ineRawWrap');
       if (raw) raw.value = text;
       if (wrap) wrap.style.display = '';
+    }
+    // ===== Escáner de INE en la RESERVA (cámara + OCR) =====
+    function escanearINERes() { var i = document.getElementById('ineFileInputRes'); if (i) i.click(); }
+    async function _procesarINERes(file) {
+      if (!file) return;
+      var st = document.getElementById('ineScanStatusRes');
+      var set = function (t) { if (st) st.textContent = t; };
+      set('📷 Procesando la foto…');
+      try {
+        if (typeof Tesseract === 'undefined') {
+          set('Descargando lector (solo la primera vez, ~unos segundos)…');
+          await _loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js');
+        }
+        set('Reconociendo texto de la INE…');
+        var r = await Tesseract.recognize(file, 'spa');
+        var text = (r && r.data && r.data.text) || '';
+        if (!text.trim()) { set('No se detectó texto. Toma la foto de frente, cerca y con buena luz.'); return; }
+        _rellenarDesdeINEReserva(text);
+        set('✅ Datos cargados — revísalos y corrige lo que haga falta.');
+      } catch (e) {
+        set('No se pudo leer la INE (' + (e && e.message ? e.message : e) + '). Captura los datos a mano.');
+      }
+    }
+    // Rellena el formulario de RESERVA: nombre en el campo, domicilio/clave en las notas.
+    function _rellenarDesdeINEReserva(text) {
+      var d = _parseINE(text);
+      var nombreEl = document.getElementById('newResHuesped');
+      if (nombreEl && d.nombre) { nombreEl.value = d.nombre; }
+      var extra = [];
+      if (d.domicilio) extra.push('Domicilio: ' + d.domicilio);
+      if (d.clave) extra.push('INE: ' + d.clave);
+      if (extra.length) {
+        var notasEl = document.getElementById('newResNotas');
+        if (notasEl) {
+          var cur = (notasEl.value || '').trim();
+          var add = extra.join(' · ');
+          if (cur.indexOf(add) === -1) notasEl.value = cur ? (cur + '\n' + add) : add;
+        }
+      }
     }
 
     function showGuestRegistration(res, room) {
