@@ -2612,6 +2612,13 @@
             <button type="button" class="form-button secondary" onclick="subirINERes()" style="flex:1;border-color:var(--accent);color:var(--accent);margin-top:0;font-size:12px;">🖼️ Subir foto</button>
           </div>
           <div id="ineScanStatusRes" style="font-size:11px;color:var(--text2);margin-top:5px;min-height:14px;line-height:1.4;"></div>
+          <div id="ineRawWrapRes" style="display:none;margin-top:6px;">
+            <button type="button" onclick="var w=document.getElementById('ineRawBoxRes');w.style.display=w.style.display==='none'?'block':'none';" style="background:none;border:none;color:var(--text2);font-size:11px;cursor:pointer;padding:2px 0;text-decoration:underline;">📄 Ver / copiar texto leído</button>
+            <div id="ineRawBoxRes" style="display:none;margin-top:4px;">
+              <textarea id="ineRawTextRes" readonly style="width:100%;box-sizing:border-box;min-height:90px;background:var(--surface2);border:1px solid var(--surface3);border-radius:8px;padding:8px;font-size:10px;color:var(--text2);font-family:monospace;"></textarea>
+              <button type="button" onclick="try{navigator.clipboard.writeText(document.getElementById('ineRawTextRes').value);toast('Texto copiado');}catch(e){}" style="margin-top:4px;background:var(--surface3);border:none;color:var(--text);font-size:11px;padding:6px 10px;border-radius:8px;cursor:pointer;">📋 Copiar texto</button>
+            </div>
+          </div>
         </div>
         <div class="form-group">
           <label class="form-label">Huésped</label>
@@ -3504,7 +3511,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-10-27b';
+    var APP_BUILD = '2026-10-27c';
 
     // ===== Selectores de fecha entrada→salida: la salida siempre mínimo el día siguiente =====
     function _nextDayStr(ymd) {
@@ -16340,7 +16347,7 @@
       document.getElementById('newResTotal').textContent = '$0';
       document.getElementById('newResHuesped').value = '';
       document.getElementById('newResTel').value = '';
-      try { var _iss = document.getElementById('ineScanStatusRes'); if (_iss) _iss.textContent = ''; var _ifi = document.getElementById('ineFileInputRes'); if (_ifi) _ifi.value = ''; var _ifu = document.getElementById('ineFileUploadRes'); if (_ifu) _ifu.value = ''; var _ic = document.getElementById('newResINEClave'); if (_ic) _ic.value = ''; var _id = document.getElementById('newResINEDomicilio'); if (_id) _id.value = ''; } catch (e) {}
+      try { var _iss = document.getElementById('ineScanStatusRes'); if (_iss) _iss.textContent = ''; var _ifi = document.getElementById('ineFileInputRes'); if (_ifi) _ifi.value = ''; var _ifu = document.getElementById('ineFileUploadRes'); if (_ifu) _ifu.value = ''; var _ic = document.getElementById('newResINEClave'); if (_ic) _ic.value = ''; var _id = document.getElementById('newResINEDomicilio'); if (_id) _id.value = ''; var _irw = document.getElementById('ineRawWrapRes'); if (_irw) _irw.style.display = 'none'; var _irt = document.getElementById('ineRawTextRes'); if (_irt) _irt.value = ''; var _irb = document.getElementById('ineRawBoxRes'); if (_irb) _irb.style.display = 'none'; } catch (e) {}
       document.getElementById('newResEmail').value = '';
       document.getElementById('newResAdultos').value = '1';
       document.getElementById('newResNinos').value = '0';
@@ -17439,17 +17446,55 @@
       }
       return out.join(' ').replace(/\s+/g, ' ').trim();
     }
-    // Parser reutilizable de la INE: devuelve { nombre, domicilio, clave }.
+    // Parser reutilizable de la INE: devuelve { nombre, domicilio, clave, raw }.
     function _parseINE(text) {
-      var up = text.toUpperCase();
-      var lines = up.split('\n').map(function (l) { return l.trim(); }).filter(Boolean);
+      var raw = String(text || '');
+      var up = raw.toUpperCase().replace(/[|¡!·•]/g, ' ');
+      var lines = up.split('\n').map(function (l) { return l.replace(/\s+/g, ' ').trim(); }).filter(function (l) { return l.length >= 2; });
+      // Palabras de etiqueta/encabezado que NO son parte del nombre ni del domicilio
+      var LBL = /INSTITUTO|NACIONAL|ELECTORAL|CREDENCIAL|VOTAR|M[EÉ]XICO|ESTADOS|UNIDOS|DOMICILIO|CLAVE|CURP|SEXO|FECHA|NACIMIENTO|REGISTRO|ESTADO|MUNICIPIO|SECCI[OÓ]N|LOCALIDAD|EMISI[OÓ]N|VIGENCIA|A[NÑ]O|FIRMA|ELECTOR/;
+
+      // CLAVE DE ELECTOR (18) o patrón 6 letras + dígitos
       var clave = '';
-      var m = up.match(/CLAVE\s*DE\s*ELECTOR\s*[:\-]?\s*([A-Z0-9]{14,18})/);
-      if (m) clave = m[1];
-      if (!clave) { var m2 = up.match(/\b[A-Z]{6}\d{6,8}[A-Z0-9]{0,6}\b/); if (m2) clave = m2[0]; }
-      var nombre = _ineBloque(lines, 'NOMBRE', ['DOMICILIO', 'CLAVE', 'CURP', 'SEXO', 'FECHA', 'ANO', 'AÑO', 'SECCION']);
-      var domicilio = _ineBloque(lines, 'DOMICILIO', ['CLAVE', 'CURP', 'ESTADO', 'MUNICIPIO', 'SECCION', 'LOCALIDAD', 'EMISION', 'VIGENCIA', 'ANO', 'AÑO', 'FECHA', 'CURP']);
-      return { nombre: nombre ? _ineTitle(nombre) : '', domicilio: domicilio ? _ineTitle(domicilio) : '', clave: clave };
+      var mc = up.match(/CLAVE\s*D[E]?\s*ELECTOR\s*[:\-]?\s*([A-Z0-9]{13,18})/);
+      if (mc) clave = mc[1];
+      if (!clave) { var mc2 = up.match(/\b[A-Z]{6}\d{6,8}[A-Z0-9]{0,6}\b/); if (mc2) clave = mc2[0]; }
+
+      // ¿la línea parece una parte de nombre? (solo letras y espacios, sin etiquetas ni dígitos)
+      function esNombreParte(L) { return /^[A-ZÁÉÍÓÚÑ ]{2,40}$/.test(L) && !LBL.test(L); }
+
+      // NOMBRE: líneas tras "NOMBRE" que sean puras letras (apellidos + nombres), máx 3
+      var nombreParts = [], capN = false;
+      for (var i = 0; i < lines.length; i++) {
+        var L = lines[i];
+        if (!capN) {
+          var mN = L.match(/\bNOMBRE\b[:\-\s]*(.*)$/);
+          if (mN) { capN = true; var after = (mN[1] || '').trim(); if (esNombreParte(after)) nombreParts.push(after); }
+          continue;
+        }
+        if (/DOMICILIO|CLAVE|CURP|SEXO|FECHA|REGISTRO|SECCI/.test(L)) break;
+        if (nombreParts.length >= 3) break;
+        if (esNombreParte(L)) nombreParts.push(L);
+        else if (nombreParts.length > 0) break; // ya tomó algo y llegó ruido → corta
+      }
+      var nombre = nombreParts.join(' ').replace(/\s+/g, ' ').trim();
+
+      // DOMICILIO: líneas tras "DOMICILIO" hasta una etiqueta, máx 4
+      var domParts = [], capD = false;
+      for (var j = 0; j < lines.length; j++) {
+        var D = lines[j];
+        if (!capD) {
+          var mD = D.match(/\bDOMICILIO\b[:\-\s]*(.*)$/);
+          if (mD) { capD = true; var ad = (mD[1] || '').trim(); if (ad.length >= 2 && !/CLAVE|CURP/.test(ad)) domParts.push(ad); }
+          continue;
+        }
+        if (/CLAVE|CURP|SECCI[OÓ]N|\bESTADO\b|MUNICIPIO|LOCALIDAD|EMISI[OÓ]N|VIGENCIA|A[NÑ]O|FECHA|REGISTRO|SEXO/.test(D)) break;
+        if (domParts.length >= 4) break;
+        if (D.length >= 2) domParts.push(D);
+      }
+      var domicilio = domParts.join(' ').replace(/\s+/g, ' ').trim();
+
+      return { nombre: nombre ? _ineTitle(nombre) : '', domicilio: domicilio ? _ineTitle(domicilio) : '', clave: clave, raw: raw };
     }
     // Rellena el formulario de CHECK-IN con los datos de la INE.
     function _rellenarDesdeINE(text) {
@@ -17499,6 +17544,9 @@
       // Campos ocultos para que fluyan al registro y al check-in
       var cEl = document.getElementById('newResINEClave'); if (cEl && d.clave) cEl.value = d.clave;
       var dEl = document.getElementById('newResINEDomicilio'); if (dEl && d.domicilio) dEl.value = d.domicilio;
+      // Texto crudo para revisar/copiar (diagnóstico)
+      var rawEl = document.getElementById('ineRawTextRes'); var rawWrap = document.getElementById('ineRawWrapRes');
+      if (rawEl) rawEl.value = text; if (rawWrap) rawWrap.style.display = '';
       // También visibles en notas
       var extra = [];
       if (d.domicilio) extra.push('Domicilio: ' + d.domicilio);
