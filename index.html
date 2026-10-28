@@ -736,6 +736,25 @@
     .conf-foot{text-align:center;font-size:11px;color:var(--text2);padding:4px 0 2px}
     .conf-btns{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px 20px 20px}
     .conf-btn{border:none;border-radius:12px;padding:11px;font-size:12.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px}
+    /* Onboarding: checklist "Primeros pasos" */
+    .ob-card{background:linear-gradient(160deg,rgba(167,139,250,.15),rgba(167,139,250,.04));border:1px solid var(--accent);border-radius:16px;padding:14px 16px;margin-bottom:16px;}
+    .ob-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px;}
+    .ob-title{font-size:15px;font-weight:800;color:var(--text);}
+    .ob-sub{font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.4;}
+    .ob-bar{height:7px;background:var(--surface3);border-radius:10px;overflow:hidden;margin-bottom:12px;}
+    .ob-bar-fill{height:100%;background:var(--accent);border-radius:10px;transition:width .3s;}
+    .ob-step{display:flex;align-items:center;gap:11px;background:var(--surface2);border:1px solid var(--surface3);border-radius:12px;padding:10px 12px;margin-bottom:7px;cursor:pointer;transition:all .15s;}
+    .ob-step:active{transform:scale(.99);}
+    .ob-step.done{opacity:.65;}
+    .ob-step-ic{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:17px;background:var(--surface3);flex-shrink:0;}
+    .ob-step.done .ob-step-ic{background:rgba(107,191,123,.2);}
+    .ob-step-tx{flex:1;min-width:0;}
+    .ob-step-t{font-size:13px;font-weight:700;color:var(--text);}
+    .ob-step-d{font-size:11px;color:var(--text2);line-height:1.3;}
+    .ob-step-chk{font-size:17px;flex-shrink:0;color:var(--text2);}
+    .ob-step.done .ob-step-chk{color:var(--green);}
+    .ob-x{background:none;border:none;color:var(--text2);font-size:12px;cursor:pointer;padding:2px 6px;text-decoration:underline;}
+    .ob-done-msg{text-align:center;padding:8px 0 4px;font-size:14px;color:var(--green);font-weight:700;}
     @media print{
       body * { visibility: hidden !important; }
       .receipt-overlay, .receipt-overlay * { visibility: visible !important; }
@@ -2325,6 +2344,7 @@
               <div class="user-greeting" id="userGreeting"></div>
               <div class="user-role" id="userRoleText"></div>
             </div>
+            <div id="onboardCard"></div>
             <div id="arrivalsAlert" style="display:none;"></div>
             <div id="onlineResAlert" style="display:none;"></div>
 
@@ -3493,7 +3513,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-10-27g';
+    var APP_BUILD = '2026-10-28a';
 
     // ===== Selectores de fecha entrada→salida: la salida siempre mínimo el día siguiente =====
     function _nextDayStr(ymd) {
@@ -8021,8 +8041,73 @@
       document.getElementById('dashAvailResults').innerHTML = h;
     }
 
+    // ===== Onboarding: "Primeros pasos" (checklist) + saludo guiado =====
+    var OB_STEPS = [
+      { tab: 'rooms', ic: '🛏️', t: 'Revisa tus habitaciones', d: 'Estado de cada cuarto: disponible, ocupada, limpieza, mantenimiento.' },
+      { tab: 'reservas', ic: '📅', t: 'Explora las reservas', d: 'Crea, confirma y haz check-in desde aquí.' },
+      { tab: 'cobros', ic: '💰', t: 'Mira los cobros', d: 'Registra pagos y revisa saldos pendientes.' },
+      { tab: 'cotizaciones', ic: '📝', t: 'Haz una cotización', d: 'Arma precios por habitación y envíala por WhatsApp.' },
+      { tab: 'config', ic: '⚙️', t: 'Configura tu hotel', d: 'Datos, tarifas, usuarios y políticas (Ajustes).' }
+    ];
+    function _obGet(k) { try { return localStorage.getItem(k) === '1'; } catch (e) { return false; } }
+    function _obSet(k) { try { localStorage.setItem(k, '1'); } catch (e) {} }
+    function _obVisited(tab) { return _obGet('ob_v_' + tab); }
+    function _obMarkVisit(tab) { _obSet('ob_v_' + tab); }
+    function _obHidden() { return _obGet('ob_hide'); }
+    function renderOnboarding() {
+      var host = document.getElementById('onboardCard'); if (!host) return;
+      if (_obHidden()) { host.innerHTML = ''; return; }
+      var done = OB_STEPS.filter(function (s) { return _obVisited(s.tab); }).length;
+      var total = OB_STEPS.length, pct = Math.round(done / total * 100);
+      var h = '<div class="ob-card">';
+      h += '<div class="ob-head"><div class="ob-title">👋 Primeros pasos</div><button class="ob-x" onclick="_obHide()">Ocultar</button></div>';
+      if (done >= total) {
+        h += '<div class="ob-done-msg">🎉 ¡Listo! Ya conoces lo básico.</div>';
+        h += '<button class="form-button secondary" onclick="_obHide()" style="width:100%;margin-top:6px;">Entendido, ocultar</button>';
+      } else {
+        h += '<div class="ob-sub">Toca cada paso para conocer la app — se van marcando solos (' + done + '/' + total + ').</div>';
+        h += '<div class="ob-bar"><div class="ob-bar-fill" style="width:' + pct + '%"></div></div>';
+        OB_STEPS.forEach(function (s) {
+          var dn = _obVisited(s.tab);
+          h += '<div class="ob-step' + (dn ? ' done' : '') + '" onclick="_obGoto(\'' + s.tab + '\')">';
+          h += '<div class="ob-step-ic">' + s.ic + '</div>';
+          h += '<div class="ob-step-tx"><div class="ob-step-t">' + s.t + '</div><div class="ob-step-d">' + s.d + '</div></div>';
+          h += '<div class="ob-step-chk">' + (dn ? '✅' : '›') + '</div>';
+          h += '</div>';
+        });
+      }
+      h += '</div>';
+      host.innerHTML = h;
+    }
+    function _obGoto(tab) { _obMarkVisit(tab); switchTab(tab); }
+    function _obHide() { _obSet('ob_hide'); renderOnboarding(); toast('Lo puedes volver a ver en Ajustes → App'); }
+    function _obReset() {
+      try { localStorage.removeItem('ob_hide'); localStorage.removeItem('ob_welcomed'); OB_STEPS.forEach(function (s) { localStorage.removeItem('ob_v_' + s.tab); }); } catch (e) {}
+      renderOnboarding(); toast('Primeros pasos reiniciado');
+    }
+    function showWelcomeIntro() {
+      if (_obGet('ob_welcomed')) return;
+      _obSet('ob_welcomed');
+      try {
+        var hi = getHotelInfo();
+        var h = '<div class="receipt-overlay" id="obWelcomeOverlay" onclick="if(event.target===this)_obCloseWelcome()">';
+        h += '<div class="conf-box" style="max-width:380px;">';
+        h += '<div class="conf-hdr"><img src="' + LOGO_V_LIGHT + '" alt="Logo"><div class="conf-title">Bienvenido</div></div>';
+        h += '<div class="conf-body">';
+        h += '<div style="font-size:14px;color:var(--text);line-height:1.6;margin-bottom:12px;">Con esta app manejas <b>' + _wbEsc(hi.nombre || 'tu hotel') + '</b>: reservas, check-in, cobros, cotizaciones, limpieza y más — todo desde el celular.</div>';
+        h += '<div style="font-size:13px;color:var(--text2);line-height:1.7;">Te dejé una tarjeta de <b>Primeros pasos</b> en el inicio: tócala para conocer cada sección en unos minutos. 🙂</div>';
+        h += '</div>';
+        h += '<div class="conf-btns" style="grid-template-columns:1fr;padding:12px 20px 20px;"><button class="conf-btn" onclick="_obCloseWelcome()" style="background:var(--accent);color:var(--bg);">Empezar →</button></div>';
+        h += '</div></div>';
+        document.body.insertAdjacentHTML('beforeend', h);
+      } catch (e) {}
+    }
+    function _obCloseWelcome() { var e = document.getElementById('obWelcomeOverlay'); if (e) e.remove(); }
+
     function renderDashboard() {
       if (!S.user || !S.rooms) return;
+      try { renderOnboarding(); } catch (e) {}
+      try { showWelcomeIntro(); } catch (e) {}
       const today = normDate(new Date());
       const occupied = S.rooms.filter(r => r.estado === 'Ocupada').length;
       const available = S.rooms.filter(r => r.estado === 'Disponible').length;
@@ -14043,6 +14128,13 @@
       h += '<div class="section-title">Configuración de la App</div>';
       h += '</div>';
 
+      // Primeros pasos (onboarding)
+      h += '<div style="background:var(--surface2);border-radius:var(--radius);padding:16px;margin-bottom:12px">';
+      h += '<div style="font-weight:700;font-size:14px;margin-bottom:6px">👋 Primeros pasos</div>';
+      h += '<div style="font-size:12px;color:var(--text2);margin-bottom:10px">Vuelve a mostrar la guía de bienvenida y el checklist en el inicio (útil para personal nuevo).</div>';
+      h += '<button class="form-button secondary" onclick="_obReset();switchTab(\'dashboard\')" style="width:100%">Ver primeros pasos de nuevo</button>';
+      h += '</div>';
+
       // Theme section
       var currentTheme = getTheme();
       h += '<div style="background:var(--surface2);border-radius:var(--radius);padding:16px;margin-bottom:12px">';
@@ -19345,6 +19437,7 @@
 
       var prevTab = S.currentTab;
       S.currentTab = tabName;
+      try { _obMarkVisit(tabName); if (tabName === 'dashboard') renderOnboarding(); } catch (e) {}
       closeNav();
       renderNav();
 
