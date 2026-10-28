@@ -755,6 +755,24 @@
     .ob-step.done .ob-step-chk{color:var(--green);}
     .ob-x{background:none;border:none;color:var(--text2);font-size:12px;cursor:pointer;padding:2px 6px;text-decoration:underline;}
     .ob-done-msg{text-align:center;padding:8px 0 4px;font-size:14px;color:var(--green);font-weight:700;}
+    /* Lección guiada (ventana de pasos) */
+    .les-box{background:var(--surface2);color:var(--text);border-radius:20px;max-width:400px;width:100%;max-height:92vh;overflow-y:auto;border:1px solid var(--surface3);box-shadow:0 24px 70px rgba(0,0,0,.55);animation:slideUp .25s ease;padding:16px 18px 18px;}
+    .les-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;}
+    .les-title{font-size:15px;font-weight:800;color:var(--text);line-height:1.2;}
+    .les-dots{display:flex;gap:6px;justify-content:center;margin-bottom:16px;flex-wrap:wrap;}
+    .les-dot{width:7px;height:7px;border-radius:50%;background:var(--surface3);transition:all .2s;}
+    .les-dot.on{background:var(--accent);width:20px;border-radius:5px;}
+    .les-body{text-align:center;min-height:170px;padding:0 4px;}
+    .les-ic{font-size:40px;line-height:1;margin-bottom:12px;}
+    .les-st{font-size:16px;font-weight:800;color:var(--text);margin-bottom:10px;}
+    .les-tx{font-size:13.5px;color:var(--text2);line-height:1.65;text-align:left;}
+    .les-tx b{color:var(--text);}
+    .les-nav{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:18px;}
+    .les-btn{border:none;border-radius:12px;padding:12px;font-size:13px;font-weight:700;cursor:pointer;}
+    .les-btn.secondary{background:var(--surface3);color:var(--text);}
+    .les-btn.primary{background:var(--accent);color:var(--bg);}
+    .les-try{width:100%;margin-top:8px;background:rgba(107,191,123,.15);color:var(--green);border:1px solid var(--green);border-radius:12px;padding:11px;font-size:12.5px;font-weight:700;cursor:pointer;}
+    .les-count{text-align:center;font-size:11px;color:var(--text2);margin-top:10px;}
     @media print{
       body * { visibility: hidden !important; }
       .receipt-overlay, .receipt-overlay * { visibility: visible !important; }
@@ -3513,7 +3531,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-10-28a';
+    var APP_BUILD = '2026-10-28b';
 
     // ===== Selectores de fecha entrada→salida: la salida siempre mínimo el día siguiente =====
     function _nextDayStr(ymd) {
@@ -8041,35 +8059,97 @@
       document.getElementById('dashAvailResults').innerHTML = h;
     }
 
-    // ===== Onboarding: "Primeros pasos" (checklist) + saludo guiado =====
+    // ===== Onboarding: lecciones guiadas paso a paso + saludo =====
     var OB_STEPS = [
-      { tab: 'rooms', ic: '🛏️', t: 'Revisa tus habitaciones', d: 'Estado de cada cuarto: disponible, ocupada, limpieza, mantenimiento.' },
-      { tab: 'reservas', ic: '📅', t: 'Explora las reservas', d: 'Crea, confirma y haz check-in desde aquí.' },
-      { tab: 'cobros', ic: '💰', t: 'Mira los cobros', d: 'Registra pagos y revisa saldos pendientes.' },
-      { tab: 'cotizaciones', ic: '📝', t: 'Haz una cotización', d: 'Arma precios por habitación y envíala por WhatsApp.' },
-      { tab: 'config', ic: '⚙️', t: 'Configura tu hotel', d: 'Datos, tarifas, usuarios y políticas (Ajustes).' }
+      { key: 'reserva', ic: '📅', t: 'Cómo hacer una reservación', d: 'La más importante — cada paso explicado.' },
+      { key: 'checkin', ic: '🔑', t: 'Confirmar y hacer check-in', d: 'De "reservada" a huésped hospedado.' },
+      { key: 'desayunos', ic: '🍳', t: 'Códigos de desayuno', d: 'Generarlos y enviarlos al huésped.' },
+      { key: 'acceso', ic: '🔐', t: 'Guía y código de acceso', d: 'La guía digital personal del huésped.' },
+      { key: 'cobros', ic: '💰', t: 'Registrar cobros', d: 'Pagos, saldos y recibos.' },
+      { key: 'cotizacion', ic: '📝', t: 'Hacer una cotización', d: 'Precios por cuarto y enviar por WhatsApp.' }
     ];
+    // Contenido de cada lección (pasos con explicación). body admite <b>.
+    var OB_LESSONS = {
+      reserva: {
+        title: '📅 Hacer una reservación', tryLabel: 'Abrir "Nueva Reserva" para practicar', tryFn: 'openNewReservaModal()',
+        steps: [
+          { icon: '📋', title: '1. Abre el formulario', body: 'Desde el <b>Inicio</b> toca <b>Reservar</b>, o en la pestaña <b>Reservas</b> el botón <b>+</b>. Se abre la ventana <b>"Nueva Reserva"</b>.' },
+          { icon: '🛏️', title: '2. Elige la habitación', body: 'En <b>Habitación</b> selecciona el cuarto. La lista solo muestra los <b>disponibles para esas fechas</b>; los ocupados o en mantenimiento aparecen bloqueados y no se pueden elegir.' },
+          { icon: '👤', title: '3. Datos del huésped', body: 'Escribe el <b>nombre completo</b>. Si ya es cliente registrado, aparece en una lista para elegirlo (trae su teléfono). Agrega <b>teléfono</b> y <b>email</b> (el email es opcional).' },
+          { icon: '📅', title: '4. Fechas de estancia', body: 'Pon la <b>entrada</b> y la <b>salida</b>. La salida se ajusta sola a mínimo el <b>día siguiente</b> de la entrada. Las <b>noches</b> y el total se calculan automáticamente.' },
+          { icon: '👥', title: '5. Personas', body: 'Indica <b>adultos</b> y <b>niños</b>. Si se quedan <b>más personas que la base del cuarto</b>, pon las <b>personas extra</b>: la app suma sola el cargo por persona por noche.' },
+          { icon: '💲', title: '6. Tarifa y total', body: 'La <b>tarifa diaria</b> viene de la habitación; puedes cambiarla. Si la <b>bajas</b> de la tarifa estándar, te pide un <b>motivo</b> (precio especial). El <b>Total</b> se calcula solo: noches × tarifa + extras.' },
+          { icon: '🧾', title: '7. Factura y anticipo (opcional)', body: 'Activa <b>Factura</b> si el huésped pide comprobante (captura RFC y razón social; se agregan IVA e ISH). Activa <b>registrar pago</b> para capturar el <b>anticipo</b> en ese momento.' },
+          { icon: '✅', title: '8. Guardar', body: 'Toca <b>Guardar</b>. La reserva queda en estado <b>Reservada</b>. Después la <b>Confirmas</b> y, el día de llegada, haces <b>Check-in</b> (ver la siguiente lección).' }
+        ]
+      },
+      checkin: {
+        title: '🔑 Confirmar y Check-in', tryLabel: 'Ir a Reservas', tryFn: "switchTab('reservas')",
+        steps: [
+          { icon: '📂', title: '1. Abre la reserva', body: 'En la pestaña <b>Reservas</b> (o desde el <b>Inicio</b>) toca la reserva para ver su detalle y sus botones de acción.' },
+          { icon: '🟢', title: '2. Confirmar', body: 'Toca <b>Confirmar Reserva</b>: pasa de <b>Reservada</b> a <b>Confirmada</b> (significa que ya está apartada en firme). En una reserva de grupo puedes <b>confirmar todas de un jalón</b>.' },
+          { icon: '🔑', title: '3. Hacer check-in', body: 'El día de llegada, abre la reserva y toca <b>Hacer Check-in</b> (o el botón <b>Check-in</b> del inicio). Es cuando el huésped llega y se hospeda.' },
+          { icon: '🪪', title: '4. Registrar al huésped', body: 'Se piden los datos de registro (requerido por ley): <b>nombre, tipo y número de identificación, nacionalidad y domicilio</b>. Al terminar, la habitación pasa a <b>Ocupada</b>.' },
+          { icon: '🚶', title: 'Tip: Walk-in', body: 'Si alguien llega <b>sin reserva previa</b>, usa <b>Walk-in</b> en el inicio: crea la reserva y hace el check-in en un solo flujo.' }
+        ]
+      },
+      desayunos: {
+        title: '🍳 Códigos de desayuno', tryLabel: 'Ir a Reservas', tryFn: "switchTab('reservas')",
+        steps: [
+          { icon: '🍳', title: '1. ¿Qué son?', body: 'Si la estancia <b>incluye desayuno</b>, cada huésped recibe un <b>código</b> (uno por persona, por noche) que presenta en el restaurante asociado para desayunar sin costo.' },
+          { icon: '✅', title: '2. Activarlos', body: 'Al hacer el <b>Check-in</b> aparece la opción <b>"🍳 Activar desayunos para esta estancia"</b>. Al activarla, la app genera automáticamente <b>un código por huésped por noche</b>.' },
+          { icon: '📲', title: '3. Enviarlos al huésped', body: 'En la ficha de la reserva usa <b>compartir códigos de desayuno</b> para mandárselos por <b>WhatsApp</b>, con el horario y cómo usarlos.' },
+          { icon: '☕', title: '4. Avisar al restaurante', body: 'Puedes mandarle al restaurante la <b>lista de huéspedes con desayuno</b> (en reservas de grupo, con un solo botón) para que los reciban y marquen sus llegadas.' }
+        ]
+      },
+      acceso: {
+        title: '🔐 Guía y código de acceso', tryLabel: 'Ir a Reservas', tryFn: "switchTab('reservas')",
+        steps: [
+          { icon: '📖', title: '1. La guía digital', body: 'Cada reserva tiene una <b>guía digital personal</b> que el huésped abre por <b>QR o enlace</b>, sin instalar nada. Incluye su <b>código de acceso</b>, WiFi, desayuno, recomendaciones de la zona y horarios.' },
+          { icon: '🔐', title: '2. ¿Para qué el código de acceso?', body: 'La recepción atiende hasta cierta hora (ej. 10 PM). Después, el huésped entra con su <b>código de acceso personal</b> que viene en su guía.' },
+          { icon: '📤', title: '3. Enviarla', body: 'En la ficha de la reserva genera el <b>enlace/QR del huésped</b> y envíalo por WhatsApp. La dirección, WiFi y contactos se toman solos de <b>Ajustes</b>, así que no capturas nada extra.' }
+        ]
+      },
+      cobros: {
+        title: '💰 Registrar cobros', tryLabel: 'Ir a Cobros', tryFn: "switchTab('cobros')",
+        steps: [
+          { icon: '💵', title: '1. Cobrar', body: 'En <b>Cobros</b> (o desde la reserva) toca <b>Cobrar</b>: captura el <b>monto</b> y el <b>método</b> (efectivo, tarjeta, transferencia). Sirve para anticipos o para liquidar.' },
+          { icon: '📊', title: '2. Saldos', body: 'Cada reserva muestra <b>total, pagado y saldo</b>. En una reserva de grupo puedes <b>cobrar todo junto</b> y la app reparte el pago entre los cuartos.' },
+          { icon: '🧾', title: '3. Recibo', body: 'Después de cobrar puedes generar el <b>recibo en PDF</b> para el huésped y enviarlo por WhatsApp.' }
+        ]
+      },
+      cotizacion: {
+        title: '📝 Hacer una cotización', tryLabel: 'Ir a Cotizaciones', tryFn: "switchTab('cotizaciones')",
+        steps: [
+          { icon: '➕', title: '1. Nueva cotización', body: 'En <b>Cotizaciones</b> toca <b>+ Nueva</b>. Pon el <b>nombre del cliente</b>, su teléfono, y las <b>fechas</b>.' },
+          { icon: '🛏️', title: '2. Agregar habitaciones', body: 'Agrega una o varias <b>habitaciones</b>: tipo, cantidad y <b>personas por cuarto</b>. La app calcula los <b>extras</b> (personas adicionales) según la base de cada tipo.' },
+          { icon: '🧮', title: '3. Precios e impuestos', body: 'Ves el <b>subtotal</b> y el total. Si activas <b>factura</b>, agrega IVA (16%) e ISH (5%) automáticamente.' },
+          { icon: '📱', title: '4. Enviar al cliente', body: 'Descarga el <b>PDF</b> y mándalo por <b>WhatsApp</b> directo al número del cliente, con el mensaje ya armado.' },
+          { icon: '✅', title: '5. Convertir en reserva', body: 'Cuando el cliente acepte, desde la cotización puedes <b>crear las reservas</b> directamente (revisas los datos antes de aceptar).' }
+        ]
+      }
+    };
     function _obGet(k) { try { return localStorage.getItem(k) === '1'; } catch (e) { return false; } }
     function _obSet(k) { try { localStorage.setItem(k, '1'); } catch (e) {} }
-    function _obVisited(tab) { return _obGet('ob_v_' + tab); }
     function _obMarkVisit(tab) { _obSet('ob_v_' + tab); }
+    function _obDone(key) { return _obGet('ob_done_' + key); }
     function _obHidden() { return _obGet('ob_hide'); }
     function renderOnboarding() {
       var host = document.getElementById('onboardCard'); if (!host) return;
       if (_obHidden()) { host.innerHTML = ''; return; }
-      var done = OB_STEPS.filter(function (s) { return _obVisited(s.tab); }).length;
+      var done = OB_STEPS.filter(function (s) { return _obDone(s.key); }).length;
       var total = OB_STEPS.length, pct = Math.round(done / total * 100);
       var h = '<div class="ob-card">';
-      h += '<div class="ob-head"><div class="ob-title">👋 Primeros pasos</div><button class="ob-x" onclick="_obHide()">Ocultar</button></div>';
+      h += '<div class="ob-head"><div class="ob-title">👋 Aprende a usar la app</div><button class="ob-x" onclick="_obHide()">Ocultar</button></div>';
       if (done >= total) {
-        h += '<div class="ob-done-msg">🎉 ¡Listo! Ya conoces lo básico.</div>';
+        h += '<div class="ob-done-msg">🎉 ¡Completaste la guía!</div>';
         h += '<button class="form-button secondary" onclick="_obHide()" style="width:100%;margin-top:6px;">Entendido, ocultar</button>';
       } else {
-        h += '<div class="ob-sub">Toca cada paso para conocer la app — se van marcando solos (' + done + '/' + total + ').</div>';
+        h += '<div class="ob-sub">Lecciones guiadas paso a paso. Toca una para aprender a hacerlo (' + done + '/' + total + ').</div>';
         h += '<div class="ob-bar"><div class="ob-bar-fill" style="width:' + pct + '%"></div></div>';
         OB_STEPS.forEach(function (s) {
-          var dn = _obVisited(s.tab);
-          h += '<div class="ob-step' + (dn ? ' done' : '') + '" onclick="_obGoto(\'' + s.tab + '\')">';
+          var dn = _obDone(s.key);
+          h += '<div class="ob-step' + (dn ? ' done' : '') + '" onclick="openLesson(\'' + s.key + '\')">';
           h += '<div class="ob-step-ic">' + s.ic + '</div>';
           h += '<div class="ob-step-tx"><div class="ob-step-t">' + s.t + '</div><div class="ob-step-d">' + s.d + '</div></div>';
           h += '<div class="ob-step-chk">' + (dn ? '✅' : '›') + '</div>';
@@ -8079,11 +8159,40 @@
       h += '</div>';
       host.innerHTML = h;
     }
-    function _obGoto(tab) { _obMarkVisit(tab); switchTab(tab); }
+    // ----- Motor de lecciones (ventana con pasos) -----
+    var _obLessonKey = null, _obLessonIdx = 0;
+    function openLesson(key) { if (!OB_LESSONS[key]) return; _obLessonKey = key; _obLessonIdx = 0; _renderLesson(); }
+    function _renderLesson() {
+      var L = OB_LESSONS[_obLessonKey]; if (!L) return;
+      var steps = L.steps, i = _obLessonIdx, s = steps[i], isLast = i >= steps.length - 1;
+      var dots = steps.map(function (_, idx) { return '<span class="les-dot' + (idx === i ? ' on' : '') + '"></span>'; }).join('');
+      var h = '<div class="receipt-overlay" id="lessonOverlay" onclick="if(event.target===this)_obCloseLesson()">';
+      h += '<div class="les-box">';
+      h += '<div class="les-head"><div class="les-title">' + _wbEsc(L.title) + '</div><button class="ob-x" style="font-size:16px;" onclick="_obCloseLesson()">✕</button></div>';
+      h += '<div class="les-dots">' + dots + '</div>';
+      h += '<div class="les-body"><div class="les-ic">' + (s.icon || '') + '</div><div class="les-st">' + _wbEsc(s.title) + '</div><div class="les-tx">' + s.body + '</div></div>';
+      h += '<div class="les-nav">';
+      h += '<button class="les-btn secondary"' + (i === 0 ? ' disabled style="opacity:.35"' : '') + ' onclick="_obLessonPrev()">‹ Atrás</button>';
+      if (!isLast) h += '<button class="les-btn primary" onclick="_obLessonNext()">Siguiente ›</button>';
+      else h += '<button class="les-btn primary" onclick="_obFinishLesson()">✅ Entendido</button>';
+      h += '</div>';
+      if (isLast && L.tryFn) h += '<button class="les-try" onclick="_obFinishLesson();_obCloseLesson();' + L.tryFn + '">' + _wbEsc(L.tryLabel || 'Probar ahora') + ' →</button>';
+      h += '<div class="les-count">Paso ' + (i + 1) + ' de ' + steps.length + '</div>';
+      h += '</div></div>';
+      var old = document.getElementById('lessonOverlay'); if (old) old.remove();
+      document.body.insertAdjacentHTML('beforeend', h);
+    }
+    function _obLessonNext() { var L = OB_LESSONS[_obLessonKey]; if (L && _obLessonIdx < L.steps.length - 1) { _obLessonIdx++; _renderLesson(); } }
+    function _obLessonPrev() { if (_obLessonIdx > 0) { _obLessonIdx--; _renderLesson(); } }
+    function _obFinishLesson() { if (_obLessonKey) _obSet('ob_done_' + _obLessonKey); _obCloseLesson(); renderOnboarding(); }
+    function _obCloseLesson() { var e = document.getElementById('lessonOverlay'); if (e) e.remove(); }
     function _obHide() { _obSet('ob_hide'); renderOnboarding(); toast('Lo puedes volver a ver en Ajustes → App'); }
     function _obReset() {
-      try { localStorage.removeItem('ob_hide'); localStorage.removeItem('ob_welcomed'); OB_STEPS.forEach(function (s) { localStorage.removeItem('ob_v_' + s.tab); }); } catch (e) {}
-      renderOnboarding(); toast('Primeros pasos reiniciado');
+      try {
+        localStorage.removeItem('ob_hide'); localStorage.removeItem('ob_welcomed');
+        OB_STEPS.forEach(function (s) { localStorage.removeItem('ob_done_' + s.key); });
+      } catch (e) {}
+      renderOnboarding(); toast('Guía reiniciada');
     }
     function showWelcomeIntro() {
       if (_obGet('ob_welcomed')) return;
@@ -8095,7 +8204,7 @@
         h += '<div class="conf-hdr"><img src="' + LOGO_V_LIGHT + '" alt="Logo"><div class="conf-title">Bienvenido</div></div>';
         h += '<div class="conf-body">';
         h += '<div style="font-size:14px;color:var(--text);line-height:1.6;margin-bottom:12px;">Con esta app manejas <b>' + _wbEsc(hi.nombre || 'tu hotel') + '</b>: reservas, check-in, cobros, cotizaciones, limpieza y más — todo desde el celular.</div>';
-        h += '<div style="font-size:13px;color:var(--text2);line-height:1.7;">Te dejé una tarjeta de <b>Primeros pasos</b> en el inicio: tócala para conocer cada sección en unos minutos. 🙂</div>';
+        h += '<div style="font-size:13px;color:var(--text2);line-height:1.7;">En el inicio verás <b>"Aprende a usar la app"</b>: cada lección te enseña <b>paso a paso</b> cómo hacerlo — empezando por <b>cómo hacer una reservación</b>. 🙂</div>';
         h += '</div>';
         h += '<div class="conf-btns" style="grid-template-columns:1fr;padding:12px 20px 20px;"><button class="conf-btn" onclick="_obCloseWelcome()" style="background:var(--accent);color:var(--bg);">Empezar →</button></div>';
         h += '</div></div>';
