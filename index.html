@@ -3531,7 +3531,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-10-28b';
+    var APP_BUILD = '2026-10-30a';
 
     // ===== Selectores de fecha entrada→salida: la salida siempre mínimo el día siguiente =====
     function _nextDayStr(ymd) {
@@ -6591,12 +6591,12 @@
 
       container.innerHTML =
         '<div style="text-align:center;margin-bottom:20px;">' +
-          '<img src="' + LOGO_H_DARK + '" alt="Logo" style="max-width:200px;margin:0 auto 10px;" onerror="this.style.display=\'none\'">' +
+          '<img src="' + LOGO_H_LIGHT + '" alt="Logo" style="max-width:200px;margin:0 auto 10px;" onerror="this.style.display=\'none\'">' +
         '</div>' +
-        '<h2 style="text-align:center;margin-bottom:4px;">🍳 Validar Desayuno</h2>' +
-        (promoName ? '<p style="text-align:center;color:var(--text-secondary);margin-bottom:8px;font-size:14px;">' + promoName + '</p>' : '') +
-        (promoDesc ? '<div style="text-align:center;margin-bottom:20px;padding:8px 12px;background:rgba(46,125,50,0.08);border-radius:8px;border-left:3px solid #2e7d32;font-size:13px;color:#2e7d32;line-height:1.4;">🍽️ ' + promoDesc + '</div>' : '') +
-        '<div style="text-align:center;color:#6c757d;font-size:13px;margin-bottom:8px;">Marca a cada huésped cuando llegue a desayunar. La lista de autorizados aparece abajo.</div>' +
+        '<h2 style="text-align:center;margin-bottom:4px;color:var(--text);">🍳 Validar Desayuno</h2>' +
+        (promoName ? '<p style="text-align:center;color:var(--text2);margin-bottom:8px;font-size:14px;">' + promoName + '</p>' : '') +
+        (promoDesc ? '<div style="text-align:center;margin-bottom:20px;padding:10px 12px;background:var(--surface2);border-radius:var(--radius);border-left:4px solid var(--green);font-size:13px;color:var(--text2);line-height:1.4;">🍽️ ' + promoDesc + '</div>' : '') +
+        '<div style="text-align:center;color:var(--text2);font-size:13px;margin-bottom:8px;">Marca a cada huésped cuando llegue a desayunar. La lista de autorizados aparece abajo.</div>' +
         '<div id="validarResult" style="margin-top:20px;"></div>' +
         '<div id="validarRoster" style="margin-top:24px;"></div>' +
         '<div id="validarHistory" style="margin-top:30px;"></div>';
@@ -21477,10 +21477,8 @@
       var dates = [];
       _rosterAll.forEach(function(c) { if (dates.indexOf(c.fecha) === -1 && c.fecha) dates.push(c.fecha); });
       dates.sort();
-      // fecha activa: la del link, o hoy, o la primera con pendientes
-      var pendingDates = dates.filter(function(dt) { return _rosterAll.some(function(c) { return c.fecha === dt && c.estado === 'Pendiente'; }); });
-      _rosterDate = (urlFecha && dates.indexOf(urlFecha) !== -1) ? urlFecha
-                   : (pendingDates.indexOf(today) !== -1 ? today : (pendingDates[0] || dates[0] || today));
+      // Siempre inicia en HOY (salvo que el link traiga una fecha específica).
+      _rosterDate = (urlFecha && dates.indexOf(urlFecha) !== -1) ? urlFecha : today;
       _rosterRenderList();
     }
 
@@ -21490,24 +21488,21 @@
       var today = normDate(new Date());
       var dates = [];
       _rosterAll.forEach(function(c) { if (dates.indexOf(c.fecha) === -1 && c.fecha) dates.push(c.fecha); });
+      if (dates.indexOf(today) === -1) dates.push(today);   // hoy siempre seleccionable
       dates.sort();
 
       var h = '';
-      h += '<div style="border-top:1px solid #e5ddcf;padding-top:16px;">';
-      h += '<div style="font-weight:800;font-size:16px;color:#3d3324;margin-bottom:4px;">📋 Huéspedes con desayuno</div>';
-      h += '<div style="font-size:12px;color:#8a7a5f;margin-bottom:10px;">🪪 Pide el INE o identificación oficial, verifícalo en esta lista y toca “Llegó” cuando se presente.</div>';
-      // Selector de fecha (chips)
-      if (dates.length > 1) {
-        h += '<div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin-bottom:10px;">';
-        dates.forEach(function(dt) {
-          var active = dt === _rosterDate;
-          var pend = _rosterAll.filter(function(c) { return c.fecha === dt && c.estado === 'Pendiente'; }).length;
-          h += '<button onclick="_rosterSetDate(\'' + dt + '\')" style="flex:0 0 auto;padding:6px 12px;border-radius:20px;border:1px solid ' + (active ? '#2e7d32' : '#d8cdb8') + ';background:' + (active ? '#2e7d32' : '#fff') + ';color:' + (active ? '#fff' : '#5a4d38') + ';font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">' + _bfDateLabel(dt) + (pend ? ' · ' + pend : '') + '</button>';
-        });
-        h += '</div>';
-      } else {
-        h += '<div style="font-size:13px;font-weight:700;color:#2e7d32;margin-bottom:8px;">📅 ' + _bfDateLabel(_rosterDate) + '</div>';
-      }
+      h += '<div style="font-weight:800;font-size:17px;color:var(--text);margin-bottom:4px;">📋 Huéspedes con desayuno</div>';
+      h += '<div style="font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.4;">🪪 Pide una identificación oficial, verifícala en la lista y toca “Llegó” cuando se presente.</div>';
+      // Selector de fecha (chips) — siempre, para poder volver a hoy u otro día
+      h += '<div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin-bottom:12px;">';
+      dates.forEach(function(dt) {
+        var active = dt === _rosterDate;
+        var pend = _rosterAll.filter(function(c) { return c.fecha === dt && c.estado === 'Pendiente'; }).length;
+        var lbl = _bfDateLabel(dt);
+        h += '<button onclick="_rosterSetDate(\'' + dt + '\')" style="flex:0 0 auto;padding:7px 13px;border-radius:20px;border:1px solid ' + (active ? 'var(--accent)' : 'var(--surface3)') + ';background:' + (active ? 'var(--accent)' : 'var(--surface2)') + ';color:' + (active ? 'var(--bg)' : 'var(--text2)') + ';font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">' + lbl + (pend ? ' · ' + pend : '') + '</button>';
+      });
+      h += '</div>';
 
       var list = _rosterAll.filter(function(c) { return c.fecha === _rosterDate; });
       list.sort(function(a, b) {
@@ -21516,22 +21511,23 @@
         return String(a.huesped).localeCompare(String(b.huesped));
       });
       if (!list.length) {
-        h += '<div style="text-align:center;color:#999;font-size:13px;padding:16px;">No hay desayunos para esta fecha.</div>';
+        h += '<div style="text-align:center;color:var(--text2);font-size:13px;padding:22px;background:var(--surface2);border-radius:var(--radius);border:1px dashed var(--surface3);">No hay desayunos para esta fecha.</div>';
       }
       list.forEach(function(c) {
         var done = /consum|used/i.test(c.estado);
         var cancel = /cancel/i.test(c.estado);
-        h += '<div style="display:flex;align-items:center;gap:10px;padding:12px;border-radius:12px;margin-bottom:8px;background:' + (done ? '#eef5ec' : cancel ? '#f6eeee' : '#fff') + ';border:1px solid ' + (done ? '#bcdcae' : '#e5ddcf') + ';' + (done || cancel ? 'opacity:.75;' : '') + '">';
+        var bc = done ? 'var(--green)' : cancel ? 'var(--red)' : 'var(--accent)';
+        h += '<div style="display:flex;align-items:center;gap:10px;padding:13px;border-radius:var(--radius);margin-bottom:8px;background:var(--surface2);border-left:4px solid ' + bc + ';' + (done || cancel ? 'opacity:.6;' : '') + '">';
         h += '<div style="flex:1;min-width:0;">';
-        h += '<div style="font-size:15px;font-weight:700;color:#3d3324;">' + (c.huesped || '') + '</div>';
-        h += '<div style="font-size:12px;color:#8a7a5f;">Hab. ' + (c.habitacion || '') + ' · ' + c.personas + ' pers</div>';
+        h += '<div style="font-size:15px;font-weight:700;color:var(--text);">' + (c.huesped || '') + '</div>';
+        h += '<div style="font-size:12px;color:var(--text2);">Hab. ' + (c.habitacion || '') + ' · ' + c.personas + ' pers</div>';
         h += '</div>';
         if (done) {
-          h += '<div style="color:#2e7d32;font-weight:700;font-size:13px;white-space:nowrap;">✅ Llegó</div>';
+          h += '<div style="color:var(--green);font-weight:700;font-size:13px;white-space:nowrap;">✅ Llegó</div>';
         } else if (cancel) {
-          h += '<div style="color:#b04a4a;font-weight:700;font-size:12px;white-space:nowrap;">Cancelado</div>';
+          h += '<div style="color:var(--red);font-weight:700;font-size:12px;white-space:nowrap;">Cancelado</div>';
         } else {
-          h += '<button id="rbtn_' + c.codigo + '" onclick="_rosterConsume(\'' + c.codigo + '\')" style="flex:0 0 auto;padding:10px 14px;border:none;border-radius:10px;background:#2e7d32;color:#fff;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;">✅ Llegó</button>';
+          h += '<button id="rbtn_' + c.codigo + '" onclick="_rosterConsume(\'' + c.codigo + '\')" style="flex:0 0 auto;padding:11px 16px;border:none;border-radius:10px;background:var(--green);color:#fff;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;">✅ Llegó</button>';
         }
         h += '</div>';
       });
@@ -21539,10 +21535,9 @@
       // Resumen
       var pend = list.filter(function(c) { return c.estado === 'Pendiente'; }).length;
       var done = list.filter(function(c) { return /consum|used/i.test(c.estado); }).length;
-      h += '<div style="display:flex;gap:8px;margin-top:6px;">';
-      h += '<div style="flex:1;text-align:center;background:#fff8e1;border-radius:8px;padding:8px;"><div style="font-size:18px;font-weight:800;color:#b7860b;">' + pend + '</div><div style="font-size:10px;color:#8a7a5f;">Por llegar</div></div>';
-      h += '<div style="flex:1;text-align:center;background:#eef5ec;border-radius:8px;padding:8px;"><div style="font-size:18px;font-weight:800;color:#2e7d32;">' + done + '</div><div style="font-size:10px;color:#8a7a5f;">Registrados</div></div>';
-      h += '</div>';
+      h += '<div style="display:flex;gap:8px;margin-top:12px;">';
+      h += '<div style="flex:1;text-align:center;background:var(--surface2);border-radius:var(--radius);padding:12px;"><div style="font-size:22px;font-weight:800;color:var(--yellow);font-family:Space Mono,monospace;">' + pend + '</div><div style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;">Por llegar</div></div>';
+      h += '<div style="flex:1;text-align:center;background:var(--surface2);border-radius:var(--radius);padding:12px;"><div style="font-size:22px;font-weight:800;color:var(--green);font-family:Space Mono,monospace;">' + done + '</div><div style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;">Registrados</div></div>';
       h += '</div>';
       el.innerHTML = h;
     }
