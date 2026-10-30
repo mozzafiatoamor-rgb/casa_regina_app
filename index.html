@@ -3531,7 +3531,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-10-30a';
+    var APP_BUILD = '2026-10-30b';
 
     // ===== Selectores de fecha entrada→salida: la salida siempre mínimo el día siguiente =====
     function _nextDayStr(ymd) {
@@ -3883,6 +3883,18 @@
       var guestValidar = urlParams.has('validar');
       var guestGuia = urlParams.has('guia');
       var guestCfg = urlParams.get('cfg');
+
+      // === MODO KIOSKO PERSISTENTE (restaurante) ===
+      // En cuanto el restaurante abre el enlace ?validar una vez, el equipo queda
+      // "fijado" en modo kiosko: al instalar la app o reabrirla SIN el enlace,
+      // entra directo al panel de desayunos del día (sin pedir el PIN del hotel).
+      try {
+        if (guestValidar) {
+          localStorage.setItem('_kioskMode', '1');
+        } else if (localStorage.getItem('_kioskMode') === '1') {
+          guestValidar = true;
+        }
+      } catch (e) {}
 
       // Legacy full cfg= base64 links (backward compat)
       if ((guestRegId || guestBooking || guestValidar) && guestCfg) {
@@ -6599,13 +6611,22 @@
         '<div style="text-align:center;color:var(--text2);font-size:13px;margin-bottom:8px;">Marca a cada huésped cuando llegue a desayunar. La lista de autorizados aparece abajo.</div>' +
         '<div id="validarResult" style="margin-top:20px;"></div>' +
         '<div id="validarRoster" style="margin-top:24px;"></div>' +
-        '<div id="validarHistory" style="margin-top:30px;"></div>';
+        '<div id="validarHistory" style="margin-top:30px;"></div>' +
+        '<div style="text-align:center;margin-top:34px;padding-bottom:24px;">' +
+          '<button onclick="_kioskExit()" style="background:none;border:none;color:var(--text2);opacity:.5;font-size:11px;cursor:pointer;text-decoration:underline;">Salir del modo kiosko</button>' +
+        '</div>';
 
       // Lista de llegadas (roster) para el restaurante
       try { _renderValidarRoster(); } catch (e) {}
       // Auto-fill from QR code link (?validar&code=DES-XXXX)
       var urlCode = new URLSearchParams(window.location.search).get('code');
       if (urlCode) { setTimeout(function() { try { validarDesayunoCode(urlCode.toUpperCase()); } catch (e) {} }, 300); }
+    }
+
+    function _kioskExit() {
+      if (!confirm('¿Salir del modo kiosko del restaurante?\n\nLa app dejará de abrir directo al panel de desayunos. Para volver a activarlo, abre de nuevo el enlace del restaurante.')) return;
+      try { localStorage.removeItem('_kioskMode'); } catch (e) {}
+      location.href = location.pathname;
     }
 
     function _isRestaurantPinAuthed() {
@@ -21468,7 +21489,7 @@
       }
       _rosterAll = data.map(function(d) {
         return { codigo: String(d[0] || ''), huesped: String(d[2] || ''), habitacion: String(d[3] || ''),
-                 fecha: String(d[4] || '').substring(0, 10), personas: d[5] || '', estado: String(d[6] || 'Pendiente') };
+                 fecha: _ymd(d[4]), personas: d[5] || '', estado: String(d[6] || 'Pendiente') };
       }).filter(function(c) { return c.codigo; });
       _rosterLoaded = true;
 
