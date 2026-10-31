@@ -3531,7 +3531,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-10-30b';
+    var APP_BUILD = '2026-10-31a';
 
     // ===== Selectores de fecha entrada→salida: la salida siempre mínimo el día siguiente =====
     function _nextDayStr(ymd) {
@@ -17983,12 +17983,17 @@
         return r.estado === 'Check-in' || r.estado === 'Confirmada' || r.estado === 'Reservada';
       });
 
+      var h = '';
+
+      // === Acción rápida: responder «Quiero información» (prospecto nuevo) ===
+      h += _infoReplyBlockHtml();
+
       if (activeRes.length === 0) {
-        toast('No hay reservas activas para enviar mensajes', true);
+        h += '<div style="text-align:center;padding:18px;color:var(--text2);font-size:12px;background:var(--surface2);border-radius:var(--radius);">No hay reservas activas de huéspedes todavía. La respuesta de información de arriba funciona de todas formas.</div>';
+        document.getElementById('messagingPanelContent').innerHTML = h;
+        openModal('messagingPanelModal');
         return;
       }
-
-      var h = '';
 
       // Guest selector
       h += '<div style="margin-bottom:14px;">';
@@ -18019,6 +18024,131 @@
       if (preResId) {
         setTimeout(function() { msgPanelSelectGuest(); }, 100);
       }
+    }
+
+    // ============ RESPUESTA RÁPIDA: «QUIERO INFORMACIÓN» ============
+    // Bloque plegable en el Centro de Mensajería para responder a un prospecto
+    // con tipos de habitación, costos (con/sin impuestos) y desayuno vigente,
+    // y abrir el chat de WhatsApp automáticamente.
+    function _infoReplyBlockHtml() {
+      var h = '';
+      h += '<div style="background:var(--surface2);border-radius:var(--radius);padding:14px;margin-bottom:16px;border-left:4px solid var(--accent);">';
+      h += '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">';
+      h += '<div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:14px;color:var(--text);">💬 Responder «Quiero información»</div>';
+      h += '<div style="font-size:11px;color:var(--text2);margin-top:2px;line-height:1.4;">Tipos de habitación, precios con y sin impuestos y desayuno — listo para WhatsApp.</div></div>';
+      h += '<button onclick="_infoReplyToggle()" class="form-button" style="flex:0 0 auto;width:auto;padding:9px 15px;font-size:12px;background:var(--accent);color:var(--bg);">Redactar</button>';
+      h += '</div>';
+      h += '<div id="infoReplyForm" style="display:none;margin-top:12px;">';
+      h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">';
+      h += '<div><label class="form-label" style="font-size:11px;">Nombre (opcional)</label><input id="infoReplyNombre" class="form-input" oninput="_infoReplyUpdatePreview()" placeholder="Ej. María" style="font-size:12px;padding:8px;"></div>';
+      h += '<div><label class="form-label" style="font-size:11px;">WhatsApp</label><input id="infoReplyTel" class="form-input" type="tel" inputmode="numeric" placeholder="10 dígitos" style="font-size:12px;padding:8px;font-family:Space Mono,monospace;"></div>';
+      h += '</div>';
+      h += '<label class="form-label" style="font-size:11px;">Vista previa del mensaje</label>';
+      h += '<textarea id="infoReplyPreview" class="form-textarea" oninput="void(0)" style="height:170px;font-size:12px;line-height:1.5;margin-bottom:8px;"></textarea>';
+      h += '<div style="display:flex;gap:8px;">';
+      h += '<button onclick="_infoReplyCopy()" class="form-button secondary" style="flex:0 0 auto;width:auto;padding:11px 14px;font-size:12px;">📋 Copiar</button>';
+      h += '<button onclick="_infoReplySend()" class="form-button" style="flex:1;font-size:13px;background:var(--green);color:#fff;">📲 Abrir WhatsApp con la info</button>';
+      h += '</div>';
+      h += '<div style="font-size:10px;color:var(--text2);margin-top:8px;line-height:1.4;">Puedes editar el texto de la vista previa antes de enviarlo. Los precios y el desayuno se toman de la configuración vigente (Tarifas y Desayunos).</div>';
+      h += '</div>';
+      h += '</div>';
+      return h;
+    }
+
+    function _infoReplyToggle() {
+      var box = document.getElementById('infoReplyForm');
+      if (!box) return;
+      if (!box.style.display || box.style.display === 'none') {
+        box.style.display = 'block';
+        _infoReplyUpdatePreview();
+        var n = document.getElementById('infoReplyNombre');
+        if (n) { try { n.focus(); } catch (e) {} }
+      } else {
+        box.style.display = 'none';
+      }
+    }
+
+    function _infoReplyMoney(n) {
+      return '$' + (Math.round(parseFloat(n) || 0)).toLocaleString('es-MX') + ' MXN';
+    }
+
+    function _buildInfoReplyMsg(nombre) {
+      var hi = getHotelInfo();
+      var hotel = hi.nombre || 'nuestro hotel';
+      var promoActive = isBreakfastPromoActive();
+
+      // Agrupar habitaciones por tipo con su tarifa base (sin impuestos)
+      var byType = {};
+      (S.rooms || []).forEach(function(r) {
+        var t = String(r.tipo || '').trim();
+        var tarifa = parseFloat(r.tarifa) || 0;
+        if (!t || tarifa <= 0) return;
+        if (!byType[t]) { byType[t] = { min: tarifa, varia: false }; }
+        else {
+          if (tarifa !== byType[t].min) byType[t].varia = true;
+          if (tarifa < byType[t].min) byType[t].min = tarifa;
+        }
+      });
+      var tipos = Object.keys(byType);
+
+      var saludo = (nombre && nombre.trim()) ? ('¡Hola ' + nombre.trim() + '! 👋') : '¡Hola! 👋';
+      var msg = saludo + ' Gracias por tu interés en ' + hotel + ' ✨\n\n';
+
+      if (!tipos.length) {
+        msg += 'Con mucho gusto te ayudo con la información. Cuéntame para qué fechas y cuántas personas, y te preparo una cotización a tu medida. 🌿\n\n';
+      } else {
+        msg += 'Con gusto te comparto nuestras habitaciones y tarifas vigentes:\n\n';
+        var ishP = Math.round((typeof ISH_RATE !== 'undefined' ? ISH_RATE : 0.05) * 100);
+        var ivaP = Math.round((typeof IVA_RATE !== 'undefined' ? IVA_RATE : 0.16) * 100);
+        tipos.forEach(function(t) {
+          var base = byType[t].min;
+          var tb = _taxBreak(base, true);
+          var pre = byType[t].varia ? 'desde ' : '';
+          msg += '🛏️ ' + t.toUpperCase() + '\n';
+          msg += '   • ' + pre + _infoReplyMoney(base) + ' por noche (sin impuestos)\n';
+          msg += '   • Con factura: ' + _infoReplyMoney(tb.total) + ' (ISH ' + ishP + '% + IVA ' + ivaP + '%)\n';
+          if (promoActive) {
+            var pers = getBreakfastPersonas(t);
+            if (pers > 0) msg += '   • Incluye desayuno para ' + pers + (pers === 1 ? ' persona' : ' personas') + ' 🍳\n';
+          }
+          msg += '\n';
+        });
+        if (promoActive) msg += '🍳 El desayuno ya viene incluido en tu estancia.\n\n';
+      }
+
+      msg += 'Nos encantaría recibirte en ' + hotel + '. 🌿 Dime qué fechas tienes en mente y con gusto te aparto tu habitación. ¿La reservamos? 💛';
+      return msg;
+    }
+
+    function _infoReplyUpdatePreview() {
+      var nEl = document.getElementById('infoReplyNombre');
+      var prev = document.getElementById('infoReplyPreview');
+      if (prev) prev.value = _buildInfoReplyMsg(nEl ? nEl.value : '');
+    }
+
+    function _infoReplyCopy() {
+      var ta = document.getElementById('infoReplyPreview');
+      if (!ta) return;
+      try { ta.focus(); ta.select(); } catch (e) {}
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(ta.value).then(function () { toast('Mensaje copiado'); }).catch(function () {
+          try { document.execCommand('copy'); toast('Mensaje copiado'); } catch (e2) {}
+        });
+      } else {
+        try { document.execCommand('copy'); toast('Mensaje copiado'); } catch (e) {}
+      }
+    }
+
+    function _infoReplySend() {
+      var telEl = document.getElementById('infoReplyTel');
+      var prev = document.getElementById('infoReplyPreview');
+      var telRaw = telEl ? telEl.value : '';
+      var num = _waNormMX(telRaw);
+      if (!num || num.length < 10) { toast('Escribe un número de WhatsApp válido (10 dígitos)', true); if (telEl) { try { telEl.focus(); } catch (e) {} } return; }
+      // Usa el texto de la vista previa (permite ediciones del usuario); si está vacío, lo arma
+      var msg = (prev && prev.value && prev.value.trim()) ? prev.value : _buildInfoReplyMsg((document.getElementById('infoReplyNombre') || {}).value || '');
+      var url = 'https://wa.me/' + num + '?text=' + encodeURIComponent(msg);
+      window.open(url, '_blank');
     }
 
     function msgPanelSelectGuest() {
