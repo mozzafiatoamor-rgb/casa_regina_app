@@ -3531,7 +3531,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-11-04a';
+    var APP_BUILD = '2026-11-04b';
 
     // ===== Selectores de fecha entrada→salida: la salida siempre mínimo el día siguiente =====
     function _nextDayStr(ymd) {
@@ -17987,6 +17987,8 @@
 
       // === Acción rápida: responder «Quiero información» (prospecto nuevo) ===
       h += _infoReplyBlockHtml();
+      // === Banco de respuestas a preguntas comunes (con datos de la app) ===
+      h += _faqBlockHtml();
 
       if (activeRes.length === 0) {
         h += '<div style="text-align:center;padding:18px;color:var(--text2);font-size:12px;background:var(--surface2);border-radius:var(--radius);">No hay reservas activas de huéspedes todavía. La respuesta de información de arriba funciona de todas formas.</div>';
@@ -18232,6 +18234,217 @@
       var msg = (prev && prev.value && prev.value.trim()) ? prev.value : _buildInfoReplyMsg((document.getElementById('infoReplyNombre') || {}).value || '');
       var url = 'https://wa.me/' + num + '?text=' + encodeURIComponent(msg);
       window.open(url, '_blank');
+    }
+
+    // ============ RESPUESTAS A PREGUNTAS COMUNES (FAQ, con datos de la app) ============
+    var _faqCurrentId = '';
+    var _FAQ_ITEMS = [
+      { group: 'Llegada e instalaciones', items: [
+        { id: 'ubicacion', icon: '📍', label: 'Ubicación / cómo llegar' },
+        { id: 'horarios', icon: '🕐', label: 'Horarios check-in/out' },
+        { id: 'wifi', icon: '📶', label: 'WiFi' },
+        { id: 'parking', icon: '🅿️', label: 'Estacionamiento' }
+      ]},
+      { group: 'Precios y pagos', items: [
+        { id: 'apartar', icon: '💳', label: 'Cómo apartar / anticipo' },
+        { id: 'pago', icon: '🏦', label: 'Datos para transferencia' }
+      ]},
+      { group: 'Políticas', items: [
+        { id: 'cancelacion', icon: '↩️', label: 'Cancelación' },
+        { id: 'mascotas', icon: '🐾', label: 'Mascotas' },
+        { id: 'extra', icon: '👥', label: 'Persona extra / niños' }
+      ]},
+      { group: 'Desayuno', items: [
+        { id: 'desayuno', icon: '🍳', label: 'Desayuno' }
+      ]}
+    ];
+
+    function _faqBlockHtml() {
+      var h = '';
+      h += '<div style="background:var(--surface2);border-radius:var(--radius);padding:14px;margin-bottom:16px;border-left:4px solid var(--blue);">';
+      h += '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">';
+      h += '<div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:14px;color:var(--text);">💬 Respuestas a preguntas comunes</div>';
+      h += '<div style="font-size:11px;color:var(--text2);margin-top:2px;line-height:1.4;">Ubicación, horarios, pagos, políticas y desayuno — con tus datos vigentes, listo para WhatsApp.</div></div>';
+      h += '<button onclick="_faqToggle()" class="form-button" style="flex:0 0 auto;width:auto;padding:9px 15px;font-size:12px;background:var(--blue);color:#fff;">Abrir</button>';
+      h += '</div>';
+      h += '<div id="faqForm" style="display:none;margin-top:12px;">';
+      h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">';
+      h += '<div><label class="form-label" style="font-size:11px;">Nombre (opcional)</label><input id="faqNombre" class="form-input" oninput="_faqUpdatePreview()" placeholder="Ej. María" style="font-size:12px;padding:8px;"></div>';
+      h += '<div><label class="form-label" style="font-size:11px;">WhatsApp</label><input id="faqTel" class="form-input" type="tel" inputmode="numeric" placeholder="10 dígitos" style="font-size:12px;padding:8px;font-family:Space Mono,monospace;"></div>';
+      h += '</div>';
+      h += '<div id="faqChips"></div>';
+      h += '<label class="form-label" style="font-size:11px;">Vista previa del mensaje</label>';
+      h += '<textarea id="faqPreview" class="form-textarea" placeholder="Elige una pregunta de arriba…" style="height:185px;font-size:12px;line-height:1.5;margin-bottom:8px;"></textarea>';
+      h += '<div style="display:flex;gap:8px;">';
+      h += '<button onclick="_faqCopy()" class="form-button secondary" style="flex:0 0 auto;width:auto;padding:11px 14px;font-size:12px;">📋 Copiar</button>';
+      h += '<button onclick="_faqSend()" class="form-button" style="flex:1;font-size:13px;background:var(--green);color:#fff;">📲 Abrir WhatsApp</button>';
+      h += '</div>';
+      h += '<div style="font-size:10px;color:var(--text2);margin-top:8px;line-height:1.4;">Puedes editar el texto antes de enviarlo. Los datos salen de Ajustes (Hotel, Tarifas, Desayunos, Pagos y Términos).</div>';
+      h += '</div>';
+      h += '</div>';
+      return h;
+    }
+
+    function _faqToggle() {
+      var box = document.getElementById('faqForm');
+      if (!box) return;
+      if (!box.style.display || box.style.display === 'none') { box.style.display = 'block'; _faqRenderChips(); }
+      else { box.style.display = 'none'; }
+    }
+
+    function _faqRenderChips() {
+      var el = document.getElementById('faqChips');
+      if (!el) return;
+      var h = '';
+      _FAQ_ITEMS.forEach(function(grp) {
+        h += '<div style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin:4px 0 6px;">' + grp.group + '</div>';
+        h += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">';
+        grp.items.forEach(function(it) {
+          var active = it.id === _faqCurrentId;
+          h += '<button onclick="_faqSelect(\'' + it.id + '\')" style="flex:0 0 auto;padding:7px 11px;border-radius:18px;border:1px solid ' + (active ? 'var(--accent)' : 'var(--surface3)') + ';background:' + (active ? 'var(--accent)' : 'var(--surface3)') + ';color:' + (active ? 'var(--bg)' : 'var(--text)') + ';font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">' + it.icon + ' ' + it.label + '</button>';
+        });
+        h += '</div>';
+      });
+      el.innerHTML = h;
+    }
+
+    function _faqSelect(id) {
+      _faqCurrentId = id;
+      _faqRenderChips();
+      _faqUpdatePreview();
+      var prev = document.getElementById('faqPreview');
+      if (prev) { try { prev.scrollTop = 0; } catch (e) {} }
+    }
+
+    function _faqUpdatePreview() {
+      var prev = document.getElementById('faqPreview');
+      if (!prev) return;
+      if (!_faqCurrentId) { prev.value = ''; return; }
+      var nEl = document.getElementById('faqNombre');
+      prev.value = _faqBuild(_faqCurrentId, nEl ? nEl.value : '');
+    }
+
+    function _faqCopy() {
+      var ta = document.getElementById('faqPreview');
+      if (!ta || !ta.value.trim()) { toast('Primero elige una pregunta', true); return; }
+      try { ta.focus(); ta.select(); } catch (e) {}
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(ta.value).then(function(){ toast('Mensaje copiado'); }).catch(function(){ try { document.execCommand('copy'); toast('Mensaje copiado'); } catch (e2) {} });
+      } else { try { document.execCommand('copy'); toast('Mensaje copiado'); } catch (e) {} }
+    }
+
+    function _faqSend() {
+      var telEl = document.getElementById('faqTel');
+      var prev = document.getElementById('faqPreview');
+      if (!prev || !prev.value.trim()) { toast('Primero elige una pregunta', true); return; }
+      var num = _waNormMX(telEl ? telEl.value : '');
+      if (!num || num.length < 10) { toast('Escribe un número de WhatsApp válido (10 dígitos)', true); if (telEl) { try { telEl.focus(); } catch (e) {} } return; }
+      window.open('https://wa.me/' + num + '?text=' + encodeURIComponent(prev.value), '_blank');
+    }
+
+    function _faqSaludo(nombre) { return (nombre && nombre.trim()) ? ('¡Hola ' + nombre.trim() + '! 👋 ') : '¡Hola! 👋 '; }
+
+    function _faqBuild(id, nombre) {
+      var hi = getHotelInfo();
+      var hotel = hi.nombre || 'nuestro hotel';
+      var s = _faqSaludo(nombre);
+      var msg = '';
+      if (id === 'ubicacion') {
+        msg = s + 'Con gusto te comparto cómo llegar a ' + hotel + ' 📍\n\n';
+        if (hi.direccion) msg += '📍 ' + hi.direccion + '\n\n';
+        var q = encodeURIComponent((hotel + ' ' + (hi.direccion || '')).trim());
+        msg += 'Te dejo el mapa directo:\nhttps://www.google.com/maps/search/?api=1&query=' + q + '\n\n';
+        if (hi.telefono) msg += 'Si se te complica llegar, llámanos al ' + hi.telefono + ' y te guiamos. ';
+        msg += '¡Te esperamos! 🌿';
+      } else if (id === 'horarios') {
+        msg = s + 'Estos son nuestros horarios en ' + hotel + ' 🕐\n\n';
+        msg += '🛎️ Check-in: a partir de las ' + formatHoraDisplay(hi.checkin_hora) + '\n';
+        msg += '🔑 Check-out: hasta las ' + formatHoraDisplay(hi.checkout_hora) + '\n\n';
+        msg += 'Si necesitas entrar antes o salir más tarde, lo revisamos según disponibilidad (puede aplicar un cargo). ¿Te ayudo con tu reserva? 💛';
+      } else if (id === 'wifi') {
+        if (hi.wifi_red) {
+          msg = s + 'Claro, aquí tienes el WiFi 📶\n\n📶 Red: ' + hi.wifi_red + '\n🔑 Contraseña: ' + (hi.wifi_pass || '(sin contraseña)') + '\n\nCualquier cosa, con gusto te apoyamos. 🌿';
+        } else {
+          msg = s + 'Sí, contamos con WiFi gratis en todo el hotel 📶. Los datos de acceso te los damos a tu llegada. ¿Te ayudo con algo más? 🌿';
+        }
+      } else if (id === 'parking') {
+        msg = s + 'Sobre el estacionamiento en ' + hotel + ' 🅿️\n\n';
+        msg += 'Contamos con estacionamiento para huéspedes, sujeto a disponibilidad de lugares. ';
+        if (hi.telefono) msg += 'Si llegas en auto y quieres asegurar lugar, escríbenos o llámanos al ' + hi.telefono + '. ';
+        msg += '\n\n¿Te ayudo con tu reservación? 💛';
+      } else if (id === 'apartar') {
+        var pct = getAnticipoPct();
+        msg = s + 'Te explico cómo apartar tu habitación en ' + hotel + ' ✨\n\n';
+        msg += 'Para dejar tu reservación confirmada pedimos un anticipo del ' + pct + '% del total de la estancia; el ' + (100 - pct) + '% restante lo cubres al llegar (check-in).\n\n';
+        msg += 'Puedes pagar el anticipo por transferencia y, en cuanto nos mandes tu comprobante, te confirmamos la reserva. ¿Te paso los datos y te aparto la fecha? 💛';
+      } else if (id === 'pago') {
+        var g = getGuestGuide();
+        msg = s + 'Estos son nuestros datos para pago por transferencia 🏦\n\n';
+        var pn = (g.pagosNotas && g.pagosNotas.es) ? String(g.pagosNotas.es).trim() : '';
+        if (pn) msg += pn + '\n\n';
+        var any = false;
+        (g.pagos || []).forEach(function(c) {
+          if (!c || (!c.clabe && !c.cuenta)) return;
+          any = true;
+          msg += '• ' + (c.titulo || 'Transferencia') + '\n';
+          if (c.banco) msg += '   Banco: ' + c.banco + '\n';
+          if (c.clabe) msg += '   CLABE: ' + c.clabe + '\n';
+          if (c.cuenta) msg += '   Cuenta: ' + c.cuenta + '\n';
+          msg += '\n';
+        });
+        if (!any) msg += 'Escríbeme y con gusto te comparto los datos bancarios.\n\n';
+        msg += 'Cuando hagas tu transferencia, mándanos el comprobante por aquí y confirmamos tu reserva 🙌';
+        if (g.pagosTel) msg += '\nDudas de pago: ' + g.pagosTel;
+      } else if (id === 'cancelacion') {
+        var terms = getTerms();
+        var T = function(t) { var f = terms.find(function(x) { return x.title === t; }); return f ? f.text : ''; };
+        msg = s + 'Con gusto te comparto nuestra política de cancelación 📋\n\n';
+        var c1 = T('Cancelación con más de 7 días de anticipación');
+        var c2 = T('Cancelación entre 3 y 7 días antes');
+        var c3 = T('Cancelación con menos de 3 días / No Show');
+        var cm = T('Modificaciones');
+        if (c1) msg += '✅ Más de 7 días antes:\n' + c1 + '\n\n';
+        if (c2) msg += '⚠️ Entre 3 y 7 días antes:\n' + c2 + '\n\n';
+        if (c3) msg += '❌ Menos de 3 días / No Show:\n' + c3 + '\n\n';
+        if (cm) msg += '🔄 Cambios de fecha:\n' + cm + '\n\n';
+        msg += 'Cualquier duda, con gusto te explico. 🌿';
+      } else if (id === 'mascotas') {
+        msg = s + 'Sobre mascotas en ' + hotel + ' 🐾\n\n';
+        msg += 'El ingreso de mascotas está sujeto a disponibilidad y a confirmación previa. Cuéntanos qué mascota y de qué tamaño es, para revisar si podemos recibirla.';
+        msg += '\n\n¿Me das esos datos y lo confirmamos? 💛';
+      } else if (id === 'extra') {
+        var pe = hi.persona_extra || 150, base = hi.ocupacionBase || 2, menor = hi.menoresEdadLimite || 11;
+        msg = s + 'Te explico sobre huéspedes adicionales y niños 👥\n\n';
+        msg += '• La tarifa cubre hasta ' + base + ' persona(s) por habitación.\n';
+        msg += '• Persona adicional: $' + _fmt(pe) + ' MXN + impuestos por persona, por noche (cama extra sujeta a disponibilidad).\n';
+        msg += '• Niños menores de ' + menor + ' años no pagan compartiendo cama con sus papás (máx. 1 menor gratis por habitación). Desde los ' + (menor + 1) + ' años cuentan como adulto.\n\n';
+        var rules = hi.occupancyRules || [];
+        if (rules.length) {
+          msg += 'Capacidad máxima por tipo:\n';
+          rules.forEach(function(r) { msg += '   • ' + r.tipo + ': hasta ' + r.maxPersonas + ' personas\n'; });
+          msg += '\n';
+        }
+        msg += 'Dime cuántos adultos y niños vienen y te armo la mejor opción. 💛';
+      } else if (id === 'desayuno') {
+        var active = isBreakfastPromoActive();
+        var p = getBreakfastPromo();
+        if (active) {
+          msg = s + '¡Sí! Tu estancia incluye desayuno 🍳\n\n';
+          if (p.descripcion) msg += '🍽️ ' + p.descripcion + '\n\n';
+          if (p.horario) msg += '🕐 Horario: ' + p.horario + '\n';
+          if (p.partner) msg += '📍 En: ' + p.partner + '\n';
+          msg += '\nEl desayuno ya viene incluido en tu tarifa. ¿Te ayudo a reservar? 💛';
+        } else {
+          msg = s + 'Con gusto te comparto la info del desayuno 🍳\n\n';
+          if (p.precioPorPersona) msg += '• Desayuno por $' + _fmt(p.precioPorPersona) + ' MXN por persona' + (p.partner ? (' en ' + p.partner) : '') + '.\n';
+          if (p.horario) msg += '• Horario: ' + p.horario + '\n';
+          if (p.descripcion) msg += '\n🍽️ ' + p.descripcion + '\n';
+          msg += '\n¿Te ayudo con tu reservación? 💛';
+        }
+      } else {
+        msg = s + '¿En qué te puedo ayudar? 🌿';
+      }
+      return msg;
     }
 
     function msgPanelSelectGuest() {
