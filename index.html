@@ -3531,7 +3531,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-10-31a';
+    var APP_BUILD = '2026-11-04a';
 
     // ===== Selectores de fecha entrada→salida: la salida siempre mínimo el día siguiente =====
     function _nextDayStr(ymd) {
@@ -18043,6 +18043,11 @@
       h += '<div><label class="form-label" style="font-size:11px;">Nombre (opcional)</label><input id="infoReplyNombre" class="form-input" oninput="_infoReplyUpdatePreview()" placeholder="Ej. María" style="font-size:12px;padding:8px;"></div>';
       h += '<div><label class="form-label" style="font-size:11px;">WhatsApp</label><input id="infoReplyTel" class="form-input" type="tel" inputmode="numeric" placeholder="10 dígitos" style="font-size:12px;padding:8px;font-family:Space Mono,monospace;"></div>';
       h += '</div>';
+      h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:4px;">';
+      h += '<div><label class="form-label" style="font-size:11px;">Entrada (opcional)</label><input id="infoReplyCheckin" type="date" class="form-input" onchange="_infoReplyDatesChanged()" style="font-size:12px;padding:8px;"></div>';
+      h += '<div><label class="form-label" style="font-size:11px;">Salida (opcional)</label><input id="infoReplyCheckout" type="date" class="form-input" onchange="_infoReplyUpdatePreview()" style="font-size:12px;padding:8px;"></div>';
+      h += '</div>';
+      h += '<div style="font-size:10px;color:var(--text2);margin:0 0 8px;line-height:1.4;">Si pones fechas, el mensaje verifica la <strong>disponibilidad real</strong> para esos días. Déjalas vacías para info general.</div>';
       h += '<label class="form-label" style="font-size:11px;">Vista previa del mensaje</label>';
       h += '<textarea id="infoReplyPreview" class="form-textarea" oninput="void(0)" style="height:170px;font-size:12px;line-height:1.5;margin-bottom:8px;"></textarea>';
       h += '<div style="display:flex;gap:8px;">';
@@ -18072,12 +18077,78 @@
       return '$' + (Math.round(parseFloat(n) || 0)).toLocaleString('es-MX') + ' MXN';
     }
 
-    function _buildInfoReplyMsg(nombre) {
+    // Etiqueta amigable del rango de fechas en español
+    function _infoReplyRangeLabel(ci, co) {
+      try {
+        var meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+        var d1 = new Date(ci + 'T12:00:00'), d2 = new Date(co + 'T12:00:00');
+        if (isNaN(d1.getTime()) || isNaN(d2.getTime())) return 'del ' + ci + ' al ' + co;
+        if (d1.getMonth() === d2.getMonth() && d1.getFullYear() === d2.getFullYear())
+          return 'del ' + d1.getDate() + ' al ' + d2.getDate() + ' de ' + meses[d1.getMonth()] + ' de ' + d1.getFullYear();
+        return 'del ' + d1.getDate() + ' de ' + meses[d1.getMonth()] + ' al ' + d2.getDate() + ' de ' + meses[d2.getMonth()] + ' de ' + d2.getFullYear();
+      } catch (e) { return 'del ' + ci + ' al ' + co; }
+    }
+
+    function _buildInfoReplyMsg(nombre, ci, co) {
       var hi = getHotelInfo();
       var hotel = hi.nombre || 'nuestro hotel';
       var promoActive = isBreakfastPromoActive();
+      var ishP = Math.round((typeof ISH_RATE !== 'undefined' ? ISH_RATE : 0.05) * 100);
+      var ivaP = Math.round((typeof IVA_RATE !== 'undefined' ? IVA_RATE : 0.16) * 100);
+      var saludo = (nombre && nombre.trim()) ? ('¡Hola ' + nombre.trim() + '! 👋') : '¡Hola! 👋';
+      var msg = saludo + ' Gracias por tu interés en ' + hotel + ' ✨\n\n';
 
-      // Agrupar habitaciones por tipo con su tarifa base (sin impuestos)
+      var datedMode = !!(ci && co && co > ci);
+
+      if (datedMode) {
+        // === Modo con fechas: disponibilidad real para el rango ===
+        var nights = daysUntil(ci, co);
+        // Agrupar SOLO habitaciones libres en el rango, por tipo
+        var availByType = {};
+        (S.rooms || []).forEach(function(r) {
+          var t = String(r.tipo || '').trim();
+          var tarifa = parseFloat(r.tarifa) || 0;
+          if (!t || tarifa <= 0) return;
+          if (hasOverlap(r.numero, ci, co)) return; // ocupada en esas fechas
+          if (!availByType[t]) { availByType[t] = { min: tarifa, varia: false, count: 1 }; }
+          else {
+            availByType[t].count++;
+            if (tarifa !== availByType[t].min) availByType[t].varia = true;
+            if (tarifa < availByType[t].min) availByType[t].min = tarifa;
+          }
+        });
+        var aTipos = Object.keys(availByType);
+        var rango = _infoReplyRangeLabel(ci, co);
+        var nochesTxt = nights + (nights === 1 ? ' noche' : ' noches');
+
+        if (!aTipos.length) {
+          msg += 'Verifiqué la disponibilidad ' + rango + ' y justo en esas fechas no tengo habitaciones libres 😔\n\n';
+          msg += '¿Tendrías flexibilidad con las fechas? Dime y con gusto reviso otras opciones muy cercanas para recibirte. 🌿';
+          return msg;
+        }
+
+        msg += 'Revisé la disponibilidad ' + rango + ' (' + nochesTxt + ') y esto es lo que tengo para ti:\n\n';
+        aTipos.forEach(function(t) {
+          var base = availByType[t].min;
+          var totBase = base * nights;
+          var tbTotal = _taxBreak(totBase, true);
+          var pre = availByType[t].varia ? 'desde ' : '';
+          var cnt = availByType[t].count;
+          msg += '🛏️ ' + t.toUpperCase() + ' (' + cnt + (cnt === 1 ? ' disponible' : ' disponibles') + ')\n';
+          msg += '   • ' + pre + _infoReplyMoney(base) + '/noche · ' + nochesTxt + ' = ' + _infoReplyMoney(totBase) + ' (sin impuestos)\n';
+          msg += '   • Con factura: ' + _infoReplyMoney(tbTotal.total) + ' (ISH ' + ishP + '% + IVA ' + ivaP + '%)\n';
+          if (promoActive) {
+            var persA = getBreakfastPersonas(t);
+            if (persA > 0) msg += '   • Incluye desayuno para ' + persA + (persA === 1 ? ' persona' : ' personas') + ' 🍳\n';
+          }
+          msg += '\n';
+        });
+        if (promoActive) msg += '🍳 El desayuno ya viene incluido en tu estancia.\n\n';
+        msg += '¿Te aparto una? Con un anticipo te la dejo reservada y lista para tu llegada. 💛';
+        return msg;
+      }
+
+      // === Modo general (sin fechas) ===
       var byType = {};
       (S.rooms || []).forEach(function(r) {
         var t = String(r.tipo || '').trim();
@@ -18091,15 +18162,10 @@
       });
       var tipos = Object.keys(byType);
 
-      var saludo = (nombre && nombre.trim()) ? ('¡Hola ' + nombre.trim() + '! 👋') : '¡Hola! 👋';
-      var msg = saludo + ' Gracias por tu interés en ' + hotel + ' ✨\n\n';
-
       if (!tipos.length) {
         msg += 'Con mucho gusto te ayudo con la información. Cuéntame para qué fechas y cuántas personas, y te preparo una cotización a tu medida. 🌿\n\n';
       } else {
         msg += 'Con gusto te comparto nuestras habitaciones y tarifas vigentes:\n\n';
-        var ishP = Math.round((typeof ISH_RATE !== 'undefined' ? ISH_RATE : 0.05) * 100);
-        var ivaP = Math.round((typeof IVA_RATE !== 'undefined' ? IVA_RATE : 0.16) * 100);
         tipos.forEach(function(t) {
           var base = byType[t].min;
           var tb = _taxBreak(base, true);
@@ -18120,10 +18186,27 @@
       return msg;
     }
 
+    // Ajusta la salida mínima al cambiar la entrada y refresca la vista previa
+    function _infoReplyDatesChanged() {
+      var ciEl = document.getElementById('infoReplyCheckin');
+      var coEl = document.getElementById('infoReplyCheckout');
+      if (ciEl && coEl && ciEl.value) {
+        try {
+          var next = new Date(ciEl.value + 'T12:00:00'); next.setDate(next.getDate() + 1);
+          var minOut = normDate(next);
+          coEl.min = minOut;
+          if (!coEl.value || coEl.value <= ciEl.value) coEl.value = minOut;
+        } catch (e) {}
+      }
+      _infoReplyUpdatePreview();
+    }
+
     function _infoReplyUpdatePreview() {
       var nEl = document.getElementById('infoReplyNombre');
+      var ciEl = document.getElementById('infoReplyCheckin');
+      var coEl = document.getElementById('infoReplyCheckout');
       var prev = document.getElementById('infoReplyPreview');
-      if (prev) prev.value = _buildInfoReplyMsg(nEl ? nEl.value : '');
+      if (prev) prev.value = _buildInfoReplyMsg(nEl ? nEl.value : '', ciEl ? ciEl.value : '', coEl ? coEl.value : '');
     }
 
     function _infoReplyCopy() {
