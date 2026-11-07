@@ -3531,7 +3531,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-11-04b';
+    var APP_BUILD = '2026-11-07a';
 
     // ===== Selectores de fecha entrada→salida: la salida siempre mínimo el día siguiente =====
     function _nextDayStr(ymd) {
@@ -17803,7 +17803,7 @@
     function showGuestRegistration(res, room) {
       // Pre-llenar con lo ya capturado en ESTA reserva (o visita anterior como respaldo)
       var prev = _prevRegForCheckin(res);
-      var hasPrev = prev && (prev.tipoID || prev.numID || prev.nacionalidad);
+      var hasPrev = prev && (prev.tipoID || prev.numID || prev.nacionalidad || prev.domicilio || prev.procedencia || prev.motivo);
 
       var h = '';
       h += '<div style="background:var(--surface3);padding:12px;border-radius:var(--radius);margin-bottom:14px;">';
@@ -23439,20 +23439,37 @@
       var out = {}, src = '';
       function _norm(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim(); }
       function _tel10(s) { return String(s || '').replace(/[^0-9]/g, '').slice(-10); }
+      // Asigna solo si el valor nuevo trae algo; las fuentes se procesan de MENOR a MAYOR
+      // prioridad, así la última con dato gana (reserva > visita anterior > caché > cliente).
+      function _set(k, v) { if (v !== undefined && v !== null && String(v).trim() !== '') out[k] = String(v).trim(); }
       var tgtName = _norm(res.huesped), tgtTel = _tel10(res.telefono);
 
-      // 1) Caché local (respaldo heredado, solo en este dispositivo)
+      // (A) Directorio de Clientes: por si el domicilio/INE quedó en sus notas
       try {
-        var prev = (typeof getGuestRegCache === 'function') ? getGuestRegCache(res.huesped) : null;
-        if (prev) { out.tipoID = prev.tipoID; out.numID = prev.numID; out.nacionalidad = prev.nacionalidad; out.procedencia = prev.procedencia; out.motivo = prev.motivo; src = 'anterior'; }
+        var cli = (S.clientes || []).find(function (c) {
+          return (tgtName && _norm(c.nombre) === tgtName) || (tgtTel && tgtTel.length >= 10 && _tel10(c.telefono) === tgtTel);
+        });
+        if (cli && cli.notas) {
+          var dmC = _extractDomicilioObs(cli.notas); if (dmC) { _set('domicilio', dmC); src = 'cliente'; }
+          var ineC = _extractINEObs(cli.notas); if (ineC) { _set('numID', ineC); _set('tipoID', 'INE / IFE'); src = 'cliente'; }
+        }
       } catch (e) {}
 
-      // 2) Registro de una VISITA ANTERIOR (otra reserva) del mismo huésped, leído del historial del Sheet.
-      //    Coincide por nombre o por teléfono, y toma la visita más reciente con datos de identificación.
+      // (B) Caché local (respaldo heredado, solo en este dispositivo)
+      try {
+        var prev = (typeof getGuestRegCache === 'function') ? getGuestRegCache(res.huesped) : null;
+        if (prev) {
+          _set('tipoID', prev.tipoID); _set('numID', prev.numID); _set('nacionalidad', prev.nacionalidad);
+          _set('procedencia', prev.procedencia); _set('motivo', prev.motivo); _set('domicilio', prev.domicilio);
+          src = 'anterior';
+        }
+      } catch (e) {}
+
+      // (C) VISITA ANTERIOR (otra reserva) del mismo huésped, por nombre o teléfono.
       try {
         var cands = (S.registros || []).filter(function (g) {
-          if (String(g.resId) === String(res.id)) return false;        // esos se tratan en el paso 3
-          if (!(g.numId || g.tipoId || g.nacionalidad)) return false;  // sin datos útiles
+          if (String(g.resId) === String(res.id)) return false;                     // esos van en (D)
+          if (!(g.numId || g.tipoId || g.nacionalidad || _extractDomicilioObs(g.observaciones))) return false;
           var nameMatch = tgtName && _norm(g.nombre) === tgtName;
           var telMatch = tgtTel && tgtTel.length >= 10 && _tel10(g.telefono) === tgtTel;
           return nameMatch || telMatch;
@@ -23460,41 +23477,50 @@
         if (cands.length) {
           cands.sort(function (a, b) {
             var ak = String(a.ts || a.fecha || ''), bk = String(b.ts || b.fecha || '');
-            return bk < ak ? -1 : (bk > ak ? 1 : 0);                   // más reciente primero
+            return bk < ak ? -1 : (bk > ak ? 1 : 0);                                 // más reciente primero
           });
           var p0 = cands[0];
-          if (p0.tipoId) out.tipoID = _mapTipoIdCheckin(p0.tipoId);
-          if (p0.numId) out.numID = p0.numId;
-          if (p0.nacionalidad) out.nacionalidad = p0.nacionalidad;
-          if (p0.procedencia) out.procedencia = p0.procedencia;
-          if (p0.motivo) out.motivo = p0.motivo;
+          if (p0.tipoId) _set('tipoID', _mapTipoIdCheckin(p0.tipoId));
+          _set('numID', p0.numId); _set('nacionalidad', p0.nacionalidad);
+          _set('procedencia', p0.procedencia); _set('motivo', p0.motivo);
+          var dmP = _extractDomicilioObs(p0.observaciones); if (dmP) _set('domicilio', dmP);
           src = 'anterior';
         }
       } catch (e) {}
 
-      // 3) Datos ya capturados en ESTA reserva (máxima prioridad)
+      // (D) Registro(s) ya capturados en ESTA reserva (incluye al titular)
       try {
         var reg = (S.registros || []).filter(function (g) { return String(g.resId) === String(res.id); });
         var mine = reg.filter(function (g) { return g.numId || g.tipoId || g.nacionalidad; });
         var pick = mine.filter(function (g) { return _norm(g.nombre) === tgtName; })[0] || mine[0];
         if (pick) {
-          if (pick.tipoId) out.tipoID = _mapTipoIdCheckin(pick.tipoId);
-          if (pick.numId) out.numID = pick.numId;
-          if (pick.nacionalidad) out.nacionalidad = pick.nacionalidad;
-          if (pick.procedencia) out.procedencia = pick.procedencia;
-          if (pick.motivo) out.motivo = pick.motivo;
-          var _dm = _extractDomicilioObs(pick.observaciones);
-          if (_dm) out.domicilio = _dm;
+          if (pick.tipoId) _set('tipoID', _mapTipoIdCheckin(pick.tipoId));
+          _set('numID', pick.numId); _set('nacionalidad', pick.nacionalidad);
+          _set('procedencia', pick.procedencia); _set('motivo', pick.motivo);
           src = 'reserva';
         }
+        // domicilio desde CUALQUIER registro de esta reserva (incluye el del titular)
+        reg.forEach(function (g) { var dm = _extractDomicilioObs(g.observaciones); if (dm) _set('domicilio', dm); });
+      } catch (e) {}
+
+      // (E) La PROPIA reserva: domicilio e INE guardados en sus notas (máxima prioridad)
+      try {
+        var dmR = _extractDomicilioObs(res.notas); if (dmR) { _set('domicilio', dmR); if (!src) src = 'reserva'; }
+        var ineR = _extractINEObs(res.notas);
+        if (ineR) { if (!out.numID) _set('numID', ineR); if (!out.tipoID) _set('tipoID', 'INE / IFE'); if (!src) src = 'reserva'; }
       } catch (e) {}
 
       out._source = src;
       return out;
     }
-    // Extrae "Domicilio: ..." de las observaciones (lo guarda el escáner de INE en la reserva).
+    // Extrae "Domicilio: ..." de las observaciones / notas.
     function _extractDomicilioObs(obs) {
       var m = String(obs || '').match(/Domicilio:\s*([^\n·|]+)/i);
+      return m ? m[1].trim() : '';
+    }
+    // Extrae "INE: ..." (clave o número) de las observaciones / notas.
+    function _extractINEObs(obs) {
+      var m = String(obs || '').match(/\bINE:\s*([A-Za-z0-9]+)/i);
       return m ? m[1].trim() : '';
     }
 
