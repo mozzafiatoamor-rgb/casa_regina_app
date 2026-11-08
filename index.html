@@ -3144,6 +3144,28 @@
     }
     function getAnticipoFraction() { return getAnticipoPct() / 100; }
 
+    // Estado de confirmación de una reserva según el pago (fuente única para recibos/mensajes).
+    // Una reserva SOLO está confirmada si no requiere anticipo, si ya cubrió el anticipo,
+    // si está liquidada, o si pasó a un estado posterior (Confirmada/Check-in/etc.).
+    function _resConfStatus(res) {
+      var aPct = getAnticipoPct();
+      var total = res.tarifaTotal || 0;
+      var anticipoMin = Math.round(total * getAnticipoFraction() * 100) / 100;
+      var totalPaid = (S.cobros || []).filter(function (c) { return c.reservaId === res.id; }).reduce(function (s, c) { return s + (c.monto || 0); }, 0);
+      var EPS = (typeof PAY_EPS !== 'undefined') ? PAY_EPS : 0.99;
+      var liquidado = total > 0 && totalPaid >= total - EPS;
+      var anticipoCubierto = aPct > 0 && totalPaid >= anticipoMin - EPS;
+      var estado = res.estado || 'Reservada';
+      var postStates = ['Confirmada', 'Check-in', 'Check-out', 'Completada'];
+      var confirmed = aPct === 0 || anticipoCubierto || liquidado || postStates.indexOf(estado) !== -1;
+      return { aPct: aPct, total: total, anticipoMin: anticipoMin, totalPaid: totalPaid, balance: Math.round((total - totalPaid) * 100) / 100, liquidado: liquidado, anticipoCubierto: anticipoCubierto, confirmed: confirmed, estado: estado };
+    }
+    // Leyenda para recibos cuando la reserva NO está confirmada (sin anticipo). '' si está confirmada.
+    function _resConfLegend(st) {
+      if (st.confirmed) return '';
+      return 'Tu reservación quedó APARTADA, pero AÚN NO está CONFIRMADA. Se confirma únicamente al recibir el anticipo del ' + st.aPct + '% ($' + _fmt(st.anticipoMin) + ') o la liquidación total ($' + _fmt(st.total) + ').';
+    }
+
     // ============ BREAKFAST PROMO ============
     var DEFAULT_BREAKFAST_PROMO = {
       active: true,
@@ -3421,7 +3443,7 @@
       confirmacion: {
         nombre: 'Confirmación de Reserva',
         icon: '✅',
-        texto: '🏨 *{hotel}*\n_Confirmación de Reservación_\n\nHola *{huesped}* 👋\n\nTu reservación ha sido confirmada:\n\n*No. Reservación:* {reservaId}\n*Habitación:* {habitacion} ({tipoHab})\n*Entrada:* {entrada} ({checkin_hora})\n*Salida:* {salida} ({checkout_hora})\n*Noches:* {noches}\n*Huéspedes:* {huespedes}\n─────────────\n*Tarifa/noche:* ${tarifa}\n*Total estancia:* ${total}\n{infoPago}\n─────────────\n\n📍 *Dirección:* {direccion}\n\n_Gracias por elegirnos_ 🌿'
+        texto: '🏨 *{hotel}*\n_Confirmación de Reservación_\n\nHola *{huesped}* 👋\n\n{estadoLeyenda}\n\n*No. Reservación:* {reservaId}\n*Habitación:* {habitacion} ({tipoHab})\n*Entrada:* {entrada} ({checkin_hora})\n*Salida:* {salida} ({checkout_hora})\n*Noches:* {noches}\n*Huéspedes:* {huespedes}\n─────────────\n*Tarifa/noche:* ${tarifa}\n*Total estancia:* ${total}\n{infoPago}\n─────────────\n\n📍 *Dirección:* {direccion}\n\n_Gracias por elegirnos_ 🌿'
       },
       recordatorio: {
         nombre: 'Recordatorio (1 día antes)',
@@ -3531,7 +3553,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-11-07a';
+    var APP_BUILD = '2026-11-08a';
 
     // ===== Selectores de fecha entrada→salida: la salida siempre mínimo el día siguiente =====
     function _nextDayStr(ymd) {
@@ -3728,14 +3750,24 @@
       var balance = res.tarifaTotal - totalPaid;
       var aPct = getAnticipoPct();
       var anticipoMin = Math.round(res.tarifaTotal * getAnticipoFraction() * 100) / 100;
+      var _st = _resConfStatus(res);
+
+      var estadoLeyenda = _st.confirmed
+        ? 'Tu reservación está *confirmada* ✅:'
+        : '⏳ Tu reservación quedó *apartada*, pero *aún NO está confirmada*. Se confirma únicamente al recibir el anticipo o la liquidación:';
 
       var infoPago = '';
-      if (totalPaid > 0) {
-        infoPago = '*Anticipo recibido:* $' + totalPaid + '\n*Saldo pendiente:* $' + balance;
+      if (_st.liquidado) {
+        infoPago = '*Pagado:* $' + _fmt(totalPaid) + ' ✅ _(liquidado)_';
+      } else if (totalPaid > 0) {
+        infoPago = '*Anticipo recibido:* $' + _fmt(totalPaid) + '\n*Saldo pendiente:* $' + _fmt(balance);
+        if (!_st.confirmed && aPct > 0 && totalPaid < anticipoMin) {
+          infoPago += '\n⏳ *Falta para confirmar (anticipo ' + aPct + '%):* $' + _fmt(Math.round((anticipoMin - totalPaid) * 100) / 100);
+        }
       } else if (aPct > 0) {
-        infoPago = '*Anticipo requerido (' + aPct + '%):* $' + anticipoMin;
+        infoPago = '*Anticipo para confirmar (' + aPct + '%):* $' + _fmt(anticipoMin) + '\n*o liquidación total:* $' + _fmt(res.tarifaTotal) + '\n\n⚠️ _Tu reservación se confirma al recibir el anticipo o el pago total._';
       } else {
-        infoPago = '*Total a pagar:* $' + res.tarifaTotal;
+        infoPago = '*Total a pagar:* $' + _fmt(res.tarifaTotal);
       }
 
       var huespedes = res.adultos + ' adulto(s)';
@@ -3752,6 +3784,13 @@
       text = text.replace(/\{tarifa\}/g, res.tarifa);
       text = text.replace(/\{total\}/g, res.tarifaTotal);
       text = text.replace(/\{infoPago\}/g, infoPago);
+      text = text.replace(/\{estadoLeyenda\}/g, estadoLeyenda);
+      // Salvaguarda para plantillas personalizadas (legado): si NO está confirmada,
+      // nunca decir "confirmada" ni titular "Confirmación".
+      if (!_st.confirmed) {
+        text = text.replace(/_Confirmación de Reservación_/g, '_Comprobante de Reservación_');
+        text = text.replace(/Tu reservación ha sido confirmada:?/gi, estadoLeyenda);
+      }
       text = text.replace(/\{huespedes\}/g, huespedes);
       text = text.replace(/\{telefono\}/g, res.telefono || '');
       text = text.replace(/\{email\}/g, res.email || '');
@@ -13090,14 +13129,20 @@
       var h = '<div class="receipt-overlay" id="receiptOverlay" onclick="if(event.target===this)closeReceipt()">';
       h += '<div class="conf-box">';
 
+      var _stV = _resConfStatus(res);
+
       // Header
       h += '<div class="conf-hdr">';
       h += '<img src="' + LOGO_V_LIGHT + '" alt="Logo">';
-      h += '<div class="conf-title">Confirmación de reservación</div>';
+      h += '<div class="conf-title">' + (_stV.confirmed ? 'Confirmación de reservación' : 'Comprobante de reservación') + '</div>';
       h += '<div class="conf-chip" style="background:' + chip.bg + ';color:' + chip.c + ';">' + chip.t + '</div>';
       h += '</div>';
 
       h += '<div class="conf-body">';
+      // Leyenda: apartada pero no confirmada (sin anticipo)
+      if (!_stV.confirmed) {
+        h += '<div style="background:rgba(251,191,36,.12);border:1px solid var(--yellow);border-radius:var(--radius);padding:10px 12px;margin-bottom:14px;font-size:12px;color:var(--yellow);line-height:1.45;">⏳ <strong>Reservada — aún NO confirmada.</strong> Se confirma únicamente al recibir el anticipo del ' + _stV.aPct + '% ($' + _fmt(_stV.anticipoMin) + ') o la liquidación total ($' + _fmt(_stV.total) + ').</div>';
+      }
       // Guest
       h += '<div class="conf-guest">' + _esc(res.huesped) + (_ivaConf ? ' <span style="font-size:11px;background:rgba(107,191,123,.18);color:var(--green);padding:2px 7px;border-radius:6px;vertical-align:middle;">🧾 Factura</span>' : '') + '</div>';
       var gsub = [];
@@ -13205,8 +13250,12 @@
       var anticipoMin = Math.round(res.tarifaTotal * getAnticipoFraction() * 100) / 100;
       var hi = getHotelInfo();
 
+      var _stC = _resConfStatus(res);
       var t = '🏨 *' + hi.nombre + '*\n';
-      t += '_Confirmación de Reservación_\n\n';
+      t += (_stC.confirmed ? '_Confirmación de Reservación_' : '_Comprobante de Reservación_') + '\n\n';
+      if (!_stC.confirmed) {
+        t += '⏳ *APARTADA — AÚN NO CONFIRMADA.* Se confirma únicamente con el anticipo (' + _stC.aPct + '%: $' + _fmt(_stC.anticipoMin) + ') o la liquidación total ($' + _fmt(_stC.total) + ').\n\n';
+      }
       t += '*No. Reservación:* ' + res.id + '\n';
       t += '*Huésped:* ' + res.huesped + '\n';
       t += '*Habitación:* ' + res.habitacionNum + ' (' + (room ? room.tipo : '') + ')\n';
@@ -13228,11 +13277,17 @@
       } else {
         t += '*Total estancia:* $' + res.tarifaTotal + '\n';
       }
-      if (totalPaid > 0) {
-        t += '*Anticipo recibido:* $' + totalPaid + '\n';
-        t += '*Saldo pendiente:* $' + balance + '\n';
-      } else {
-        if (_aPct > 0) t += '*Anticipo requerido (' + _aPct + '%):* $' + anticipoMin + '\n';
+      if (_stC.liquidado) {
+        t += '*Pagado:* $' + _fmt(totalPaid) + ' ✅ (liquidado)\n';
+      } else if (totalPaid > 0) {
+        t += '*Anticipo recibido:* $' + _fmt(totalPaid) + '\n';
+        t += '*Saldo pendiente:* $' + _fmt(balance) + '\n';
+        if (!_stC.confirmed && _aPct > 0 && totalPaid < anticipoMin) {
+          t += '⏳ *Falta para confirmar (anticipo ' + _aPct + '%):* $' + _fmt(Math.round((anticipoMin - totalPaid) * 100) / 100) + '\n';
+        }
+      } else if (_aPct > 0) {
+        t += '*Anticipo para confirmar (' + _aPct + '%):* $' + _fmt(anticipoMin) + '\n';
+        t += '*o liquidación total:* $' + _fmt(res.tarifaTotal) + '\n';
       }
       t += '─────────────\n';
       // Breakfast codes
@@ -13278,10 +13333,16 @@
       var pageW = 320;
       var estado = res.estado || 'Reservada';
       var chipText = estado==='Confirmada'?'Confirmada':estado==='Check-in'?'Hospedado':estado==='Reservada'?'Reservada':estado;
+      var _stP = _resConfStatus(res);
 
       function draw(doc, render){
         var k = _pdfBrandKit(doc, pageW, render);
-        k.header(LOGO_V_DARK_B64 || LOGO_V_DARK, LOGO_V_RATIO, 'Confirmación de reservación', chipText, _pdfChipColor(estado));
+        k.header(LOGO_V_DARK_B64 || LOGO_V_DARK, LOGO_V_RATIO, _stP.confirmed ? 'Confirmación de reservación' : 'Comprobante de reservación', chipText, _pdfChipColor(estado));
+
+        if (!_stP.confirmed) {
+          k.paragraph('APARTADA — AÚN NO CONFIRMADA. Se confirma únicamente al recibir el anticipo del ' + _stP.aPct + '% ($' + _fmt(_stP.anticipoMin) + ') o la liquidación total ($' + _fmt(_stP.total) + ').', 8, [196, 150, 40]);
+          k.space(4);
+        }
 
         k.section('Huésped');
         k.row('Nombre', res.huesped, k.INK, true);
@@ -13350,7 +13411,7 @@
       if (mode==='share') {
         doc.save(fileName);
         toast('PDF descargado — abriendo WhatsApp...');
-        var waText = '🏨 *' + hi.nombre + '*\n\nHola *' + res.huesped + '* 👋\n\nTe comparto tu confirmación de reservación en PDF.\n\n📄 _Archivo: ' + fileName + '_\n\n_' + hi.nombre + '_ 🌿';
+        var waText = '🏨 *' + hi.nombre + '*\n\nHola *' + res.huesped + '* 👋\n\n' + (_stP.confirmed ? 'Te comparto tu confirmación de reservación en PDF.' : 'Te comparto tu comprobante de reservación en PDF. ⏳ Tu reservación quedó *apartada pero aún no confirmada*; se confirma con el anticipo o la liquidación.') + '\n\n📄 _Archivo: ' + fileName + '_\n\n_' + hi.nombre + '_ 🌿';
         setTimeout(function(){ window.open('https://wa.me/' + (phone||'') + '?text=' + encodeURIComponent(waText), '_blank'); }, 500);
       } else { doc.save(fileName); toast('PDF descargado: '+fileName); }
     }
@@ -16999,6 +17060,7 @@
 
     function showPostReservaConfirm(resId, huesped, roomNum, isToday) {
       var res = S.reservas.find(function(r){return r.id===resId});
+      var _stPost = _resConfStatus(res);
       var _aPct = getAnticipoPct();
       var anticipoMin = Math.round(res.tarifaTotal * getAnticipoFraction() * 100) / 100;
       var pmts = S.cobros.filter(function(c){return c.reservaId===resId});
@@ -17030,14 +17092,18 @@
         h += '<div style="background:#fff8e1;border:1px solid #f0d060;border-radius:10px;padding:10px;margin-bottom:16px;font-size:12px;color:#8a6d00">💡 Anticipo requerido (' + _aPct + '%): <strong>$' + anticipoMin + '</strong></div>';
       }
 
-      h += '<div style="font-size:13px;font-weight:600;color:#333;margin-bottom:12px">¿Enviar confirmación al huésped?</div>';
+      if (!_stPost.confirmed) {
+        h += '<div style="background:#fff8e1;border:1px solid #f0d060;border-radius:10px;padding:10px;margin-bottom:12px;font-size:12px;color:#8a6d00;line-height:1.45;text-align:left">⏳ <strong>Reservada — aún NO confirmada.</strong> El comprobante avisa al huésped que se confirma con el anticipo ('+_aPct+'%: $'+_fmt(anticipoMin)+') o la liquidación total.</div>';
+      }
+
+      h += '<div style="font-size:13px;font-weight:600;color:#333;margin-bottom:12px">' + (_stPost.confirmed ? '¿Enviar confirmación al huésped?' : '¿Enviar comprobante de reservación al huésped?') + '</div>';
 
       h += '<div class="receipt-btns">';
-      h += '<button onclick="closeReceipt();previewTemplate(\'confirmacion\',\'' + resId + '\')" style="background:#25D366;border:none;color:#fff;font-weight:700">✅ Confirmación WhatsApp</button>';
+      h += '<button onclick="closeReceipt();previewTemplate(\'confirmacion\',\'' + resId + '\')" style="background:#25D366;border:none;color:#fff;font-weight:700">' + (_stPost.confirmed ? '✅ Confirmación WhatsApp' : '📩 Enviar comprobante WhatsApp') + '</button>';
       h += '</div>';
 
       h += '<div class="receipt-btns" style="margin-top:8px">';
-      h += '<button onclick="closeReceipt();showReservaConfirmation(\'' + resId + '\')" style="background:#8baa6a;border:none;color:#fff">📄 Ver Confirmación</button>';
+      h += '<button onclick="closeReceipt();showReservaConfirmation(\'' + resId + '\')" style="background:#8baa6a;border:none;color:#fff">' + (_stPost.confirmed ? '📄 Ver Confirmación' : '📄 Ver Comprobante') + '</button>';
       h += '<button onclick="closeReceipt();generateReservaConfirmPDF(\'' + resId + '\',\'download\')" style="background:#666;border:none;color:#fff">📄 Descargar PDF</button>';
       h += '</div>';
 
