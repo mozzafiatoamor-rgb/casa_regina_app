@@ -3166,6 +3166,23 @@
       if (st.confirmed) return '';
       return 'Tu reservación quedó APARTADA, pero AÚN NO está CONFIRMADA. Se confirma únicamente al recibir el anticipo del ' + st.aPct + '% ($' + _fmt(st.anticipoMin) + ') o la liquidación total ($' + _fmt(st.total) + ').';
     }
+    // Abonos de una reserva, ordenados del más antiguo al más reciente (para el desglose en recibos).
+    function _resPagos(resId) {
+      return (S.cobros || []).filter(function (c) { return c.reservaId === resId; })
+        .slice().sort(function (a, b) {
+          var ka = String(a.fecha || '') + ' ' + String(a.hora || '');
+          var kb = String(b.fecha || '') + ' ' + String(b.hora || '');
+          return ka.localeCompare(kb);
+        });
+    }
+    // Etiqueta corta de un abono: "12 nov · Transferencia · Anticipo"
+    function _resPagoLabel(p) {
+      var parts = [];
+      if (p.fecha) parts.push(formatDate(p.fecha));
+      if (p.metodoPago) parts.push(p.metodoPago);
+      if (p.concepto) parts.push(p.concepto);
+      return parts.join(' · ');
+    }
 
     // ============ BREAKFAST PROMO ============
     var DEFAULT_BREAKFAST_PROMO = {
@@ -3554,7 +3571,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-11-08b';
+    var APP_BUILD = '2026-11-08c';
 
     // ===== Selectores de fecha entrada→salida: la salida siempre mínimo el día siguiente =====
     function _nextDayStr(ymd) {
@@ -3757,18 +3774,24 @@
         ? 'Tu reservación está *confirmada* ✅:'
         : '⏳ Tu reservación quedó *apartada*, pero *aún NO está confirmada*. Se confirma únicamente al recibir el anticipo o la liquidación:';
 
+      var _pagos = _resPagos(res.id);
       var infoPago = '';
-      if (_st.liquidado) {
-        infoPago = '*Pagado:* $' + _fmt(totalPaid) + ' ✅ _(liquidado)_';
-      } else if (totalPaid > 0) {
-        infoPago = '*Anticipo recibido:* $' + _fmt(totalPaid) + '\n*Saldo pendiente:* $' + _fmt(balance);
-        if (!_st.confirmed && aPct > 0 && totalPaid < anticipoMin) {
-          infoPago += '\n⏳ *Falta para confirmar (anticipo ' + aPct + '%):* $' + _fmt(Math.round((anticipoMin - totalPaid) * 100) / 100);
+      if (_pagos.length) {
+        infoPago += '💳 *Abonos:*\n';
+        _pagos.forEach(function (p) { infoPago += '• ' + _resPagoLabel(p) + ': $' + _fmt(p.monto) + '\n'; });
+        infoPago += '*Total abonado:* $' + _fmt(totalPaid) + '\n';
+        if (_st.liquidado) {
+          infoPago += '*Saldo:* $0.00 ✅ _(liquidado)_';
+        } else {
+          infoPago += '*Saldo pendiente:* $' + _fmt(balance);
+          if (!_st.confirmed && aPct > 0 && totalPaid < anticipoMin) {
+            infoPago += '\n⏳ *Falta para confirmar (anticipo ' + aPct + '%):* $' + _fmt(Math.round((anticipoMin - totalPaid) * 100) / 100);
+          }
         }
       } else if (aPct > 0) {
-        infoPago = '*Anticipo para confirmar (' + aPct + '%):* $' + _fmt(anticipoMin) + '\n*o liquidación total:* $' + _fmt(res.tarifaTotal) + '\n\n⚠️ _Tu reservación se confirma al recibir el anticipo o el pago total._';
+        infoPago = '*Anticipo para confirmar (' + aPct + '%):* $' + _fmt(anticipoMin) + '\n*o liquidación total:* $' + _fmt(res.tarifaTotal) + '\n\n⚠️ _Sin abonos todavía. Tu reservación se confirma al recibir el anticipo o el pago total._';
       } else {
-        infoPago = '*Total a pagar:* $' + _fmt(res.tarifaTotal);
+        infoPago = '*Total a pagar:* $' + _fmt(res.tarifaTotal) + '\n_Sin abonos todavía._';
       }
 
       var huespedes = res.adultos + ' adulto(s)';
@@ -13216,17 +13239,25 @@
       // Total destacado
       h += '<div class="conf-total"><div><div class="tl">Total' + (_ivaConf ? ' c/impuestos' : ' estancia') + '</div></div><div class="tv">$' + _fmt(res.tarifaTotal) + '</div></div>';
 
-      // Pago
-      if (totalPaid > 0) {
+      // Pago — desglose de abonos
+      var _pagosV = _resPagos(resId);
+      if (_pagosV.length) {
         h += '<div class="conf-sec">';
-        h += '<div class="conf-sec-t">Pago</div>';
-        h += '<div class="conf-row"><span class="k">Anticipo recibido</span><span class="v" style="color:var(--green)">$' + _fmt(totalPaid) + '</span></div>';
-        h += '<div class="conf-row"><span class="k">Saldo pendiente</span><span class="v" style="color:' + (balance > 0.01 ? 'var(--red)' : 'var(--green)') + '">$' + _fmt(balance) + '</span></div>';
+        h += '<div class="conf-sec-t">Pagos / Abonos</div>';
+        _pagosV.forEach(function (p) {
+          h += '<div class="conf-row"><span class="k">' + _esc(_resPagoLabel(p)) + '</span><span class="v" style="color:var(--green)">$' + _fmt(p.monto) + '</span></div>';
+        });
+        h += '<div class="conf-row" style="border-top:1px dashed var(--surface3);margin-top:4px;padding-top:6px;"><span class="k" style="font-weight:700;">Total abonado</span><span class="v" style="color:var(--green);font-weight:700;">$' + _fmt(totalPaid) + '</span></div>';
+        h += '<div class="conf-row"><span class="k">Saldo pendiente</span><span class="v" style="color:' + (balance > 0.01 ? 'var(--red)' : 'var(--green)') + '">$' + _fmt(balance) + (balance > 0.01 ? '' : ' ✅') + '</span></div>';
+        if (!_stV.confirmed && _aPct > 0 && totalPaid < anticipoMin) {
+          h += '<div class="conf-row"><span class="k" style="color:var(--yellow)">Falta para confirmar (' + _aPct + '%)</span><span class="v" style="color:var(--yellow)">$' + _fmt(Math.round((anticipoMin - totalPaid) * 100) / 100) + '</span></div>';
+        }
         h += '</div>';
       } else if (_aPct > 0) {
         h += '<div class="conf-sec">';
         h += '<div class="conf-sec-t">Pago</div>';
-        h += '<div class="conf-row"><span class="k" style="color:var(--yellow)">Anticipo requerido (' + _aPct + '%)</span><span class="v" style="color:var(--yellow)">$' + _fmt(anticipoMin) + '</span></div>';
+        h += '<div class="conf-row"><span class="k" style="color:var(--yellow)">Anticipo para confirmar (' + _aPct + '%)</span><span class="v" style="color:var(--yellow)">$' + _fmt(anticipoMin) + '</span></div>';
+        h += '<div class="conf-row"><span class="k" style="color:var(--text2);font-size:11px;">Sin abonos todavía</span><span class="v"></span></div>';
         h += '</div>';
       }
 
@@ -13308,17 +13339,23 @@
       } else {
         t += '*Total estancia:* $' + res.tarifaTotal + '\n';
       }
-      if (_stC.liquidado) {
-        t += '*Pagado:* $' + _fmt(totalPaid) + ' ✅ (liquidado)\n';
-      } else if (totalPaid > 0) {
-        t += '*Anticipo recibido:* $' + _fmt(totalPaid) + '\n';
-        t += '*Saldo pendiente:* $' + _fmt(balance) + '\n';
-        if (!_stC.confirmed && _aPct > 0 && totalPaid < anticipoMin) {
-          t += '⏳ *Falta para confirmar (anticipo ' + _aPct + '%):* $' + _fmt(Math.round((anticipoMin - totalPaid) * 100) / 100) + '\n';
+      var _pagosC = _resPagos(res.id);
+      if (_pagosC.length) {
+        t += '💳 *Abonos:*\n';
+        _pagosC.forEach(function (p) { t += '• ' + _resPagoLabel(p) + ': $' + _fmt(p.monto) + '\n'; });
+        t += '*Total abonado:* $' + _fmt(totalPaid) + '\n';
+        if (_stC.liquidado) {
+          t += '*Saldo:* $0.00 ✅ (liquidado)\n';
+        } else {
+          t += '*Saldo pendiente:* $' + _fmt(balance) + '\n';
+          if (!_stC.confirmed && _aPct > 0 && totalPaid < anticipoMin) {
+            t += '⏳ *Falta para confirmar (anticipo ' + _aPct + '%):* $' + _fmt(Math.round((anticipoMin - totalPaid) * 100) / 100) + '\n';
+          }
         }
       } else if (_aPct > 0) {
         t += '*Anticipo para confirmar (' + _aPct + '%):* $' + _fmt(anticipoMin) + '\n';
         t += '*o liquidación total:* $' + _fmt(res.tarifaTotal) + '\n';
+        t += '_Sin abonos todavía._\n';
       }
       t += '─────────────\n';
       // Breakfast codes
@@ -13400,13 +13437,19 @@
         }
         k.totalBox('Total' + (_ivaPdf ? ' c/impuestos' : ' estancia'), '$'+_fmt(res.tarifaTotal));
 
-        if (totalPaid > 0) {
-          k.section('Pago');
-          k.row('Anticipo recibido', '$'+_fmt(totalPaid), [40,160,90], true);
+        var _pagosP = _resPagos(resId);
+        if (_pagosP.length) {
+          k.section('Pagos / Abonos');
+          _pagosP.forEach(function (p) { k.row(_resPagoLabel(p), '$'+_fmt(p.monto), [40,160,90], true); });
+          k.row('Total abonado', '$'+_fmt(totalPaid), [40,160,90], true);
           k.row('Saldo pendiente', '$'+_fmt(balance), balance>0.01?[210,70,70]:[40,160,90], true);
+          if (!_stP.confirmed && _aPct > 0 && totalPaid < anticipoMin) {
+            k.row('Falta para confirmar ('+_aPct+'%)', '$'+_fmt(Math.round((anticipoMin - totalPaid) * 100) / 100), [196,150,40], true);
+          }
         } else if (_aPct > 0) {
           k.section('Pago');
-          k.row('Anticipo requerido ('+_aPct+'%)', '$'+_fmt(anticipoMin), [196,150,40], true);
+          k.row('Anticipo para confirmar ('+_aPct+'%)', '$'+_fmt(anticipoMin), [196,150,40], true);
+          k.row('Estado', 'Sin abonos todavía', k.GRY, false);
         }
 
         if (_bfPdf.length) {
