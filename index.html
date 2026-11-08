@@ -2485,6 +2485,7 @@
       <div class="tab-content" id="tabReservas">
         <div class="tab-scroll">
           <div class="tabs-pills" id="reservasPills"></div>
+          <div id="reservasEstadoBtns" style="display:flex;gap:7px;overflow-x:auto;padding-bottom:4px;margin:10px 0 12px;-webkit-overflow-scrolling:touch;"></div>
           <div class="search-box">
             <span style="font-size: 16px;">🔍</span>
             <input type="text" id="reservasSearch" placeholder="Buscar huésped..." onkeyup="filterReservas()" />
@@ -3553,7 +3554,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-11-08a';
+    var APP_BUILD = '2026-11-08b';
 
     // ===== Selectores de fecha entrada→salida: la salida siempre mínimo el día siguiente =====
     function _nextDayStr(ymd) {
@@ -3869,6 +3870,7 @@
       cobros: [],
       clientes: [],
       filterReservas: 'activas',
+      filterResEstado: 'todas',
       filterHousekeeping: 'pendientes',
       filterReports: 'ocupacion',
       searchText: '',
@@ -8788,6 +8790,35 @@
         allFiltered = allFiltered.filter(r => r.huesped.toLowerCase().includes(S.searchText.toLowerCase()));
       }
 
+      // --- Botones de categoría por estado (colores distinguidos) ---
+      var _estadoOrder = ['Check-in', 'Confirmada', 'Reservada', 'Check-out', 'Cancelada'];
+      var _estadoMeta = {
+        'Check-in':   { label: 'Check-ins',   icon: '🔵', color: 'var(--blue)',   tint: 'rgba(96,165,250,.16)' },
+        'Confirmada': { label: 'Confirmadas', icon: '🟢', color: 'var(--green)',  tint: 'rgba(52,211,153,.16)' },
+        'Reservada':  { label: 'Reservadas',  icon: '🟡', color: 'var(--yellow)', tint: 'rgba(251,191,36,.16)' },
+        'Check-out':  { label: 'Check-outs',  icon: '✅', color: 'var(--text2)',  tint: 'rgba(148,148,170,.16)' },
+        'Cancelada':  { label: 'Canceladas',  icon: '❌', color: 'var(--red)',    tint: 'rgba(251,113,133,.16)' }
+      };
+      var _estadoCounts = {};
+      _estadoOrder.forEach(function(e) { _estadoCounts[e] = allFiltered.filter(function(r) { return r.estado === e; }).length; });
+      // Si el estado elegido ya no existe en esta vista, regresar a "Todas"
+      if (S.filterResEstado && S.filterResEstado !== 'todas' && !_estadoCounts[S.filterResEstado]) S.filterResEstado = 'todas';
+      var _todasOn = (!S.filterResEstado || S.filterResEstado === 'todas');
+      var _ebtns = '';
+      _ebtns += '<button onclick="filterResEstadoSet(\'todas\')" style="flex:0 0 auto;padding:8px 14px;border-radius:20px;border:1px solid ' + (_todasOn ? 'var(--accent)' : 'var(--surface3)') + ';background:' + (_todasOn ? 'var(--accent)' : 'var(--surface2)') + ';color:' + (_todasOn ? 'var(--bg)' : 'var(--text2)') + ';font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">Todas · ' + allFiltered.length + '</button>';
+      _estadoOrder.forEach(function(e) {
+        if (!_estadoCounts[e]) return;
+        var m = _estadoMeta[e], on = S.filterResEstado === e;
+        _ebtns += '<button onclick="filterResEstadoSet(\'' + e + '\')" style="flex:0 0 auto;padding:8px 14px;border-radius:20px;border:1px solid ' + m.color + ';background:' + (on ? m.color : m.tint) + ';color:' + (on ? 'var(--bg)' : m.color) + ';font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">' + m.icon + ' ' + m.label + ' · ' + _estadoCounts[e] + '</button>';
+      });
+      var _ebtnsEl = document.getElementById('reservasEstadoBtns');
+      if (_ebtnsEl) _ebtnsEl.innerHTML = _ebtns;
+
+      // Aplicar el filtro por estado seleccionado (muestra solo esa categoría)
+      if (S.filterResEstado && S.filterResEstado !== 'todas') {
+        allFiltered = allFiltered.filter(function(r) { return r.estado === S.filterResEstado; });
+      }
+
       // Group by status
       const groups = {
         'Check-in': allFiltered.filter(r => r.estado === 'Check-in'),
@@ -8822,7 +8853,7 @@
       Object.entries(groups).forEach(([status, items]) => {
         if (S.filterReservas !== 'todas' && items.length === 0) return;
 
-        const isCollapsed = _collapsedGroups[status];
+        const isCollapsed = (S.filterResEstado && S.filterResEstado !== 'todas') ? false : _collapsedGroups[status];
         const borderClass = status === 'Check-in' ? 'check-in' :
                            status === 'Confirmada' ? 'confirmada' :
                            status === 'Reservada' ? 'reservada' :
@@ -19958,6 +19989,12 @@
     // ============ FILTERS ============
     function filterReservaTab(tab) {
       S.filterReservas = tab;
+      S.filterResEstado = 'todas'; // al cambiar de vista, reinicia la categoría
+      renderReservas();
+    }
+
+    function filterResEstadoSet(estado) {
+      S.filterResEstado = (S.filterResEstado === estado) ? 'todas' : estado; // segundo toque = quitar filtro
       renderReservas();
     }
 
