@@ -3157,8 +3157,10 @@
       var liquidado = total > 0 && totalPaid >= total - EPS;
       var anticipoCubierto = aPct > 0 && totalPaid >= anticipoMin - EPS;
       var estado = res.estado || 'Reservada';
-      var postStates = ['Confirmada', 'Check-in', 'Check-out', 'Completada'];
-      var confirmed = aPct === 0 || anticipoCubierto || liquidado || postStates.indexOf(estado) !== -1;
+      // Una reserva está CONFIRMADA solo con pago (anticipo o liquidación) o ya en estancia.
+      // "Confirmada" por sí sola NO basta si no hay pago (regla del hotel).
+      var postStates = ['Check-in', 'Check-out', 'Completada'];
+      var confirmed = anticipoCubierto || liquidado || postStates.indexOf(estado) !== -1;
       return { aPct: aPct, total: total, anticipoMin: anticipoMin, totalPaid: totalPaid, balance: Math.round((total - totalPaid) * 100) / 100, liquidado: liquidado, anticipoCubierto: anticipoCubierto, confirmed: confirmed, estado: estado };
     }
     // Leyenda para recibos cuando la reserva NO está confirmada (sin anticipo). '' si está confirmada.
@@ -3571,7 +3573,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-11-09a';
+    var APP_BUILD = '2026-11-09b';
 
     // ===== Selectores de fecha entrada→salida: la salida siempre mínimo el día siguiente =====
     function _nextDayStr(ymd) {
@@ -16940,14 +16942,13 @@
           notas = (notas ? notas + ' | ' : '') + '[IVA:' + ivaData + ']';
         }
 
-        // Determine initial state: if anticipo is configured and payment covers it, or no anticipo required → Confirmada; otherwise → Reservada
+        // Se confirma SOLO con pago: anticipo (si está configurado) o liquidación total.
+        // Sin pago, la reserva queda APARTADA (Reservada), aunque no se pida anticipo.
         var _aPctNew = getAnticipoPct();
         var _initEstado = 'Reservada';
-        if (_aPctNew === 0) {
-          _initEstado = 'Confirmada'; // No anticipo required → auto-confirm
-        } else if (wantsPay && payMonto > 0) {
-          var _minReqNew = Math.round(total * getAnticipoFraction() * 100) / 100;
-          if (payMonto >= _minReqNew - PAY_EPS) _initEstado = 'Confirmada';
+        var _minReqNew = (_aPctNew > 0) ? Math.round(total * getAnticipoFraction() * 100) / 100 : total;
+        if (wantsPay && payMonto > 0 && payMonto >= _minReqNew - PAY_EPS) {
+          _initEstado = 'Confirmada';
         }
         const row = [id, roomNum, huesped, tel, email, checkin, checkout, adultos, niños, tarifa, total, _initEstado, notas, S.user.usuario, n];
         const logRow = [fecha, hora, S.user.usuario, 'Nueva Reserva', huesped + ' en Hab. ' + roomNum + (wantsFactura ? ' (Factura)' : '') + (_precioMotivo ? ' · Precio especial: ' + _precioMotivo : ''), 'info'];
@@ -23205,7 +23206,8 @@
       }
       var _aPct = 0; try { _aPct = getAnticipoPct(); } catch (e) {}
       var walkin = !!(document.getElementById('grp_walkin') && document.getElementById('grp_walkin').checked);
-      var estado = walkin ? 'Check-in' : ((_aPct === 0) ? 'Confirmada' : 'Reservada');
+      // Sin pago capturado, el grupo queda Reservado (se confirma al recibir anticipo/liquidación).
+      var estado = walkin ? 'Check-in' : 'Reservada';
       var n = now(), fecha = normDate(new Date()), hora = n.split(' ')[1];
       await busy(async function () {
         var ops = [], newRes = [], newRegs = [], occRooms = [];
