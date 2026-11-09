@@ -3571,7 +3571,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-11-08g';
+    var APP_BUILD = '2026-11-09a';
 
     // ===== Selectores de fecha entrada→salida: la salida siempre mínimo el día siguiente =====
     function _nextDayStr(ymd) {
@@ -18425,6 +18425,15 @@
       h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;">';
       h += '<div style="min-width:0;"><label class="form-label" style="font-size:12px;">Entrada</label><input id="faqCheckin" type="date" class="form-input" onchange="_faqDatesChanged()" style="width:100%;box-sizing:border-box;font-size:15px;padding:10px;"></div>';
       h += '<div style="min-width:0;"><label class="form-label" style="font-size:12px;">Salida</label><input id="faqCheckout" type="date" class="form-input" onchange="_faqUpdatePreview()" style="width:100%;box-sizing:border-box;font-size:15px;padding:10px;"></div>';
+      h += '</div>';
+      h += '<div style="margin-top:9px;"><label class="form-label" style="font-size:12px;">Habitación (opcional)</label>';
+      h += '<select id="faqRoom" class="form-input" onchange="_faqUpdatePreview()" style="width:100%;box-sizing:border-box;font-size:15px;padding:10px;">';
+      h += '<option value="">Todas las habitaciones</option>';
+      (S.rooms || []).slice().sort(function(a, b) { return (parseInt(a.numero) || 0) - (parseInt(b.numero) || 0) || String(a.numero).localeCompare(String(b.numero)); }).forEach(function(r) {
+        h += '<option value="' + escapeAttr(String(r.numero)) + '">Hab. ' + escapeAttr(String(r.numero)) + ' · ' + escapeAttr(String(r.tipo || '')) + '</option>';
+      });
+      h += '</select>';
+      h += '<div style="font-size:11px;color:var(--text2);margin-top:5px;line-height:1.4;">Déjala en “Todas” para ver todo lo disponible, o elige una si el cliente ya quiere una habitación específica.</div>';
       h += '</div></div>';
       h += '<label class="form-label" style="font-size:12px;text-align:center;display:block;">Vista previa del mensaje</label>';
       h += '<textarea id="faqPreview" class="form-textarea" placeholder="Marca una o más respuestas de arriba…" style="display:block;width:100%;box-sizing:border-box;height:260px;font-size:15px;line-height:1.55;margin:0 0 10px;"></textarea>';
@@ -18569,26 +18578,56 @@
           msg = '📅 *Disponibilidad*\nDime tu fecha de entrada y salida y te confirmo la disponibilidad al momento.';
         } else {
           var nights = daysUntil(ci, co);
-          var availByType = {};
-          (S.rooms || []).forEach(function(r) {
-            var t = String(r.tipo || '').trim(), tar = parseFloat(r.tarifa) || 0;
-            if (!t || tar <= 0) return;
-            if (hasOverlap(r.numero, ci, co)) return;
-            if (!availByType[t]) { availByType[t] = { min: tar, varia: false, count: 1 }; }
-            else { availByType[t].count++; if (tar !== availByType[t].min) availByType[t].varia = true; if (tar < availByType[t].min) availByType[t].min = tar; }
-          });
-          var aTipos = Object.keys(availByType);
           var rango = _infoReplyRangeLabel(ci, co);
           var nochesTxt = nights + (nights === 1 ? ' noche' : ' noches');
-          if (!aTipos.length) {
-            msg = '📅 *Disponibilidad ' + rango + '*\nJusto en esas fechas no tengo habitaciones libres 😔. ¿Tienes flexibilidad? Con gusto reviso opciones cercanas.';
+          var roomEl = document.getElementById('faqRoom');
+          var selRoom = roomEl ? roomEl.value : '';
+          var promoAct = isBreakfastPromoActive();
+
+          if (selRoom) {
+            // Disponibilidad de UNA habitación específica (cliente que ya la conoce)
+            var room = (S.rooms || []).find(function(r) { return String(r.numero) === String(selRoom); });
+            if (!room) {
+              msg = '📅 *Disponibilidad ' + rango + '*\nNo encontré esa habitación. Elige otra o deja "Todas las habitaciones".';
+            } else {
+              var baseR = parseFloat(room.tarifa) || 0, totR = baseR * nights, tbR = _taxBreak(totR, true);
+              msg = '📅 *Disponibilidad ' + rango + ' (' + nochesTxt + ')*\n';
+              if (!hasOverlap(room.numero, ci, co)) {
+                msg += '✅ Hab. ' + room.numero + ' · ' + room.tipo + ' — *DISPONIBLE*\n';
+                msg += '   • ' + _infoReplyMoney(baseR) + '/noche · ' + nochesTxt + ' = ' + _infoReplyMoney(totR) + ' (sin impuestos)\n';
+                msg += '   • Con factura: ' + _infoReplyMoney(tbR.total) + ' (ISH ' + _ishP + '% + IVA ' + _ivaP + '%)';
+                if (promoAct) { var persR = getBreakfastPersonas(room.tipo); if (persR > 0) msg += '\n   • Incluye desayuno para ' + persR + (persR === 1 ? ' persona' : ' personas') + ' 🍳'; }
+              } else {
+                msg += '❌ Hab. ' + room.numero + ' · ' + room.tipo + ' — *No disponible* en esas fechas.';
+                var alt = (S.rooms || []).filter(function(r) { return r.tipo === room.tipo && String(r.numero) !== String(room.numero) && !hasOverlap(r.numero, ci, co); });
+                if (alt.length) {
+                  msg += '\nPero sí tengo libre del mismo tipo: ' + alt.map(function(r) { return 'Hab. ' + r.numero; }).join(', ') + '.';
+                } else {
+                  msg += '\n¿Tienes flexibilidad con las fechas, o te muestro otro tipo de habitación?';
+                }
+              }
+            }
           } else {
-            msg = '📅 *Disponibilidad ' + rango + ' (' + nochesTxt + ')*';
-            aTipos.forEach(function(t) {
-              var base = availByType[t].min, totBase = base * nights, tbT = _taxBreak(totBase, true), pre = availByType[t].varia ? 'desde ' : '', cnt = availByType[t].count;
-              msg += '\n🛏️ ' + t.toUpperCase() + ' (' + cnt + (cnt === 1 ? ' disponible' : ' disponibles') + ')\n   • ' + pre + _infoReplyMoney(base) + '/noche · ' + nochesTxt + ' = ' + _infoReplyMoney(totBase) + ' (sin impuestos)\n   • Con factura: ' + _infoReplyMoney(tbT.total) + ' (ISH ' + _ishP + '% + IVA ' + _ivaP + '%)';
-              if (isBreakfastPromoActive()) { var persD = getBreakfastPersonas(t); if (persD > 0) msg += '\n   • Incluye desayuno para ' + persD + (persD === 1 ? ' persona' : ' personas') + ' 🍳'; }
+            // Disponibilidad general, agrupada por tipo
+            var availByType = {};
+            (S.rooms || []).forEach(function(r) {
+              var t = String(r.tipo || '').trim(), tar = parseFloat(r.tarifa) || 0;
+              if (!t || tar <= 0) return;
+              if (hasOverlap(r.numero, ci, co)) return;
+              if (!availByType[t]) { availByType[t] = { min: tar, varia: false, count: 1 }; }
+              else { availByType[t].count++; if (tar !== availByType[t].min) availByType[t].varia = true; if (tar < availByType[t].min) availByType[t].min = tar; }
             });
+            var aTipos = Object.keys(availByType);
+            if (!aTipos.length) {
+              msg = '📅 *Disponibilidad ' + rango + '*\nJusto en esas fechas no tengo habitaciones libres 😔. ¿Tienes flexibilidad? Con gusto reviso opciones cercanas.';
+            } else {
+              msg = '📅 *Disponibilidad ' + rango + ' (' + nochesTxt + ')*';
+              aTipos.forEach(function(t) {
+                var base = availByType[t].min, totBase = base * nights, tbT = _taxBreak(totBase, true), pre = availByType[t].varia ? 'desde ' : '', cnt = availByType[t].count;
+                msg += '\n🛏️ ' + t.toUpperCase() + ' (' + cnt + (cnt === 1 ? ' disponible' : ' disponibles') + ')\n   • ' + pre + _infoReplyMoney(base) + '/noche · ' + nochesTxt + ' = ' + _infoReplyMoney(totBase) + ' (sin impuestos)\n   • Con factura: ' + _infoReplyMoney(tbT.total) + ' (ISH ' + _ishP + '% + IVA ' + _ivaP + '%)';
+                if (promoAct) { var persD = getBreakfastPersonas(t); if (persD > 0) msg += '\n   • Incluye desayuno para ' + persD + (persD === 1 ? ' persona' : ' personas') + ' 🍳'; }
+              });
+            }
           }
         }
       } else if (id === 'ubicacion') {
