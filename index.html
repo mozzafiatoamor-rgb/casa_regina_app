@@ -3573,7 +3573,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-11-09b';
+    var APP_BUILD = '2026-11-10b';
 
     // ===== Selectores de fecha entrada→salida: la salida siempre mínimo el día siguiente =====
     function _nextDayStr(ymd) {
@@ -13402,15 +13402,22 @@
       var jsPDF = window.jspdf.jsPDF;
       var pageW = 320;
       var estado = res.estado || 'Reservada';
-      var chipText = estado==='Confirmada'?'Confirmada':estado==='Check-in'?'Hospedado':estado==='Reservada'?'Reservada':estado;
+      var chipText = estado==='Confirmada'?'Confirmada':estado==='Check-in'?'Hospedado':estado==='Check-out'?'Check-out':estado==='Reservada'?'Reservada':estado;
       var _stP = _resConfStatus(res);
+      var _ei = _resEarlyInfo(res);
+      var _isCheckout = estado === 'Check-out';
+      var _pdfTitle = _isCheckout ? (_ei.early ? 'Comprobante de salida anticipada' : 'Comprobante de salida') : (_stP.confirmed ? 'Confirmación de reservación' : 'Comprobante de reservación');
 
       function draw(doc, render){
         var k = _pdfBrandKit(doc, pageW, render);
-        k.header(LOGO_V_DARK_B64 || LOGO_V_DARK, LOGO_V_RATIO, _stP.confirmed ? 'Confirmación de reservación' : 'Comprobante de reservación', chipText, _pdfChipColor(estado));
+        k.header(LOGO_V_DARK_B64 || LOGO_V_DARK, LOGO_V_RATIO, _pdfTitle, chipText, _pdfChipColor(estado));
 
-        if (!_stP.confirmed) {
+        if (!_isCheckout && !_stP.confirmed) {
           k.paragraph('APARTADA — AÚN NO CONFIRMADA. Se confirma únicamente al recibir el anticipo del ' + _stP.aPct + '% ($' + _fmt(_stP.anticipoMin) + ') o la liquidación total ($' + _fmt(_stP.total) + ').', 8, [196, 150, 40]);
+          k.space(4);
+        }
+        if (_isCheckout && _ei.early) {
+          k.paragraph('SALIDA ANTICIPADA — Sin reembolso por las noches no utilizadas (Política de Salida Anticipada).', 8, [196, 150, 40]);
           k.space(4);
         }
 
@@ -13423,7 +13430,8 @@
         k.section('Estancia');
         k.row('Habitación', res.habitacionNum + (room ? ' · ' + room.tipo : ''), [107,138,74], true);
         k.row('Entrada', formatDate(res.fechaEntrada) + ' · ' + formatHoraDisplay(hi.checkin_hora));
-        k.row('Salida', formatDate(res.fechaSalida) + ' · ' + formatHoraDisplay(hi.checkout_hora));
+        k.row(_isCheckout ? 'Salida reservada' : 'Salida', formatDate(res.fechaSalida) + ' · ' + formatHoraDisplay(hi.checkout_hora));
+        if (_isCheckout && _ei.early && _ei.fechaReal) k.row('Salida real', formatDate(_ei.fechaReal), [196,150,40], true);
         k.row('Noches', String(nights));
         k.row('Huéspedes', res.adultos + ' adulto(s)' + (parseInt(res.niños)>0 ? ', ' + res.niños + ' niño(s)' : ''));
 
@@ -15295,6 +15303,7 @@
       { title: 'Cancelación con menos de 3 días / No Show', text: 'No aplica reembolso. Se retiene el 100% del anticipo como penalización por cancelación tardía o inasistencia.' },
       { title: 'Modificaciones', text: 'Cambios de fecha están sujetos a disponibilidad y deben solicitarse con al menos 48 horas de anticipación. No se garantizan cambios de última hora.' },
       { title: 'Check-in / Check-out', text: 'La hora de entrada es a las ' + formatHoraDisplay(getHotelInfo().checkin_hora) + ' y la hora de salida es a las ' + formatHoraDisplay(getHotelInfo().checkout_hora) + '. El early check-in y late check-out están sujetos a disponibilidad y pueden generar cargos adicionales.' },
+      { title: 'Política de Salida Anticipada', text: 'En caso de salida anticipada (check-out antes de la fecha de salida reservada), no se realiza ningún reembolso por las noches no utilizadas. La tarifa de la estancia reservada se cobra en su totalidad.' },
       { title: 'Cargos adicionales', text: 'Servicios como minibar, room service, lavandería, estacionamiento y daños a la habitación se cargarán a la cuenta del huésped y deberán liquidarse antes del check-out.' },
       { title: 'Identificación', text: 'Al momento del check-in se solicitará una identificación oficial vigente con fotografía del titular de la reservación.' },
       { title: 'Menores de edad', text: 'Los menores de edad deberán estar acompañados en todo momento por un adulto responsable registrado en la reservación.' },
@@ -15312,6 +15321,12 @@
         try { terms = JSON.parse(stored); } catch(e) {}
       }
       if (!terms) terms = DEFAULT_TERMS.map(function(t) { return { title: t.title, text: t.text }; });
+      // Garantiza que la Política de Salida Anticipada esté presente (incluso en términos ya guardados)
+      if (!terms.some(function(t) { return /salida anticipada/i.test(t.title || ''); })) {
+        var _coIdx = terms.findIndex(function(t) { return /check-?in\s*\/\s*check-?out/i.test(t.title || ''); });
+        var _coTerm = { title: 'Política de Salida Anticipada', text: 'En caso de salida anticipada (check-out antes de la fecha de salida reservada), no se realiza ningún reembolso por las noches no utilizadas. La tarifa de la estancia reservada se cobra en su totalidad.' };
+        if (_coIdx !== -1) terms.splice(_coIdx + 1, 0, _coTerm); else terms.push(_coTerm);
+      }
       // Always inject current hotel hours into the Check-in/Check-out term
       var hi = getHotelInfo();
       var peCargoStr = '$' + (hi.persona_extra || 150) + '.00 MXN + impuestos';
@@ -19780,7 +19795,103 @@
       await doCheckout(roomNum);
     }
 
+    // ¿El huésped se va antes de su fecha de salida reservada?
+    function _resIsEarlyDeparture(res) {
+      if (!res || !res.fechaSalida) return false;
+      try { return normDate(new Date()) < String(res.fechaSalida).substring(0, 10); } catch (e) { return false; }
+    }
+    // Lee la marca de salida anticipada guardada en las notas de la reserva.
+    function _resEarlyInfo(res) {
+      var m = String(res && res.notas || '').match(/\[SALIDA_ANTICIPADA:(\d{4}-\d{2}-\d{2})/);
+      return { early: !!m, fechaReal: m ? m[1] : '' };
+    }
+
+    // Texto de WhatsApp: comprobante de salida (check-out) con todo el detalle.
+    function getCheckoutText(resId) {
+      var res = S.reservas.find(function(r) { return r.id === resId; });
+      if (!res) return '';
+      var room = S.rooms.find(function(r) { return r.numero === res.habitacionNum; });
+      var hi = getHotelInfo();
+      var ei = _resEarlyInfo(res);
+      var st = _resConfStatus(res);
+      var pagos = _resPagos(resId);
+      var nochesRes = Math.max(daysUntil(res.fechaEntrada, res.fechaSalida), 1);
+      var salidaReal = (ei.early && ei.fechaReal) ? ei.fechaReal : res.fechaSalida;
+      var nochesUsadas = Math.max(daysUntil(res.fechaEntrada, salidaReal), 0);
+
+      var t = '🏨 *' + hi.nombre + '*\n';
+      t += '_Comprobante de Salida (Check-out)_\n\n';
+      t += '*Huésped:* ' + res.huesped + '\n';
+      t += '*Habitación:* ' + res.habitacionNum + (room ? ' (' + room.tipo + ')' : '') + '\n';
+      t += '*No. Reservación:* ' + res.id + '\n';
+      t += '*Entrada:* ' + formatDate(res.fechaEntrada) + '\n';
+      t += '*Salida reservada:* ' + formatDate(res.fechaSalida) + '\n';
+      if (ei.early) {
+        t += '*Salida real:* ' + formatDate(salidaReal) + '\n';
+        t += '*Noches:* ' + nochesUsadas + ' usada(s) de ' + nochesRes + ' reservada(s)\n';
+      } else {
+        t += '*Noches:* ' + nochesRes + '\n';
+      }
+      t += '─────────────\n';
+      t += '*Total estancia:* $' + _fmt(res.tarifaTotal) + '\n';
+      if (pagos.length) {
+        t += '💳 *Abonos:*\n';
+        pagos.forEach(function(p) { t += '• ' + _resPagoLabel(p) + ': $' + _fmt(p.monto) + '\n'; });
+        t += '*Total abonado:* $' + _fmt(st.totalPaid) + '\n';
+        t += (st.balance > 0.01 ? '*Saldo pendiente:* $' + _fmt(st.balance) : '*Saldo:* $0.00 ✅ (liquidado)') + '\n';
+      } else {
+        t += '_Sin abonos registrados._\n';
+      }
+      t += '─────────────\n';
+      if (ei.early) {
+        t += '\n🚪 *Salida anticipada:* Te retiraste antes de tu fecha de salida reservada. Conforme a nuestra Política de Salida Anticipada, no aplica reembolso por las noches no utilizadas.\n';
+      }
+      if (hi.direccion) t += '\n📍 *Dirección:* ' + hi.direccion + '\n';
+      t += '\n¡Gracias por tu visita! Esperamos verte pronto 🌿\n_' + hi.nombre + '_';
+      return t;
+    }
+
+    function _sendCheckoutWA(resId) {
+      var res = S.reservas.find(function(r) { return r.id === resId; });
+      var text = getCheckoutText(resId);
+      var phone = getGuestPhone(res).replace(/\D/g, '');
+      window.open('https://wa.me/' + (phone || '') + '?text=' + encodeURIComponent(text), '_blank');
+    }
+
+    // Ofrece enviar el comprobante de salida al huésped tras el check-out.
+    function showCheckoutComprobante(resId) {
+      var res = S.reservas.find(function(r) { return r.id === resId; });
+      if (!res) return;
+      var ei = _resEarlyInfo(res);
+      var st = _resConfStatus(res);
+      var h = '<div class="receipt-overlay" id="receiptOverlay" onclick="if(event.target===this)closeReceipt()">';
+      h += '<div class="receipt-box" style="text-align:center">';
+      h += '<div style="font-size:44px;margin:12px 0">🚪</div>';
+      h += '<div style="font-size:16px;font-weight:700;color:#333;margin-bottom:6px">Check-out completado</div>';
+      h += '<div style="font-size:13px;color:#666;margin-bottom:4px">' + res.huesped + ' — Hab. ' + res.habitacionNum + '</div>';
+      if (ei.early) h += '<div style="font-size:12px;color:#8a6d00;background:#fff8e1;border:1px solid #f0d060;border-radius:8px;padding:9px;margin:10px 0;line-height:1.4;">🚪 <strong>Salida anticipada</strong> — sin reembolso por las noches no utilizadas.</div>';
+      if (st.balance > 0.01) h += '<div style="font-size:12px;color:#b22;background:#fdecec;border:1px solid #f0b0b0;border-radius:8px;padding:9px;margin:10px 0;">Saldo pendiente: <strong>$' + _fmt(st.balance) + '</strong></div>';
+      h += '<div style="font-size:13px;color:#333;margin:12px 0 10px;">¿Enviar comprobante de salida al huésped?</div>';
+      h += '<div class="receipt-btns">';
+      h += '<button onclick="closeReceipt();_sendCheckoutWA(\'' + resId + '\')" style="background:#25D366;border:none;color:#fff;font-weight:700">📲 Comprobante por WhatsApp</button>';
+      h += '</div>';
+      h += '<div class="receipt-btns" style="margin-top:8px">';
+      h += '<button onclick="closeReceipt();generateReservaConfirmPDF(\'' + resId + '\',\'share\')" style="background:#8baa6a;border:none;color:#fff">📄 PDF por WhatsApp</button>';
+      h += '<button onclick="closeReceipt();showReservaConfirmation(\'' + resId + '\')" style="background:#666;border:none;color:#fff">📄 Ver / descargar</button>';
+      h += '</div>';
+      h += '<div class="receipt-btns" style="margin-top:12px"><button onclick="closeReceipt()" style="background:#eee;border:1px solid #ddd;color:#666">Cerrar</button></div>';
+      h += '</div></div>';
+      document.body.insertAdjacentHTML('beforeend', h);
+    }
+
     async function doCheckout(roomNum) {
+      // Política de Salida Anticipada: avisar y registrar si sale antes de su fecha.
+      var _coRes0 = S.reservas.find(function(r) { return r.habitacionNum === roomNum && r.estado === 'Check-in'; });
+      var _coEarly = _resIsEarlyDeparture(_coRes0);
+      if (_coEarly) {
+        var _coNoUsadas = Math.max(daysUntil(normDate(new Date()), String(_coRes0.fechaSalida).substring(0, 10)), 0);
+        if (!confirm('🚪 Salida anticipada\n\n' + _coRes0.huesped + ' saldría antes de su fecha de salida reservada (' + formatDate(_coRes0.fechaSalida) + '), con ' + _coNoUsadas + ' noche(s) por usar.\n\nPolítica de Salida Anticipada: NO se realiza reembolso por las noches no utilizadas; la estancia reservada se cobra completa.\n\n¿Confirmar el check-out?')) return;
+      }
       await busy(async () => {
         var n = now();
         var res = S.reservas.find(r => r.habitacionNum === roomNum && r.estado === 'Check-in');
@@ -19793,8 +19904,12 @@
           var checkoutPaid = S.cobros.filter(c => c.reservaId === res.id).reduce((s, c) => s + c.monto, 0);
           checkoutBalance = res.tarifaTotal - checkoutPaid;
         }
-        var logDetail = 'Hab. ' + roomNum + (res ? ' - ' + res.huesped : '') + (checkoutBalance > 0 ? ' ⚠️ CON ADEUDO: $' + checkoutBalance : '');
-        var logRow = [normDate(new Date()), n.split(' ')[1], S.user.usuario, 'Check-out', logDetail, checkoutBalance > 0 ? 'warning' : 'info'];
+        var logDetail = 'Hab. ' + roomNum + (res ? ' - ' + res.huesped : '') + (checkoutBalance > 0 ? ' ⚠️ CON ADEUDO: $' + checkoutBalance : '') + (_coEarly ? ' 🚪 Salida anticipada (sin reembolso)' : '');
+        var logRow = [normDate(new Date()), n.split(' ')[1], S.user.usuario, 'Check-out', logDetail, (checkoutBalance > 0 || _coEarly) ? 'warning' : 'info'];
+        // Deja constancia de la salida anticipada en las notas de la reserva
+        if (res && _coEarly && String(res.notas || '').indexOf('[SALIDA_ANTICIPADA') === -1) {
+          res.notas = (res.notas ? res.notas + ' | ' : '') + '[SALIDA_ANTICIPADA:' + normDate(new Date()) + ' sin reembolso]';
+        }
 
         var ops = [
           { type: 'updateById', sheet: '🏨 Habitaciones', id: room.id, values: [room.id, room.numero, room.tipo, room.tarifa, 'Limpieza', room.notas] },
@@ -19826,8 +19941,10 @@
         closeModal();
         render();
 
-        // Offer post-stay follow-up
-        if (res && res.telefono) {
+        // Salida anticipada → ofrecer comprobante de salida; si no, seguimiento post-estancia.
+        if (res && _coEarly) {
+          setTimeout(function() { showCheckoutComprobante(res.id); }, 500);
+        } else if (res && res.telefono) {
           setTimeout(function() { showPostStayOffer(res); }, 500);
         }
       }, 'Procesando check-out...');
