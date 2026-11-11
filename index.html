@@ -3573,7 +3573,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-11-10b';
+    var APP_BUILD = '2026-11-11a';
 
     // ===== Selectores de fecha entrada→salida: la salida siempre mínimo el día siguiente =====
     function _nextDayStr(ymd) {
@@ -3814,7 +3814,7 @@
       // Salvaguarda para plantillas personalizadas (legado): si NO está confirmada,
       // nunca decir "confirmada" ni titular "Confirmación".
       if (!_st.confirmed) {
-        text = text.replace(/_Confirmación de Reservación_/g, '_Comprobante de Reservación_');
+        text = text.replace(/_Confirmación de Reservación_/g, '_Reservación sin confirmar_');
         text = text.replace(/Tu reservación ha sido confirmada:?/gi, estadoLeyenda);
       }
       text = text.replace(/\{huespedes\}/g, huespedes);
@@ -13190,7 +13190,7 @@
       // Header
       h += '<div class="conf-hdr">';
       h += '<img src="' + LOGO_V_LIGHT + '" alt="Logo">';
-      h += '<div class="conf-title">' + (_stV.confirmed ? 'Confirmación de reservación' : 'Comprobante de reservación') + '</div>';
+      h += '<div class="conf-title">' + (_stV.confirmed ? 'Confirmación de reservación' : 'Reservación sin confirmar') + '</div>';
       h += '<div class="conf-chip" style="background:' + chip.bg + ';color:' + chip.c + ';">' + chip.t + '</div>';
       h += '</div>';
 
@@ -13316,7 +13316,7 @@
 
       var _stC = _resConfStatus(res);
       var t = '🏨 *' + hi.nombre + '*\n';
-      t += (_stC.confirmed ? '_Confirmación de Reservación_' : '_Comprobante de Reservación_') + '\n\n';
+      t += (_stC.confirmed ? '_Confirmación de Reservación_' : '_Reservación sin confirmar_') + '\n\n';
       if (!_stC.confirmed) {
         t += '⏳ *APARTADA — AÚN NO CONFIRMADA.* Se confirma únicamente con el anticipo (' + _stC.aPct + '%: $' + _fmt(_stC.anticipoMin) + ') o la liquidación total ($' + _fmt(_stC.total) + ').\n\n';
       }
@@ -13406,7 +13406,7 @@
       var _stP = _resConfStatus(res);
       var _ei = _resEarlyInfo(res);
       var _isCheckout = estado === 'Check-out';
-      var _pdfTitle = _isCheckout ? (_ei.early ? 'Comprobante de salida anticipada' : 'Comprobante de salida') : (_stP.confirmed ? 'Confirmación de reservación' : 'Comprobante de reservación');
+      var _pdfTitle = _isCheckout ? (_ei.early ? 'Comprobante de salida anticipada' : 'Comprobante de salida') : (_stP.confirmed ? 'Confirmación de reservación' : 'Reservación sin confirmar');
 
       function draw(doc, render){
         var k = _pdfBrandKit(doc, pageW, render);
@@ -13490,12 +13490,16 @@
       var doc = new jsPDF({unit:'pt',format:[pageW, Math.max(totalH,260)]});
       draw(doc, true);
 
-      var fileName = 'Confirmacion_' + res.huesped.replace(/\s+/g,'_') + '_Hab' + res.habitacionNum + '.pdf';
+      var _fnTag = _isCheckout ? (_ei.early ? 'Comprobante_salida_anticipada' : 'Comprobante_salida') : (_stP.confirmed ? 'Confirmacion' : 'Reservacion_sin_confirmar');
+      var fileName = _fnTag + '_' + res.huesped.replace(/\s+/g,'_') + '_Hab' + res.habitacionNum + '.pdf';
       var phone = getGuestPhone(res).replace(/\D/g, '');
+      var _waIntro = _isCheckout
+        ? (_ei.early ? 'Te comparto tu comprobante de salida en PDF. 🚪 Salida anticipada: sin reembolso por las noches no utilizadas.' : 'Te comparto tu comprobante de salida (check-out) en PDF.')
+        : (_stP.confirmed ? 'Te comparto tu confirmación de reservación en PDF.' : 'Te comparto el comprobante de tu reservación en PDF. ⏳ Tu reservación quedó *apartada pero aún no confirmada*; se confirma con el anticipo o la liquidación.');
       if (mode==='share') {
         doc.save(fileName);
         toast('PDF descargado — abriendo WhatsApp...');
-        var waText = '🏨 *' + hi.nombre + '*\n\nHola *' + res.huesped + '* 👋\n\n' + (_stP.confirmed ? 'Te comparto tu confirmación de reservación en PDF.' : 'Te comparto tu comprobante de reservación en PDF. ⏳ Tu reservación quedó *apartada pero aún no confirmada*; se confirma con el anticipo o la liquidación.') + '\n\n📄 _Archivo: ' + fileName + '_\n\n_' + hi.nombre + '_ 🌿';
+        var waText = '🏨 *' + hi.nombre + '*\n\nHola *' + res.huesped + '* 👋\n\n' + _waIntro + '\n\n📄 _Archivo: ' + fileName + '_\n\n_' + hi.nombre + '_ 🌿';
         setTimeout(function(){ window.open('https://wa.me/' + (phone||'') + '?text=' + encodeURIComponent(waText), '_blank'); }, 500);
       } else { doc.save(fileName); toast('PDF descargado: '+fileName); }
     }
@@ -13511,7 +13515,9 @@
     function shareReservaEmail(resId) {
       var res = S.reservas.find(function(r){return r.id===resId});
       var text = getReservaConfirmText(resId).replace(/\*/g, '').replace(/_/g, '');
-      var subject = 'Confirmación de Reservación - ' + getHotelInfo().nombre + ' - ' + res.huesped;
+      var _stE = _resConfStatus(res);
+      var _subjTitle = (res.estado === 'Check-out') ? 'Comprobante de Salida' : (_stE.confirmed ? 'Confirmación de Reservación' : 'Reservación sin confirmar');
+      var subject = _subjTitle + ' - ' + getHotelInfo().nombre + ' - ' + res.huesped;
       window.open('mailto:' + encodeURIComponent(res.email || '') + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(text));
     }
 
