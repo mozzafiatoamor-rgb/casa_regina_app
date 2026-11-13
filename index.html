@@ -3573,7 +3573,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-11-13b';
+    var APP_BUILD = '2026-11-13c';
 
     // ===== Selectores de fecha entrada→salida: la salida siempre mínimo el día siguiente =====
     function _nextDayStr(ymd) {
@@ -4309,8 +4309,9 @@
           var mt = notas.match(/\[TITULAR:([^\]]+)\]/);
           if (mt && !titular) titular = mt[1].trim();
           var personas = (parseInt(row[7]) || 1) + (parseInt(row[8]) || 0);
-          var done = registros.filter(function(g) { return String(g[1]) === String(row[0]) && String(g[2] || '').trim(); }).length;
-          rooms.push({ id: String(row[0]), habitacionNum: String(row[1]), huesped: String(row[2] || ''), fechaEntrada: String(row[5]).substring(0, 10), fechaSalida: String(row[6]).substring(0, 10), personas: Math.max(personas, 1), done: done, _saved: done > 0 });
+          var regsRoom = registros.filter(function(g) { return String(g[1]) === String(row[0]) && String(g[2] || '').trim(); });
+          var guests = regsRoom.map(function(g) { return { regId: String(g[0] || ''), nombre: String(g[2] || ''), tipo: String(g[5] || 'INE'), num: String(g[6] || '') }; });
+          rooms.push({ id: String(row[0]), habitacionNum: String(row[1]), huesped: String(row[2] || ''), fechaEntrada: String(row[5]).substring(0, 10), fechaSalida: String(row[6]).substring(0, 10), personas: Math.max(personas, 1), done: guests.length, _saved: guests.length > 0, _guests: guests });
         });
         if (!rooms.length) {
           container.innerHTML = '<div style="text-align:center;padding:40px 0;"><img src="' + LOGO_V_DARK + '" style="width:200px;object-fit:contain;margin-bottom:16px;"><div style="font-size:14px;color:var(--red);margin-top:12px;">❌ Grupo no encontrado</div><div style="font-size:12px;color:var(--text2);margin-top:8px;">El enlace puede haber expirado o ser incorrecto.</div></div>';
@@ -4338,6 +4339,8 @@
       h += '</div>';
       h += '<div style="font-size:13px;color:var(--text2);margin-bottom:14px;line-height:1.5;">Escribe el nombre de cada persona que se queda en cada habitación (y su identificación si la tienes). Toca <b>Guardar</b> en cada una. Puedes ir avanzando poco a poco. Esto agiliza mucho el check-in. 🙌</div>';
       d.rooms.forEach(function(r, ri) { h += _grpRoomCardHTML(r, ri); });
+      h += '<button onclick="grpFinalizeAll()" class="login-button" style="margin-top:6px;background:var(--green);color:#fff;">✅ Verificar y guardar todo</button>';
+      h += '<div style="font-size:11px;color:var(--text2);text-align:center;margin-top:6px;line-height:1.4;">Úsalo cuando termines todas las habitaciones para revisar y cerrar el registro.</div>';
       h += '<div style="text-align:center;font-size:11px;color:var(--text2);margin:14px 0;">' + HOTEL_NAME + ' · ¡Gracias por tu apoyo! 🌿</div>';
       document.getElementById('guestFormContainer').innerHTML = h;
     }
@@ -4350,16 +4353,30 @@
       h += '<div style="font-size:12px;color:var(--text2);">' + r.personas + ' persona(s)</div>';
       h += '</div>';
       if (r._saved) {
-        h += '<div style="color:var(--green);font-weight:700;font-size:14px;">✅ Registrada (' + (r.done || r.personas) + ')</div>';
-        h += '<button onclick="_grpEditRoom(' + ri + ')" style="margin-top:8px;background:none;border:none;color:var(--text2);text-decoration:underline;font-size:12px;cursor:pointer;">Editar / agregar</button>';
+        var nombres = (r._guests || []).map(function(g) { return g.nombre; }).filter(Boolean);
+        h += '<div style="color:var(--green);font-weight:700;font-size:14px;margin-bottom:4px;">✅ Registrada (' + nombres.length + ')</div>';
+        if (nombres.length) {
+          h += '<div style="font-size:13px;color:var(--text);line-height:1.5;">';
+          nombres.forEach(function(nm, gi) { h += '• ' + _wbEscC(nm) + (r._guests[gi] && r._guests[gi].num ? ' <span style="color:var(--text2);font-size:11px;">(' + _wbEscC(r._guests[gi].num) + ')</span>' : '') + '<br>'; });
+          h += '</div>';
+        }
+        h += '<button onclick="_grpEditRoom(' + ri + ')" style="margin-top:8px;background:none;border:1px solid var(--surface2);color:var(--text2);border-radius:8px;padding:7px 12px;font-size:12px;cursor:pointer;">✏️ Corregir nombres</button>';
       } else {
-        for (var i = 0; i < r.personas; i++) {
+        var slots = Math.max(r.personas, (r._guests || []).length);
+        var tipos = ['INE', 'Pasaporte', 'Licencia', 'Otro'];
+        for (var i = 0; i < slots; i++) {
+          var g = (r._guests || [])[i] || null;
+          var valNombre = g ? g.nombre : (i === 0 ? r.huesped : '');
+          var valTipo = g ? g.tipo : 'INE';
+          var valNum = g ? g.num : '';
           h += '<div style="margin-bottom:10px;padding:9px;background:var(--surface2);border-radius:8px;">';
           h += '<div style="font-size:11px;color:var(--text2);margin-bottom:5px;">Persona ' + (i + 1) + (i === 0 ? ' (titular del cuarto)' : '') + '</div>';
-          h += '<input type="text" id="grp_' + ri + '_' + i + '_nombre" class="login-input" placeholder="Nombre completo" value="' + (i === 0 ? _wbEscC(r.huesped) : '') + '" style="margin-bottom:6px;">';
+          h += '<input type="text" id="grp_' + ri + '_' + i + '_nombre" class="login-input" placeholder="Nombre completo" value="' + _wbEscC(valNombre) + '" style="margin-bottom:6px;">';
           h += '<div style="display:grid;grid-template-columns:115px 1fr;gap:6px;">';
-          h += '<select id="grp_' + ri + '_' + i + '_tipo" class="login-input" style="padding:9px;"><option value="INE">INE</option><option value="Pasaporte">Pasaporte</option><option value="Licencia">Licencia</option><option value="Otro">Otro</option></select>';
-          h += '<input type="text" id="grp_' + ri + '_' + i + '_num" class="login-input" placeholder="N° de ID (opcional)">';
+          h += '<select id="grp_' + ri + '_' + i + '_tipo" class="login-input" style="padding:9px;">';
+          tipos.forEach(function(tp) { h += '<option value="' + tp + '"' + (valTipo === tp ? ' selected' : '') + '>' + tp + '</option>'; });
+          h += '</select>';
+          h += '<input type="text" id="grp_' + ri + '_' + i + '_num" class="login-input" placeholder="N° de ID (opcional)" value="' + _wbEscC(valNum) + '">';
           h += '</div>';
           h += '</div>';
         }
@@ -4371,32 +4388,87 @@
 
     function _grpEditRoom(ri) { if (_grpData && _grpData.rooms[ri]) { _grpData.rooms[ri]._saved = false; renderGrupoForm(); } }
 
-    async function grpSaveRoom(ri) {
+    async function grpSaveRoom(ri, silent) {
       var r = _grpData.rooms[ri];
       var btn = document.getElementById('grpBtn_' + ri);
       var today = normDate(new Date()), ts = now();
-      var rows = [];
-      for (var i = 0; i < r.personas; i++) {
-        var nombre = ((document.getElementById('grp_' + ri + '_' + i + '_nombre') || {}).value || '').trim();
-        if (!nombre) continue;
+      var slots = Math.max(r.personas, (r._guests || []).length);
+      var ops = [], newGuests = [], seq = 0;
+      for (var i = 0; i < slots; i++) {
+        var nEl = document.getElementById('grp_' + ri + '_' + i + '_nombre');
+        if (!nEl) continue;
+        var nombre = (nEl.value || '').trim();
         var tipo = (document.getElementById('grp_' + ri + '_' + i + '_tipo') || {}).value || 'INE';
         var num = ((document.getElementById('grp_' + ri + '_' + i + '_num') || {}).value || '').trim();
-        var regId = 'REG-' + Date.now() + '-' + ri + '-' + i;
-        rows.push([regId, r.id, nombre, r.habitacionNum, today, tipo, num, '', '', '', '[GRUPO] Pre-registro', ts]);
+        var existing = (r._guests || [])[i] || null;
+        if (nombre) {
+          var regId = (existing && existing.regId) ? existing.regId : ('REG-' + Date.now() + '-' + ri + '-' + (seq++));
+          var row = [regId, r.id, nombre, r.habitacionNum, today, tipo, num, '', '', '', '[GRUPO] Pre-registro', ts];
+          if (existing && existing.regId) ops.push({ type: 'updateById', sheet: '📝 Registro', id: regId, values: row });
+          else ops.push({ type: 'append', sheet: '📝 Registro', values: row });
+          newGuests.push({ regId: regId, nombre: nombre, tipo: tipo, num: num });
+        } else if (existing && existing.regId) {
+          // Se borró el nombre: limpiar esa fila (queda ignorada en el check-in)
+          ops.push({ type: 'updateById', sheet: '📝 Registro', id: existing.regId, values: [existing.regId, r.id, '', r.habitacionNum, today, '', '', '', '', '', '[GRUPO] (eliminado)', ts] });
+        }
       }
-      if (!rows.length) { alert('Escribe al menos el nombre del titular del cuarto.'); return; }
+      if (!newGuests.length) { if (!silent) alert('Escribe al menos el nombre del titular del cuarto.'); return false; }
       if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
       try {
-        for (var k = 0; k < rows.length; k++) {
-          await fetch(S.scriptUrl, { method: 'POST', body: JSON.stringify({ sheet: '📝 Registro', values: [rows[k]] }) });
+        await fetch(S.scriptUrl, { method: 'POST', body: JSON.stringify({ action: 'multi', operations: ops }) });
+        r._guests = newGuests; r._saved = true; r.done = newGuests.length;
+        if (!silent) {
+          renderGrupoForm();
+          try { var c = document.getElementById('grpCard_' + ri); if (c) c.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {}
         }
-        r._saved = true; r.done = rows.length;
-        renderGrupoForm();
-        try { var c = document.getElementById('grpCard_' + ri); if (c) c.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {}
+        return true;
       } catch (e) {
         if (btn) { btn.disabled = false; btn.textContent = '💾 Guardar habitación ' + r.habitacionNum; }
-        alert('Error al guardar. Revisa tu conexión e intenta de nuevo.');
+        if (!silent) alert('Error al guardar. Revisa tu conexión e intenta de nuevo.');
+        return false;
       }
+    }
+
+    // Verifica y guarda todo; si queda completo, cierra el registro.
+    async function grpFinalizeAll() {
+      var d = _grpData;
+      // Guarda cualquier habitación en edición que ya tenga al menos el titular escrito.
+      for (var ri = 0; ri < d.rooms.length; ri++) {
+        var r = d.rooms[ri];
+        if (r._saved) continue;
+        var n0El = document.getElementById('grp_' + ri + '_0_nombre');
+        if (n0El && n0El.value.trim()) { await grpSaveRoom(ri, true); }
+      }
+      // ¿Faltan habitaciones?
+      var faltan = d.rooms.filter(function(r) { return !r._saved || !(r._guests && r._guests.length); });
+      if (faltan.length) {
+        renderGrupoForm();
+        alert('Aún faltan habitaciones por registrar:\n' + faltan.map(function(r) { return '• Hab. ' + r.habitacionNum; }).join('\n') + '\n\nEscribe al menos el nombre del titular de cada una y toca Guardar.');
+        return;
+      }
+      // Verificación: resumen antes de cerrar.
+      var resumen = d.rooms.map(function(r) { return 'Hab. ' + r.habitacionNum + ': ' + r._guests.length + ' persona(s)'; }).join('\n');
+      var totalP = d.rooms.reduce(function(s, r) { return s + r._guests.length; }, 0);
+      if (!confirm('Vas a finalizar el registro del grupo:\n\n' + resumen + '\n\nTotal: ' + totalP + ' persona(s) en ' + d.rooms.length + ' habitación(es).\n\n¿Todo correcto? Al confirmar se cierra el registro (podrás reabrir el enlace si necesitas corregir algo).')) return;
+      grpShowComplete(totalP);
+    }
+
+    function grpShowComplete(totalP) {
+      var d = _grpData;
+      var h = '';
+      h += '<div style="text-align:center;margin-bottom:16px;"><img src="' + LOGO_V_DARK + '" style="width:200px;object-fit:contain;"></div>';
+      h += '<div style="text-align:center;font-size:54px;margin:10px 0;">🎉</div>';
+      h += '<div style="text-align:center;font-size:20px;font-weight:700;margin-bottom:6px;">¡Registro completado!</div>';
+      h += '<div style="text-align:center;font-size:13px;color:var(--text2);margin-bottom:16px;line-height:1.5;">Quedaron registrados <b>' + totalP + '</b> huésped(es) en <b>' + d.rooms.length + '</b> habitación(es). Ya puedes cerrar esta ventana. 🙌</div>';
+      h += '<div style="background:var(--surface3);padding:14px;border-radius:var(--radius);margin-bottom:16px;">';
+      d.rooms.forEach(function(r) {
+        h += '<div style="font-size:13px;margin-bottom:6px;"><b style="color:var(--accent);">🛏️ Hab. ' + r.habitacionNum + '</b> — ' + r._guests.length + ' persona(s)<br><span style="font-size:12px;color:var(--text2);">' + r._guests.map(function(g) { return _wbEscC(g.nombre); }).join(', ') + '</span></div>';
+      });
+      h += '</div>';
+      h += '<div style="text-align:center;font-size:13px;color:var(--green);font-weight:700;margin-bottom:14px;">En recepción haremos el check-in mucho más rápido gracias a ti. 🌿</div>';
+      h += '<button onclick="renderGrupoForm()" class="login-button" style="background:var(--surface3);color:var(--text);">✏️ Corregir algo</button>';
+      h += '<div style="text-align:center;font-size:11px;color:var(--text2);margin:14px 0;">' + HOTEL_NAME + ' · Hotel Boutique</div>';
+      document.getElementById('guestFormContainer').innerHTML = h;
     }
 
     // --- Link + mensaje para el encargado del grupo (lado admin) ---
