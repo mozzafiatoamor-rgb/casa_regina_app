@@ -3573,7 +3573,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-11-13c';
+    var APP_BUILD = '2026-11-13d';
 
     // ===== Selectores de fecha entrada→salida: la salida siempre mínimo el día siguiente =====
     function _nextDayStr(ymd) {
@@ -4450,7 +4450,32 @@
       var resumen = d.rooms.map(function(r) { return 'Hab. ' + r.habitacionNum + ': ' + r._guests.length + ' persona(s)'; }).join('\n');
       var totalP = d.rooms.reduce(function(s, r) { return s + r._guests.length; }, 0);
       if (!confirm('Vas a finalizar el registro del grupo:\n\n' + resumen + '\n\nTotal: ' + totalP + ' persona(s) en ' + d.rooms.length + ' habitación(es).\n\n¿Todo correcto? Al confirmar se cierra el registro (podrás reabrir el enlace si necesitas corregir algo).')) return;
+      try { await _grpMarkComplete(); } catch (e) {}
       grpShowComplete(totalP);
+    }
+
+    // Avisa a recepción: marca las reservaciones del grupo como pre-registro completo
+    // y deja constancia en la Bitácora. Re-lee fresco para no pisar cambios recientes.
+    async function _grpMarkComplete() {
+      var _grd = S._publicMode ? function(sh, rg) { return publicRead(S.scriptUrl, sh, rg); } : function(sh, rg) { return sheets.read(sh, rg); };
+      var reservas = await _grd('📋 Reservas', 'A2:P5000');
+      var today = normDate(new Date()), ts = now(), hora = (ts.split(' ')[1] || '');
+      var ops = [];
+      reservas.forEach(function(row) {
+        var notas = String(row[12] || '');
+        var mg = notas.match(/\[GRUPO:([^\]]+)\]/);
+        if (!mg || mg[1] !== _grpData.groupId) return;
+        var newNotas = /\[REGOK:/.test(notas) ? notas.replace(/\[REGOK:[^\]]*\]/, '[REGOK:' + today + ']') : (notas + (notas ? ' ' : '') + '[REGOK:' + today + ']');
+        var full = row.slice(0, 15);
+        while (full.length < 15) full.push('');
+        full[12] = newNotas;
+        ops.push({ type: 'updateById', sheet: '📋 Reservas', id: String(row[0]), values: full });
+      });
+      var totalP = _grpData.rooms.reduce(function(s, r) { return s + (r._guests ? r._guests.length : 0); }, 0);
+      ops.push({ type: 'append', sheet: '📜 Bitácora', values: [today, hora, 'Encargado del grupo', 'Pre-registro de grupo', 'Grupo ' + _grpData.titular + ' pre-registrado por el encargado (' + totalP + ' personas · ' + _grpData.rooms.length + ' habitaciones)', 'info'] });
+      if (ops.length) {
+        await fetch(S.scriptUrl, { method: 'POST', body: JSON.stringify({ action: 'multi', operations: ops }) });
+      }
     }
 
     function grpShowComplete(totalP) {
@@ -23643,6 +23668,12 @@
       h += '<input id="grpTitularEdit" value="' + _wbEscC(titular) + '" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--surface3);border-radius:6px;padding:7px 9px;font-size:13px;font-weight:700;color:var(--text);margin-top:2px;">';
       h += '<div style="font-size:12px;color:var(--text2);margin-top:6px;">' + formatDate(t.reservas[0].fechaEntrada) + ' → ' + formatDate(t.reservas[0].fechaSalida) + '</div>';
       h += '</div>';
+      // Aviso: el encargado ya completó el pre-registro del grupo (marca [REGOK:fecha])
+      var _regOk = '';
+      t.reservas.forEach(function (r) { var m = String(r.notas || '').match(/\[REGOK:([^\]]*)\]/); if (m && !_regOk) _regOk = m[1]; });
+      if (_regOk) {
+        h += '<div style="background:rgba(52,211,153,.12);border:1px solid var(--green);border-radius:var(--radius);padding:10px 12px;margin-bottom:12px;font-size:12px;color:var(--green);line-height:1.4;">✅ <b>Pre-registro del grupo completado</b> por el encargado' + (/\d{4}-\d{2}-\d{2}/.test(_regOk) ? ' el ' + formatDate(_regOk) : '') + '. Los huéspedes ya están cargados; en el check-in solo valida identificaciones.</div>';
+      }
       h += '<div style="font-size:11px;color:var(--text2);margin-bottom:6px;">✏️ Escribe el nombre del huésped que se queda en cada cuarto y toca <b>Guardar nombres</b>.</div>';
       t.reservas.forEach(function (r) {
         var b = _resBalance(r.id, r.tarifaTotal);
