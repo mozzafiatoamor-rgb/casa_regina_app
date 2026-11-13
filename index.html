@@ -3573,7 +3573,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-11-11a';
+    var APP_BUILD = '2026-11-13a';
 
     // ===== Selectores de fecha entrada→salida: la salida siempre mínimo el día siguiente =====
     function _nextDayStr(ymd) {
@@ -3948,6 +3948,7 @@
       var guestBooking = urlParams.has('reservar');
       var guestValidar = urlParams.has('validar');
       var guestGuia = urlParams.has('guia');
+      var guestGrupo = urlParams.get('grupo');
       var guestCfg = urlParams.get('cfg');
 
       // === MODO KIOSKO PERSISTENTE (restaurante) ===
@@ -3974,7 +3975,7 @@
         } catch(e) {}
       }
       // Secure links: ?reservar&u=SCRIPT_URL (reads via Apps Script, no API key)
-      if ((guestRegId || guestBooking || guestValidar || guestGuia) && !guestCfg) {
+      if ((guestRegId || guestBooking || guestValidar || guestGuia || guestGrupo) && !guestCfg) {
         var urlU = urlParams.get('u');
         var urlB = urlParams.get('b');
         var urlReservarVal = urlParams.get('reservar');
@@ -4002,7 +4003,7 @@
       if (!S.scriptUrl && typeof DEFAULT_SCRIPT_URL !== 'undefined' && DEFAULT_SCRIPT_URL) {
         S.scriptUrl = DEFAULT_SCRIPT_URL;
       }
-      if ((guestRegId || guestBooking || guestValidar || guestGuia) && !S._publicMode) {
+      if ((guestRegId || guestBooking || guestValidar || guestGuia || guestGrupo) && !S._publicMode) {
         S._publicMode = true;
       }
 
@@ -4026,6 +4027,11 @@
       if (guestGuia && (S._publicMode || (S.sheetId && S.apiKey))) {
         if (_isInAppBrowser) { _showOpenInBrowserBanner(); }
         showWelcomeBook(urlParams.get('guia') || null);
+        return;
+      }
+      if (guestGrupo && (S._publicMode || (S.sheetId && S.apiKey))) {
+        if (_isInAppBrowser) { _showOpenInBrowserBanner(); }
+        showGrupoMode(guestGrupo);
         return;
       }
 
@@ -4275,6 +4281,171 @@
       navigator.clipboard.writeText(link).then(function() {
         toast('Link copiado al portapapeles');
       });
+    }
+
+    // ============ REGISTRO DE GRUPO (link para el encargado) ============
+    var _grpData = null;
+
+    async function showGrupoMode(groupId) {
+      document.getElementById('setupScreen').classList.remove('active');
+      document.getElementById('loginScreen').classList.remove('active');
+      document.getElementById('appContainer').classList.add('hidden');
+      document.getElementById('guestScreen').classList.add('active');
+      var container = document.getElementById('guestFormContainer');
+      container.innerHTML = '<div style="text-align:center;padding:40px 0;"><div style="font-size:28px;margin-bottom:8px;">⏳</div><div style="color:var(--text2);">Cargando grupo...</div></div>';
+      try {
+        var _grd = S._publicMode ? function(sh, rg) { return publicRead(S.scriptUrl, sh, rg); } : function(sh, rg) { return sheets.read(sh, rg); };
+        var _r = await Promise.all([
+          _grd('📋 Reservas', 'A2:P5000'),
+          _grd('📝 Registro', 'A2:M5000').catch(function() { return []; })
+        ]);
+        var reservas = _r[0] || [], registros = _r[1] || [];
+        var rooms = [], titular = '';
+        reservas.forEach(function(row) {
+          var notas = String(row[12] || '');
+          var mg = notas.match(/\[GRUPO:([^\]]+)\]/);
+          if (!mg || mg[1] !== groupId) return;
+          if (/cancel/i.test(String(row[11] || ''))) return;
+          var mt = notas.match(/\[TITULAR:([^\]]+)\]/);
+          if (mt && !titular) titular = mt[1].trim();
+          var personas = (parseInt(row[7]) || 1) + (parseInt(row[8]) || 0);
+          var done = registros.filter(function(g) { return String(g[1]) === String(row[0]) && String(g[2] || '').trim(); }).length;
+          rooms.push({ id: String(row[0]), habitacionNum: String(row[1]), huesped: String(row[2] || ''), fechaEntrada: String(row[5]).substring(0, 10), fechaSalida: String(row[6]).substring(0, 10), personas: Math.max(personas, 1), done: done, _saved: done > 0 });
+        });
+        if (!rooms.length) {
+          container.innerHTML = '<div style="text-align:center;padding:40px 0;"><img src="' + LOGO_V_DARK + '" style="width:200px;object-fit:contain;margin-bottom:16px;"><div style="font-size:14px;color:var(--red);margin-top:12px;">❌ Grupo no encontrado</div><div style="font-size:12px;color:var(--text2);margin-top:8px;">El enlace puede haber expirado o ser incorrecto.</div></div>';
+          return;
+        }
+        rooms.sort(function(a, b) { return (parseInt(a.habitacionNum) || 0) - (parseInt(b.habitacionNum) || 0) || String(a.habitacionNum).localeCompare(String(b.habitacionNum)); });
+        _grpData = { groupId: groupId, titular: titular || rooms[0].huesped, rooms: rooms };
+        renderGrupoForm();
+      } catch (e) {
+        container.innerHTML = '<div style="text-align:center;padding:40px 0;"><div style="font-size:28px;margin-bottom:8px;">⚠️</div><div style="color:var(--red);">Error al cargar. Intenta de nuevo.</div><div style="font-size:11px;color:var(--text2);margin-top:8px;">' + (e.message || '') + '</div></div>';
+      }
+    }
+
+    function renderGrupoForm() {
+      var d = _grpData;
+      var totalPersonas = d.rooms.reduce(function(s, r) { return s + r.personas; }, 0);
+      var roomsDone = d.rooms.filter(function(r) { return r._saved; }).length;
+      var h = '';
+      h += '<div style="text-align:center;margin-bottom:14px;"><img src="' + LOGO_V_DARK + '" style="width:200px;object-fit:contain;"></div>';
+      h += '<div style="background:var(--surface3);padding:14px;border-radius:var(--radius);margin-bottom:14px;">';
+      h += '<div style="font-size:11px;color:var(--text2);margin-bottom:4px;">REGISTRO DE GRUPO</div>';
+      h += '<div style="font-weight:700;font-size:16px;">' + _wbEscC(d.titular) + '</div>';
+      h += '<div style="font-size:12px;color:var(--text2);margin-top:3px;">' + d.rooms.length + ' habitaciones · ' + totalPersonas + ' personas · ' + formatDate(d.rooms[0].fechaEntrada) + ' → ' + formatDate(d.rooms[0].fechaSalida) + '</div>';
+      h += '<div id="grpProgress" style="font-size:13px;color:var(--accent);font-weight:700;margin-top:7px;">' + roomsDone + ' de ' + d.rooms.length + ' habitaciones listas</div>';
+      h += '</div>';
+      h += '<div style="font-size:13px;color:var(--text2);margin-bottom:14px;line-height:1.5;">Escribe el nombre de cada persona que se queda en cada habitación (y su identificación si la tienes). Toca <b>Guardar</b> en cada una. Puedes ir avanzando poco a poco. Esto agiliza mucho el check-in. 🙌</div>';
+      d.rooms.forEach(function(r, ri) { h += _grpRoomCardHTML(r, ri); });
+      h += '<div style="text-align:center;font-size:11px;color:var(--text2);margin:14px 0;">' + HOTEL_NAME + ' · ¡Gracias por tu apoyo! 🌿</div>';
+      document.getElementById('guestFormContainer').innerHTML = h;
+    }
+
+    function _grpRoomCardHTML(r, ri) {
+      var h = '';
+      h += '<div id="grpCard_' + ri + '" style="background:var(--surface3);padding:14px;border-radius:var(--radius);margin-bottom:14px;border-left:4px solid ' + (r._saved ? 'var(--green)' : 'var(--accent)') + ';">';
+      h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">';
+      h += '<div style="font-weight:700;color:var(--accent);font-size:15px;">🛏️ Habitación ' + r.habitacionNum + '</div>';
+      h += '<div style="font-size:12px;color:var(--text2);">' + r.personas + ' persona(s)</div>';
+      h += '</div>';
+      if (r._saved) {
+        h += '<div style="color:var(--green);font-weight:700;font-size:14px;">✅ Registrada (' + (r.done || r.personas) + ')</div>';
+        h += '<button onclick="_grpEditRoom(' + ri + ')" style="margin-top:8px;background:none;border:none;color:var(--text2);text-decoration:underline;font-size:12px;cursor:pointer;">Editar / agregar</button>';
+      } else {
+        for (var i = 0; i < r.personas; i++) {
+          h += '<div style="margin-bottom:10px;padding:9px;background:var(--surface2);border-radius:8px;">';
+          h += '<div style="font-size:11px;color:var(--text2);margin-bottom:5px;">Persona ' + (i + 1) + (i === 0 ? ' (titular del cuarto)' : '') + '</div>';
+          h += '<input type="text" id="grp_' + ri + '_' + i + '_nombre" class="login-input" placeholder="Nombre completo" value="' + (i === 0 ? _wbEscC(r.huesped) : '') + '" style="margin-bottom:6px;">';
+          h += '<div style="display:grid;grid-template-columns:115px 1fr;gap:6px;">';
+          h += '<select id="grp_' + ri + '_' + i + '_tipo" class="login-input" style="padding:9px;"><option value="INE">INE</option><option value="Pasaporte">Pasaporte</option><option value="Licencia">Licencia</option><option value="Otro">Otro</option></select>';
+          h += '<input type="text" id="grp_' + ri + '_' + i + '_num" class="login-input" placeholder="N° de ID (opcional)">';
+          h += '</div>';
+          h += '</div>';
+        }
+        h += '<button onclick="grpSaveRoom(' + ri + ')" id="grpBtn_' + ri + '" class="login-button" style="margin-top:4px;">💾 Guardar habitación ' + r.habitacionNum + '</button>';
+      }
+      h += '</div>';
+      return h;
+    }
+
+    function _grpEditRoom(ri) { if (_grpData && _grpData.rooms[ri]) { _grpData.rooms[ri]._saved = false; renderGrupoForm(); } }
+
+    async function grpSaveRoom(ri) {
+      var r = _grpData.rooms[ri];
+      var btn = document.getElementById('grpBtn_' + ri);
+      var today = normDate(new Date()), ts = now();
+      var rows = [];
+      for (var i = 0; i < r.personas; i++) {
+        var nombre = ((document.getElementById('grp_' + ri + '_' + i + '_nombre') || {}).value || '').trim();
+        if (!nombre) continue;
+        var tipo = (document.getElementById('grp_' + ri + '_' + i + '_tipo') || {}).value || 'INE';
+        var num = ((document.getElementById('grp_' + ri + '_' + i + '_num') || {}).value || '').trim();
+        var regId = 'REG-' + Date.now() + '-' + ri + '-' + i;
+        rows.push([regId, r.id, nombre, r.habitacionNum, today, tipo, num, '', '', '', '[GRUPO] Pre-registro', ts]);
+      }
+      if (!rows.length) { alert('Escribe al menos el nombre del titular del cuarto.'); return; }
+      if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
+      try {
+        for (var k = 0; k < rows.length; k++) {
+          await fetch(S.scriptUrl, { method: 'POST', body: JSON.stringify({ sheet: '📝 Registro', values: [rows[k]] }) });
+        }
+        r._saved = true; r.done = rows.length;
+        renderGrupoForm();
+        try { var c = document.getElementById('grpCard_' + ri); if (c) c.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {}
+      } catch (e) {
+        if (btn) { btn.disabled = false; btn.textContent = '💾 Guardar habitación ' + r.habitacionNum; }
+        alert('Error al guardar. Revisa tu conexión e intenta de nuevo.');
+      }
+    }
+
+    // --- Link + mensaje para el encargado del grupo (lado admin) ---
+    function getGroupRegLink(groupId) {
+      return window.location.origin + window.location.pathname + '?grupo=' + encodeURIComponent(groupId);
+    }
+
+    function _groupRegMessage(groupId, link) {
+      var titular = _groupTitular(groupId);
+      var rs = _groupReservas(groupId).slice().sort(function(a, b) { return (parseInt(a.habitacionNum) || 0) - (parseInt(b.habitacionNum) || 0); });
+      var msg = '¡Hola! 👋 Te comparto el registro en línea del grupo de *' + titular + '* en *' + HOTEL_NAME + '*.\n\n';
+      msg += 'Con este enlace puedes ir capturando *quién se queda en cada habitación* (nombre y, si tienes, su identificación), respetando los lugares de cada cuarto:\n\n';
+      rs.forEach(function(r) { var personas = (parseInt(r.adultos) || 1) + (parseInt(r.niños) || 0); msg += '🛏️ Habitación ' + r.habitacionNum + ' — ' + personas + ' persona(s)\n'; });
+      msg += '\n👉 ' + link + '\n\n';
+      msg += '📝 *Cómo llenarlo:*\n';
+      msg += '1) Abre el enlace.\n';
+      msg += '2) En cada habitación escribe el nombre completo de cada persona (y su número de identificación si lo tienes a la mano).\n';
+      msg += '3) Toca *Guardar* en cada habitación. Puedes avanzar poco a poco: lo que guardes queda registrado al instante.\n\n';
+      msg += '⚡ Esto *agiliza muchísimo el check-in*: al llegar el grupo ya tendremos los datos cargados y solo validamos identificaciones, sin filas ni esperas. 🙌\n\n';
+      msg += '¡Gracias por tu apoyo! 🌿';
+      return msg;
+    }
+
+    function shareGroupRegLink(groupId) {
+      var link = getGroupRegLink(groupId);
+      var msg = _groupRegMessage(groupId, link);
+      var h = '<div class="receipt-overlay" id="receiptOverlay" onclick="if(event.target===this)closeReceipt()">';
+      h += '<div class="receipt-box" style="text-align:left;max-height:88vh;overflow-y:auto;">';
+      h += '<div style="text-align:center;font-size:34px;margin:6px 0;">🔗</div>';
+      h += '<div style="text-align:center;font-size:16px;font-weight:700;color:#333;margin-bottom:6px;">Link de registro del grupo</div>';
+      h += '<div style="font-size:12px;color:#666;margin-bottom:10px;text-align:center;">Envíalo al encargado del grupo para que capture a los huéspedes de cada habitación.</div>';
+      h += '<div style="background:#f3f3f3;border-radius:8px;padding:8px;font-size:11px;word-break:break-all;color:#333;margin-bottom:10px;">' + link + '</div>';
+      h += '<div style="font-size:11px;color:#666;margin-bottom:4px;">Mensaje para el encargado (editable):</div>';
+      h += '<textarea id="grpRegMsg" style="width:100%;box-sizing:border-box;height:210px;font-size:12px;line-height:1.5;border:1px solid #ddd;border-radius:8px;padding:8px;margin-bottom:10px;">' + _wbEscC(msg) + '</textarea>';
+      h += '<div class="receipt-btns"><button onclick="window.open(\'https://wa.me/?text=\'+encodeURIComponent(document.getElementById(\'grpRegMsg\').value),\'_blank\')" style="background:#25D366;border:none;color:#fff;font-weight:700">📲 Enviar por WhatsApp</button></div>';
+      h += '<div class="receipt-btns" style="margin-top:8px"><button onclick="_grpCopyMsg()" style="background:#8baa6a;border:none;color:#fff">📋 Copiar mensaje</button><button onclick="_grpCopyLink(\'' + _wbEscC(link) + '\')" style="background:#666;border:none;color:#fff">🔗 Copiar link</button></div>';
+      h += '<div class="receipt-btns" style="margin-top:12px"><button onclick="closeReceipt()" style="background:#eee;border:1px solid #ddd;color:#666">Cerrar</button></div>';
+      h += '</div></div>';
+      document.body.insertAdjacentHTML('beforeend', h);
+    }
+    function _grpCopyMsg() {
+      var ta = document.getElementById('grpRegMsg'); if (!ta) return;
+      try { ta.focus(); ta.select(); } catch (e) {}
+      if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(ta.value).then(function() { toast('Mensaje copiado'); }).catch(function() { try { document.execCommand('copy'); toast('Mensaje copiado'); } catch (e2) {} }); }
+      else { try { document.execCommand('copy'); toast('Mensaje copiado'); } catch (e) {} }
+    }
+    function _grpCopyLink(link) {
+      if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(link).then(function() { toast('Link copiado'); }); }
+      else { toast('Link: ' + link); }
     }
 
     function shareGuestLinkWhatsApp(resId) {
@@ -23436,6 +23607,7 @@
       acts += '<button class="form-button secondary" onclick="generateGroupReceiptPDF(\'' + groupId + '\',\'download\')" style="flex:1;">📄 Recibo PDF</button>';
       acts += '<button class="form-button secondary" onclick="generateGroupReceiptPDF(\'' + groupId + '\',\'share\')" style="flex:1;background:rgba(37,211,102,0.12);color:#25D366;border-color:#25D366;">📱 Recibo WA</button>';
       acts += '</div>';
+      acts += '<button class="form-button secondary" onclick="closeModal();shareGroupRegLink(\'' + groupId + '\')" style="width:100%;">🔗 Link de registro (encargado)</button>';
       acts += '<button class="form-button secondary" onclick="openGroupBroadcast(\'' + groupId + '\')" style="width:100%;">📣 Mensaje al grupo</button>';
       acts += '<button class="form-button secondary" onclick="sendGroupCodesToRestaurant(\'' + groupId + '\')" style="width:100%;">☕ Avisar al restaurante (desayunos)</button>';
       acts += '<button class="form-button secondary" onclick="openGroupFacturaModal(\'' + groupId + '\')" style="width:100%;">🧾 Factura del grupo</button>';
