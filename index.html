@@ -3573,7 +3573,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-11-13a';
+    var APP_BUILD = '2026-11-13b';
 
     // ===== Selectores de fecha entrada→salida: la salida siempre mínimo el día siguiente =====
     function _nextDayStr(ymd) {
@@ -21042,7 +21042,7 @@
       // Register service worker for offline caching
       if ('serviceWorker' in navigator) {
         var swCode = `
-          var CACHE_NAME = 'casa-regina-pms-v3';
+          var CACHE_NAME = 'casa-regina-pms-v4';
 
           self.addEventListener('install', function(e) {
             // Activate immediately; don't pre-cache the document so updates are always fetched fresh.
@@ -21076,7 +21076,7 @@
                         url.indexOf('index.html') !== -1 || /\\/($|\\?)/.test(url);
             if (isDoc) {
               e.respondWith(
-                fetch(req).then(function(response) {
+                fetch(req, { cache: 'no-cache' }).then(function(response) {
                   if (response && response.ok) {
                     var clone = response.clone();
                     caches.open(CACHE_NAME).then(function(cache) { cache.put(req, clone); });
@@ -21102,21 +21102,28 @@
             );
           });
         `;
-        var swBlob = new Blob([swCode], { type: 'application/javascript' });
-        var swUrl = URL.createObjectURL(swBlob);
-        var _swReloaded = false;
-        navigator.serviceWorker.register(swUrl, { scope: location.pathname })
-          .then(function(reg) {
-            console.log('SW registered:', reg.scope);
-            try { reg.update(); } catch (e) {}
-          })
-          .catch(function(err) { console.log('SW registration skipped:', err.message); });
-        // When a new service worker takes control, reload once so the fresh app is shown.
-        navigator.serviceWorker.addEventListener('controllerchange', function() {
-          if (_swReloaded) return;
-          _swReloaded = true;
-          location.reload();
-        });
+        // Evita re-registrar el SW en CADA apertura (eso provocaba una recarga automática
+        // y el "retraso de versión"). Con un SW ya en control, el documento se sirve
+        // network-first (cache:no-cache), es decir SIEMPRE la última versión, sin recargar.
+        var SW_VERSION = 'v4';
+        var _hadCtrl = !!navigator.serviceWorker.controller;
+        var _swVerStored = null; try { _swVerStored = localStorage.getItem('_swVer'); } catch (e) {}
+        if (!_hadCtrl || _swVerStored !== SW_VERSION) {
+          var swBlob = new Blob([swCode], { type: 'application/javascript' });
+          var swUrl = URL.createObjectURL(swBlob);
+          navigator.serviceWorker.register(swUrl, { scope: location.pathname })
+            .then(function(reg) { try { localStorage.setItem('_swVer', SW_VERSION); } catch (e) {} })
+            .catch(function(err) { console.log('SW registration skipped:', err.message); });
+          // Recarga UNA sola vez SOLO cuando reemplazamos un SW anterior por una versión nueva.
+          if (_hadCtrl && _swVerStored !== SW_VERSION) {
+            var _swReloaded = false;
+            navigator.serviceWorker.addEventListener('controllerchange', function() {
+              if (_swReloaded) return;
+              _swReloaded = true;
+              location.reload();
+            });
+          }
+        }
       }
     }
 
