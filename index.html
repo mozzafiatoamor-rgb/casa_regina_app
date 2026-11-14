@@ -3573,7 +3573,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-11-14e';
+    var APP_BUILD = '2026-11-14f';
 
     // ===== Selectores de fecha entrada→salida: la salida siempre mínimo el día siguiente =====
     function _nextDayStr(ymd) {
@@ -4829,6 +4829,42 @@
     var _wbAccess = '';       // código de acceso personal
     var _wbFactura = '';      // texto de factura personalizado de la reserva ([FACT:...] en notas)
     var _wbEnded = false;     // la estancia ya terminó (checkout pasado / cancelada)
+    var _wbGroup = null;      // libro GRUPAL (modo ?guia&grp=<id>): titular, acceso, habitaciones y candados
+
+    // Textos de la versión grupal del welcome book (multi-idioma, autocontenido)
+    var _WB_GRP_I18N = {
+      group:     { es: 'Grupo', en: 'Group', fr: 'Groupe', it: 'Gruppo', de: 'Gruppe' },
+      rooms:     { es: 'habitaciones', en: 'rooms', fr: 'chambres', it: 'camere', de: 'Zimmer' },
+      locksTitle:{ es: 'Candado de cada habitación', en: 'Lock for each room', fr: 'Cadenas de chaque chambre', it: 'Lucchetto di ogni camera', de: 'Schloss für jedes Zimmer' },
+      locksInstr:{ es: 'En la entrada de cada habitación hay un candado para guardar su llave. El código es el número de la habitación.', en: 'At each room entrance there is a lock to store your key. The code is the room number.', fr: 'À l\'entrée de chaque chambre, un cadenas permet de ranger votre clé. Le code est le numéro de la chambre.', it: 'All\'ingresso di ogni camera c\'è un lucchetto per riporre la chiave. Il codice è il numero della camera.', de: 'Am Eingang jedes Zimmers gibt es ein Schloss zum Verstauen des Schlüssels. Der Code ist die Zimmernummer.' },
+      lock:      { es: 'Candado', en: 'Lock', fr: 'Cadenas', it: 'Lucchetto', de: 'Schloss' },
+      groupAccess:{ es: 'Código de acceso del grupo', en: 'Group access code', fr: 'Code d\'accès du groupe', it: 'Codice di accesso del gruppo', de: 'Gruppen-Zugangscode' }
+    };
+    function _wbGrpW(k) { var o = _WB_GRP_I18N[k] || {}; return o[_wbLang] || o.es || ''; }
+
+    // Arma el objeto de grupo a partir de filas crudas (modo público) del libro grupal.
+    function _wbBuildGroup(grpId, reservas, habs, regs) {
+      if (!grpId) return null;
+      var esc = String(grpId).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      var tagRe = new RegExp('\\[GRUPO:' + esc + '\\]');
+      var grp = { id: grpId, titular: '', acceso: '', fechaEntrada: '', fechaSalida: '', rooms: [] };
+      var tipoByNum = {};
+      (habs || []).forEach(function (h) { tipoByNum[String(h[1])] = String(h[2] || ''); });
+      (reservas || []).forEach(function (f) {
+        var notas = String(f[12] || '');
+        if (!tagRe.test(notas)) return;
+        if (String(f[11] || '').toLowerCase().indexOf('cancel') !== -1) return;
+        if (!grp.titular) { var mt = notas.match(/\[TITULAR:([^\]]*)\]/); if (mt && mt[1]) grp.titular = mt[1]; }
+        if (!grp.acceso) { var ma = notas.match(/\[ACCESO:([^\]]*)\]/); if (ma && ma[1]) grp.acceso = ma[1]; }
+        if (!grp.fechaEntrada) grp.fechaEntrada = String(f[5] || '').substring(0, 10);
+        if (!grp.fechaSalida) grp.fechaSalida = String(f[6] || '').substring(0, 10);
+        var num = String(f[1] || '');
+        var guests = (regs || []).filter(function (r) { return String(r[1]) === String(f[0]) && String(r[2] || '').trim(); }).map(function (r) { return String(r[2]); });
+        grp.rooms.push({ num: num, tipo: tipoByNum[num] || '', lock: (typeof _lockCode === 'function' ? _lockCode(num) : ''), guests: guests });
+      });
+      grp.rooms.sort(function (a, b) { return (parseInt(a.num) || 0) - (parseInt(b.num) || 0) || String(a.num).localeCompare(String(b.num)); });
+      return grp.rooms.length ? grp : null;
+    }
 
     function _wbBaseLang(g) { return (g.langs && g.langs[0]) || 'es'; }
     function _wbT(obj, g) {
@@ -4904,7 +4940,8 @@
       scr.classList.add('active');
       scr.innerHTML = '<div class="wb-loading">' + _wbLabel('loading') + '</div>';
 
-      _wbRes = null; _wbBreakfast = []; _wbAccess = ''; _wbFactura = ''; _wbEnded = false;
+      _wbRes = null; _wbBreakfast = []; _wbAccess = ''; _wbFactura = ''; _wbEnded = false; _wbGroup = null;
+      var _wbGrpId = null; try { _wbGrpId = new URLSearchParams(window.location.search).get('grp'); } catch (e) {}
       var pub = S._publicMode || (S.sheetId && S.apiKey);
       if (pub) {
         try {
@@ -4912,7 +4949,7 @@
             ? function(sh, rg) { return publicRead(S.scriptUrl, sh, rg); }
             : function(sh, rg) { return sheets.read(sh, rg); };
           var reads = [ _rd('⚙️ Config', 'A2:B50').catch(function() { return []; }) ];
-          if (resId) {
+          if (resId || _wbGrpId) {
             reads.push(_rd('📋 Reservas', 'A2:P5000').catch(function() { return []; }));
             reads.push(_rd('🍳 Desayunos', 'A2:J5000').catch(function() { return []; }));
             reads.push(_rd('🔑 Accesos', 'A2:C5000').catch(function() { return []; }));
@@ -4971,6 +5008,11 @@
             for (var j = 0; j < acc.length; j++) {
               if (String(acc[j][0]) === String(resId)) { _wbAccess = String(acc[j][1] || '').replace(/^'/, ''); break; }
             }
+          }
+          // Libro GRUPAL: arma el grupo desde las reservas con la etiqueta [GRUPO:id]
+          if (_wbGrpId && !resId) {
+            _wbGroup = _wbBuildGroup(_wbGrpId, out[1] || [], out[4] || [], out[5] || []);
+            if (_wbGroup && _wbGroup.acceso) _wbAccess = _wbGroup.acceso;
           }
         } catch (e) { console.warn('WelcomeBook load error:', e.message); }
       }
@@ -5314,7 +5356,7 @@
       WB_TILES.forEach(function (k) {
         tiles.push(k);
         if (k === 'welcome') {
-          if (_wbAccess) tiles.push('acceso');   // código de acceso como botón propio
+          if (_wbAccess || _wbGroup) tiles.push('acceso');   // código de acceso (o candados del grupo) como botón propio
           if (showBf) tiles.push('desayuno');
         }
         if (k === 'checkin') tiles.push('recepcion'); // horario de recepción
@@ -5418,6 +5460,11 @@
         var meta = _wbLabel('room') + ' ' + _wbEsc(_wbRes.habitacionNum);
         if (_wbRes.fechaEntrada) meta += ' · ' + _wbEsc(_wbRes.fechaEntrada) + ' → ' + _wbEsc(_wbRes.fechaSalida);
         guestBanner = '<div class="wb-guest"><div class="wb-guest-hi">' + _wbEsc(_wbLabel('hello')) + ', ' + _wbEsc(_firstName(_wbRes.huesped)) + ' 👋</div><div class="wb-guest-meta">' + meta + '</div></div>';
+      } else if (_wbGroup) {
+        var gm = _wbGroup.rooms.length + ' ' + _wbGrpW('rooms');
+        if (_wbGroup.fechaEntrada) gm += ' · ' + _wbEsc(_wbGroup.fechaEntrada) + ' → ' + _wbEsc(_wbGroup.fechaSalida);
+        var ghi = _wbGrpW('group') + (_wbGroup.titular ? ' ' + _wbEsc(_wbGroup.titular) : '') + ' 👋';
+        guestBanner = '<div class="wb-guest"><div class="wb-guest-hi">' + _wbEsc(_wbLabel('hello')) + ', ' + ghi + '</div><div class="wb-guest-meta">' + gm + '</div></div>';
       }
 
       var body;
@@ -5723,12 +5770,20 @@
       if (key === 'acceso') {
         var ha = '';
         if (_wbAccess) {
-          ha += '<div class="wb-card wb-access"><div class="wb-access-lb">🔑 ' + _wbEsc(_wbLabel('accessCode')) + '</div><div class="wb-access-code">' + _wbEsc(_wbAccess) + '</div></div>';
+          var accLb = _wbGroup ? _wbGrpW('groupAccess') : _wbLabel('accessCode');
+          ha += '<div class="wb-card wb-access"><div class="wb-access-lb">🔑 ' + _wbEsc(accLb) + '</div><div class="wb-access-code">' + _wbEsc(_wbAccess) + '</div></div>';
           var ai = _wbT(g.accesoInstr, g);
           if (ai) ha += _wbCard('<div class="wb-body">' + _wbNl2br(ai) + '</div>');
-        } else {
-          ha += _wbCard('<div class="wb-body">' + _wbEsc(_wbLabel('noInfo')) + '</div>');
         }
+        // Candados por habitación (modo grupo): código = número del cuarto
+        if (_wbGroup && _wbGroup.rooms.length) {
+          ha += '<div class="wb-body" style="font-weight:700;margin:10px 2px 4px;">🔒 ' + _wbEsc(_wbGrpW('locksTitle')) + '</div>';
+          ha += _wbCard('<div class="wb-body">' + _wbEsc(_wbGrpW('locksInstr')) + '</div>');
+          _wbGroup.rooms.forEach(function (rm) {
+            ha += _wbCard('<div class="wb-kv"><span>' + _wbEsc(_wbGrpW('lock')) + ' · ' + _wbEsc(_wbLabel('room')) + ' ' + _wbEsc(rm.num) + (rm.tipo ? ' <span style="color:#8a7a5f;font-weight:400;">(' + _wbEsc(rm.tipo) + ')</span>' : '') + '</span><b class="wb-mono">' + _wbEsc(rm.lock) + '</b></div>');
+          });
+        }
+        if (!ha) ha = _wbCard('<div class="wb-body">' + _wbEsc(_wbLabel('noInfo')) + '</div>');
         return ha;
       }
       if (key === 'recepcion') {
@@ -5908,6 +5963,24 @@
     function copyWelcomeBookLink(resId) {
       var link = getWelcomeBookLink(resId);
       navigator.clipboard.writeText(link).then(function() { toast('Enlace de la guía copiado'); });
+    }
+    // ===== GRUPO: welcome book digital general (un solo link para todo el grupo) =====
+    function getGroupWelcomeBookLink(groupId) {
+      var base = window.location.origin + window.location.pathname;
+      var url = S.scriptUrl || localStorage.getItem('scriptUrl') || '';
+      return base + '?guia&grp=' + encodeURIComponent(groupId) + '&b=' + _b64u(url);
+    }
+    function previewGroupWelcomeBook(groupId) { window.open(getGroupWelcomeBookLink(groupId), '_blank'); }
+    function copyGroupWelcomeBookLink(groupId) {
+      var link = getGroupWelcomeBookLink(groupId);
+      navigator.clipboard.writeText(link).then(function () { toast('Enlace del welcome book del grupo copiado'); }, function () { toast('No se pudo copiar', true); });
+    }
+    function shareGroupWelcomeBook(groupId) {
+      var link = getGroupWelcomeBookLink(groupId);
+      var titular = (typeof _groupTitular === 'function') ? _groupTitular(groupId) : '';
+      var hi = getHotelInfo();
+      var msg = '🏨 *' + (hi.nombre || HOTEL_NAME) + '*\n\n¡Hola! 🌿 Les compartimos el *welcome book digital* del grupo' + (titular ? ' de ' + titular : '') + ' — con el código de acceso, WiFi, el candado de cada habitación, desayuno y recomendaciones de la zona, todo en un solo enlace:\n\n' + link + '\n\nÁbranlo cuando quieran y compártanlo con el grupo. ¡Los esperamos! ✨';
+      window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
     }
     // Enlace del libro para un huésped específico (su propia experiencia)
     function getGuestBookLink(resId, regId) {
@@ -23799,6 +23872,10 @@
       acts += '<div style="display:flex;gap:8px;">';
       acts += '<button class="form-button secondary" onclick="generateGroupGuestInfoPDF(\'' + groupId + '\',\'download\')" style="flex:1;">📄 Info del grupo PDF</button>';
       acts += '<button class="form-button secondary" onclick="generateGroupGuestInfoPDF(\'' + groupId + '\',\'share\')" style="flex:1;background:rgba(37,211,102,0.12);color:#25D366;border-color:#25D366;">📲 Enviar al encargado</button>';
+      acts += '</div>';
+      acts += '<div style="display:flex;gap:8px;">';
+      acts += '<button class="form-button secondary" onclick="previewGroupWelcomeBook(\'' + groupId + '\')" style="flex:1;">📖 Ver welcome book</button>';
+      acts += '<button class="form-button secondary" onclick="shareGroupWelcomeBook(\'' + groupId + '\')" style="flex:1;background:rgba(37,211,102,0.12);color:#25D366;border-color:#25D366;">🔗 Enviar welcome book</button>';
       acts += '</div>';
       acts += '<button class="form-button secondary" onclick="sendGroupCodesToRestaurant(\'' + groupId + '\')" style="width:100%;">☕ Avisar al restaurante (desayunos)</button>';
       acts += '<button class="form-button secondary" onclick="openGroupFacturaModal(\'' + groupId + '\')" style="width:100%;">🧾 Factura del grupo</button>';
