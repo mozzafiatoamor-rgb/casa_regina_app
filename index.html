@@ -3573,7 +3573,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-11-14b';
+    var APP_BUILD = '2026-11-14c';
 
     // ===== Selectores de fecha entrada→salida: la salida siempre mínimo el día siguiente =====
     function _nextDayStr(ymd) {
@@ -21136,10 +21136,39 @@
       link.href = manifestUrl;
       document.head.appendChild(link);
 
+      // ¿Hay un modal abierto? (para no interrumpir una captura con una recarga)
+      window._isModalOpen = function () {
+        try { return !!document.querySelector('.modal.active'); } catch (e) { return false; }
+      };
+      // Aplica la actualización: limpia cachés y recarga con una URL "fresca" (conserva los parámetros del enlace).
+      window._applyUpdate = function (deployed) {
+        try { sessionStorage.setItem('_verTry', deployed); } catch (e) {}
+        var go = function () {
+          try {
+            var sp = new URLSearchParams(location.search);
+            sp.set('_v', deployed); // rompe el caché del navegador (URL distinta)
+            location.replace(location.pathname + '?' + sp.toString() + location.hash);
+          } catch (e) { location.reload(); }
+        };
+        if (window.caches && caches.keys) {
+          caches.keys().then(function (ns) { return Promise.all(ns.map(function (n) { return caches.delete(n); })); }).then(go, go);
+        } else { go(); }
+      };
+      // Aviso visible de versión nueva (una sola vez), por si la actualización automática no procede.
+      window._showUpdateBanner = function (deployed) {
+        if (document.getElementById('_updBanner')) return;
+        var d = document.createElement('div');
+        d.id = '_updBanner';
+        d.style.cssText = 'position:fixed;left:0;right:0;top:0;z-index:999999;background:#2563eb;color:#fff;padding:11px 14px;font-size:13px;font-weight:600;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.35);cursor:pointer;';
+        d.textContent = '🔄 Versión nueva disponible — toca aquí para actualizar';
+        d.onclick = function () { try { sessionStorage.removeItem('_verTry'); } catch (e) {} window._applyUpdate(deployed); };
+        document.body.appendChild(d);
+      };
+
       // Register service worker for offline caching
       if ('serviceWorker' in navigator) {
         var swCode = `
-          var CACHE_NAME = 'casa-regina-pms-v4';
+          var CACHE_NAME = 'casa-regina-pms-v5';
 
           self.addEventListener('install', function(e) {
             // Activate immediately; don't pre-cache the document so updates are always fetched fresh.
@@ -21173,7 +21202,7 @@
                         url.indexOf('index.html') !== -1 || /\\/($|\\?)/.test(url);
             if (isDoc) {
               e.respondWith(
-                fetch(req, { cache: 'no-cache' }).then(function(response) {
+                fetch(req, { cache: 'reload' }).then(function(response) {
                   if (response && response.ok) {
                     var clone = response.clone();
                     caches.open(CACHE_NAME).then(function(cache) { cache.put(req, clone); });
@@ -21202,7 +21231,7 @@
         // Evita re-registrar el SW en CADA apertura (eso provocaba una recarga automática
         // y el "retraso de versión"). Con un SW ya en control, el documento se sirve
         // network-first (cache:no-cache), es decir SIEMPRE la última versión, sin recargar.
-        var SW_VERSION = 'v4';
+        var SW_VERSION = 'v5';
         var _hadCtrl = !!navigator.serviceWorker.controller;
         var _swVerStored = null; try { _swVerStored = localStorage.getItem('_swVer'); } catch (e) {}
         if (!_hadCtrl || _swVerStored !== SW_VERSION) {
@@ -21222,6 +21251,25 @@
           }
         }
       }
+
+      // === Comprobador de versión: garantiza ver SIEMPRE la última, sin reinstalar ===
+      // Unos segundos después de abrir, consulta la versión publicada (sin caché) y, si hay una
+      // más nueva, la aplica automáticamente (o muestra un aviso si no es buen momento).
+      try {
+        setTimeout(function () {
+          var ckUrl = location.pathname + '?_ck=' + Date.now();
+          fetch(ckUrl, { cache: 'no-store' }).then(function (r) { return r.text(); }).then(function (txt) {
+            var m = txt.match(/APP_BUILD\s*=\s*'([^']+)'/);
+            if (!m) return;
+            var deployed = m[1];
+            if (!deployed || deployed === APP_BUILD) return; // ya es la última
+            var tried = ''; try { tried = sessionStorage.getItem('_verTry') || ''; } catch (e) {}
+            if (tried === deployed) { window._showUpdateBanner(deployed); return; } // ya se intentó: no recargar en bucle
+            if (window._isModalOpen && window._isModalOpen()) { window._showUpdateBanner(deployed); return; } // no interrumpir una captura
+            window._applyUpdate(deployed); // actualiza una vez, automático
+          }).catch(function () {});
+        }, 2500);
+      } catch (e) {}
     }
 
     // Detect standalone mode (installed PWA)
