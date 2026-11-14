@@ -3573,7 +3573,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-11-14c';
+    var APP_BUILD = '2026-11-14d';
 
     // ===== Selectores de fecha entrada→salida: la salida siempre mínimo el día siguiente =====
     function _nextDayStr(ymd) {
@@ -23714,6 +23714,9 @@
       h += '<div style="font-size:12px;color:var(--text2);">GRUPO · ' + t.count + ' habitaciones</div>';
       h += '<label style="font-size:10px;color:var(--text2);display:block;margin-top:6px;">Titular del grupo (para cobro y factura)</label>';
       h += '<input id="grpTitularEdit" value="' + _wbEscC(titular) + '" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--surface3);border-radius:6px;padding:7px 9px;font-size:13px;font-weight:700;color:var(--text);margin-top:2px;">';
+      h += '<label style="font-size:10px;color:var(--text2);display:block;margin-top:8px;">🔑 Código de acceso del grupo (uno para todo el grupo)</label>';
+      h += '<input id="grpAccesoEdit" value="' + _wbEscC(_groupAcceso(groupId)) + '" placeholder="Ej. 2580" style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--surface3);border-radius:6px;padding:7px 9px;font-size:13px;font-weight:700;color:var(--text);margin-top:2px;letter-spacing:1px;">';
+      h += '<div style="font-size:10px;color:var(--text2);margin-top:3px;">Se guarda con «Guardar nombres» y se incluye en el PDF del encargado.</div>';
       h += '<div style="font-size:12px;color:var(--text2);margin-top:6px;">' + formatDate(t.reservas[0].fechaEntrada) + ' → ' + formatDate(t.reservas[0].fechaSalida) + '</div>';
       h += '</div>';
       // Aviso: el encargado ya completó el pre-registro del grupo (marca [REGOK:fecha])
@@ -23791,6 +23794,12 @@
       acts += '</div>';
       acts += '<button class="form-button secondary" onclick="closeModal();shareGroupRegLink(\'' + groupId + '\')" style="width:100%;">🔗 Link de registro (encargado)</button>';
       acts += '<button class="form-button secondary" onclick="openGroupBroadcast(\'' + groupId + '\')" style="width:100%;">📣 Mensaje al grupo</button>';
+      acts += '<button class="form-button secondary" onclick="generarDesayunosGrupoPorHabitacion(\'' + groupId + '\')" style="width:100%;border-color:#2e7d32;color:#2e7d32;">🍳 Generar desayunos por habitación</button>';
+      acts += '<button class="form-button secondary" onclick="sendGroupReceptionList(\'' + groupId + '\')" style="width:100%;">📋 Lista para recepción (verificar personas)</button>';
+      acts += '<div style="display:flex;gap:8px;">';
+      acts += '<button class="form-button secondary" onclick="generateGroupGuestInfoPDF(\'' + groupId + '\',\'download\')" style="flex:1;">📄 Info del grupo PDF</button>';
+      acts += '<button class="form-button secondary" onclick="generateGroupGuestInfoPDF(\'' + groupId + '\',\'share\')" style="flex:1;background:rgba(37,211,102,0.12);color:#25D366;border-color:#25D366;">📲 Enviar al encargado</button>';
+      acts += '</div>';
       acts += '<button class="form-button secondary" onclick="sendGroupCodesToRestaurant(\'' + groupId + '\')" style="width:100%;">☕ Avisar al restaurante (desayunos)</button>';
       acts += '<button class="form-button secondary" onclick="openGroupFacturaModal(\'' + groupId + '\')" style="width:100%;">🧾 Factura del grupo</button>';
       acts += '<button class="form-button secondary" onclick="cancelGroup(\'' + groupId + '\')" style="width:100%;border-color:var(--red);color:var(--red);">❌ Cancelar grupo</button>';
@@ -23881,18 +23890,158 @@
       return tag + (n ? ' ' + n : '');
     }
 
+    // Código de acceso general del grupo (una sola clave para todos), en las notas.
+    function _setAccesoTag(notas, code) {
+      var n = String(notas || '').replace(/\s*\|\s*\[ACCESO:[^\]]*\]/g, '').replace(/\[ACCESO:[^\]]*\]\s*/g, '').trim();
+      if (!code) return n;
+      return n + (n ? ' ' : '') + '[ACCESO:' + code + ']';
+    }
+    function _groupAcceso(groupId) {
+      var rs = _groupReservas(groupId);
+      for (var i = 0; i < rs.length; i++) { var m = String(rs[i].notas || '').match(/\[ACCESO:([^\]]*)\]/); if (m && m[1]) return m[1]; }
+      return '';
+    }
+    // Código del candado de una habitación: el número del cuarto repetido a 4 dígitos (Hab 7 → 7777).
+    function _lockCode(num) {
+      var s = String(num == null ? '' : num).replace(/\D/g, '') || String(num || '');
+      if (!s) return '';
+      return (s + s + s + s).slice(0, 4);
+    }
+
+    function _groupRoomsSorted(groupId) {
+      return _groupReservas(groupId).filter(function (r) { return !/cancel/i.test(String(r.estado || '')); })
+        .slice().sort(function (a, b) { return (parseInt(a.habitacionNum) || 0) - (parseInt(b.habitacionNum) || 0) || String(a.habitacionNum).localeCompare(String(b.habitacionNum)); });
+    }
+
+    // Genera desayunos POR HABITACIÓN según el tipo de cuarto (config actual), por cada noche.
+    async function generarDesayunosGrupoPorHabitacion(groupId) {
+      var rs = _groupRoomsSorted(groupId);
+      if (!rs.length) { toast('Grupo no encontrado', true); return; }
+      var plan = [], yaCon = [];
+      rs.forEach(function (r) {
+        if ((S.desayunos || []).some(function (d) { return d.reservaId === r.id; })) { yaCon.push('Hab. ' + r.habitacionNum); return; }
+        var room = S.rooms.find(function (x) { return x.numero === r.habitacionNum; });
+        var pers = 0; try { pers = getBreakfastPersonas(room ? room.tipo : '') || 0; } catch (e) {}
+        if (!pers) pers = _bfPersonasSugeridas(room);
+        var nights = Math.max(daysUntil(r.fechaEntrada, r.fechaSalida), 1);
+        plan.push({ res: r, pers: pers, nights: nights, total: pers * nights });
+      });
+      if (!plan.length) { toast('Todas las habitaciones ya tienen desayunos' + (yaCon.length ? ': ' + yaCon.join(', ') : ''), false); return; }
+      var totalCodes = plan.reduce(function (s, p) { return s + p.total; }, 0);
+      var resumen = plan.map(function (p) { return 'Hab. ' + p.res.habitacionNum + ': ' + p.pers + '/noche × ' + p.nights + ' = ' + p.total; }).join('\n');
+      if (!confirm('Generar desayunos POR HABITACIÓN (según tipo de cuarto):\n\n' + resumen + '\n\nTotal: ' + totalCodes + ' código(s).' + (yaCon.length ? '\n\n(Ya tenían, se omiten: ' + yaCon.join(', ') + ')' : '') + '\n\n¿Continuar?')) return;
+      await busy(async function () {
+        var ops = [], added = [], n = now();
+        plan.forEach(function (p) {
+          var r = p.res;
+          for (var di = 0; di < p.nights; di++) {
+            var d = new Date(r.fechaEntrada + 'T12:00:00'); d.setDate(d.getDate() + di + 1);
+            var ds = normDate(d);
+            for (var k = 0; k < p.pers; k++) {
+              var code = generateBreakfastCode();
+              ops.push({ type: 'append', sheet: '🍳 Desayunos', values: [code, r.id, r.huesped, r.habitacionNum, ds, 1, 'Pendiente', '', '', ''] });
+              added.push({ codigo: code, reservaId: r.id, huesped: r.huesped, habitacion: r.habitacionNum, fecha: ds, personas: 1, estado: 'Pendiente', validadoPor: '', horaValidacion: '', regId: '' });
+            }
+          }
+        });
+        ops.push({ type: 'append', sheet: '📜 Bitácora', values: [normDate(new Date()), n.split(' ')[1], (S.user && S.user.usuario) || '', 'Desayunos de grupo', added.length + ' código(s) por habitación (' + _groupTitular(groupId) + ')', 'info'] });
+        await sheets.multi(ops);
+        S.desayunos = (S.desayunos || []).concat(added);
+        toast('🍳 ' + added.length + ' desayuno(s) generados por habitación');
+        render();
+        setTimeout(function () { openGroupSummary(groupId); }, 300);
+      }, 'Generando desayunos del grupo...');
+    }
+
+    // Lista para la recepcionista (texto de WhatsApp): personas por cuarto a verificar.
+    function sendGroupReceptionList(groupId) {
+      var rs = _groupRoomsSorted(groupId);
+      if (!rs.length) { toast('Grupo no encontrado', true); return; }
+      var hi = getHotelInfo();
+      var titular = _groupTitular(groupId);
+      var totalConfig = 0, totalReg = 0;
+      var t = '📋 *LISTA DE RECEPCIÓN — Grupo ' + titular + '*\n_' + hi.nombre + '_\n';
+      t += formatDate(rs[0].fechaEntrada) + ' → ' + formatDate(rs[0].fechaSalida) + '\n\n';
+      t += 'Verifica cuántas personas se quedan en cada habitación:\n\n';
+      rs.forEach(function (r) {
+        var cfg = (parseInt(r.adultos) || 0) + (parseInt(r.niños) || 0); totalConfig += cfg;
+        var regs = _resGuests(r.id).filter(function (g) { return String(g.nombre || '').trim(); }); totalReg += regs.length;
+        t += '🛏️ *Hab. ' + r.habitacionNum + '* — ' + cfg + ' persona(s) [según reserva]\n';
+        if (regs.length) t += '   Registrados (' + regs.length + '): ' + regs.map(function (g) { return g.nombre; }).join(', ') + '\n';
+        else t += '   _Sin registro aún_\n';
+      });
+      t += '\n*Total:* ' + totalConfig + ' persona(s) en ' + rs.length + ' habitación(es). Registrados: ' + totalReg + '.';
+      window.open('https://wa.me/?text=' + encodeURIComponent(t), '_blank');
+    }
+
+    // PDF para el encargado del grupo: WiFi, acceso general, candados y huéspedes por habitación.
+    function generateGroupGuestInfoPDF(groupId, mode) {
+      var rs = _groupRoomsSorted(groupId);
+      if (!rs.length) { toast('Grupo no encontrado', true); return; }
+      var titular = _groupTitular(groupId);
+      var hi = getHotelInfo();
+      var acceso = _groupAcceso(groupId);
+      if (!(window.jspdf && window.jspdf.jsPDF)) { toast('No se pudo cargar el generador de PDF', true); return; }
+      var jsPDF = window.jspdf.jsPDF;
+      var pageW = 320;
+      function draw(doc, render) {
+        var k = _pdfBrandKit(doc, pageW, render);
+        k.header(LOGO_V_DARK_B64 || LOGO_V_DARK, LOGO_V_RATIO, 'Información del grupo', titular, [107, 138, 74]);
+        k.section('Estancia');
+        k.row('Grupo', titular, k.INK, true);
+        k.row('Habitaciones', String(rs.length), [107, 138, 74], true);
+        k.row('Entrada', formatDate(rs[0].fechaEntrada) + ' · ' + formatHoraDisplay(hi.checkin_hora));
+        k.row('Salida', formatDate(rs[0].fechaSalida) + ' · ' + formatHoraDisplay(hi.checkout_hora));
+        if (hi.wifi_red || hi.wifi_pass) {
+          k.section('WiFi');
+          if (hi.wifi_red) k.row('Red', hi.wifi_red, k.INK, true);
+          if (hi.wifi_pass) k.row('Contraseña', hi.wifi_pass, k.INK, true);
+        }
+        k.section('Acceso al hotel');
+        if (acceso) k.row('Código de acceso del grupo', acceso, [107, 138, 74], true);
+        k.paragraph('Ingresa el código de acceso en el teclado de la entrada principal, seguido de la tecla de confirmación. Es el mismo para todo el grupo.', 8, k.GRY);
+        k.space(2);
+        k.section('Llave de cada habitación');
+        k.paragraph('En la entrada de cada habitación hay un candado donde pueden guardar su llave. El código del candado es el número de la habitación (por ejemplo, Hab. 7 → 7777):', 8, k.GRY);
+        k.space(2);
+        rs.forEach(function (r) { k.row('Candado Hab. ' + r.habitacionNum, _lockCode(r.habitacionNum), [107, 138, 74], true); });
+        k.section('Huéspedes por habitación');
+        rs.forEach(function (r) {
+          var regs = _resGuests(r.id).filter(function (g) { return String(g.nombre || '').trim(); });
+          k.row('Hab. ' + r.habitacionNum, regs.length ? (regs.length + ' pers.') : 'por registrar', [107, 138, 74], true);
+          if (regs.length) { k.paragraph(regs.map(function (g) { return '• ' + g.nombre; }).join('\n'), 8, k.INK); k.space(2); }
+        });
+        if (hi.direccion) { k.section('Dirección'); k.paragraph(hi.direccion, 8, k.INK); k.space(2); }
+        k.footer(hi.nombre);
+        return k.y;
+      }
+      var mDoc = new jsPDF({ unit: 'pt', format: [pageW, 2200] });
+      var totalH = draw(mDoc, false);
+      var doc = new jsPDF({ unit: 'pt', format: [pageW, Math.max(totalH, 260)] });
+      draw(doc, true);
+      var fileName = 'Grupo_' + String(titular).replace(/\s+/g, '_') + '_info.pdf';
+      if (mode === 'share') {
+        doc.save(fileName);
+        toast('PDF descargado — abriendo WhatsApp...');
+        var waText = '🏨 *' + hi.nombre + '*\n\n¡Hola! 👋 Te comparto la información del grupo en PDF: WiFi, código de acceso, el candado de cada habitación (para guardar la llave) y los huéspedes por cuarto. Puedes compartirlo con tu grupo. 🌿\n\n📄 _Archivo: ' + fileName + '_';
+        setTimeout(function () { window.open('https://wa.me/?text=' + encodeURIComponent(waText), '_blank'); }, 500);
+      } else { doc.save(fileName); toast('PDF descargado: ' + fileName); }
+    }
+
     async function saveGroupGuestNames(groupId) {
       var rs = _groupReservas(groupId);
       if (!rs.length) { toast('Grupo no encontrado', true); return; }
       var titEl = document.getElementById('grpTitularEdit');
       var titular = titEl ? titEl.value.trim() : _groupTitular(groupId);
       if (!titular) titular = _groupTitular(groupId);
+      var accEl = document.getElementById('grpAccesoEdit');
+      var acceso = accEl ? accEl.value.trim() : _groupAcceso(groupId);
       var ops = [], changes = [];
       rs.forEach(function (r) {
         var inp = document.getElementById('grpGuest_' + r.id);
         var nuevo = inp ? inp.value.trim() : r.huesped;
         if (!nuevo) nuevo = r.huesped;
-        var newNotas = _setTitularTag(r.notas, titular);
+        var newNotas = _setAccesoTag(_setTitularTag(r.notas, titular), acceso);
         if (nuevo === r.huesped && newNotas === String(r.notas || '')) return; // sin cambios
         var merged = Object.assign({}, r, { huesped: nuevo, notas: newNotas });
         ops.push({ type: 'updateById', sheet: '📋 Reservas', id: r.id, values: _reservaRow(merged) });
