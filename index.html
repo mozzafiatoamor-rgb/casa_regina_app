@@ -3573,7 +3573,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-11-14f';
+    var APP_BUILD = '2026-11-14g';
 
     // ===== Selectores de fecha entrada→salida: la salida siempre mínimo el día siguiente =====
     function _nextDayStr(ymd) {
@@ -21227,15 +21227,37 @@
           caches.keys().then(function (ns) { return Promise.all(ns.map(function (n) { return caches.delete(n); })); }).then(go, go);
         } else { go(); }
       };
-      // Aviso visible de versión nueva (una sola vez), por si la actualización automática no procede.
+      // Aviso visible de versión nueva: muestra qué versión es, con botón de actualizar
+      // y botón "Ahora no" para posponer (no reaparece en esta sesión para esa misma versión).
       window._showUpdateBanner = function (deployed) {
         if (document.getElementById('_updBanner')) return;
+        try { if (sessionStorage.getItem('_updPostpone') === deployed) return; } catch (e) {}
+        var cur = (typeof APP_BUILD !== 'undefined') ? APP_BUILD : '?';
         var d = document.createElement('div');
         d.id = '_updBanner';
-        d.style.cssText = 'position:fixed;left:0;right:0;top:0;z-index:999999;background:#2563eb;color:#fff;padding:11px 14px;font-size:13px;font-weight:600;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.35);cursor:pointer;';
-        d.textContent = '🔄 Versión nueva disponible — toca aquí para actualizar';
-        d.onclick = function () { try { sessionStorage.removeItem('_verTry'); } catch (e) {} window._applyUpdate(deployed); };
+        d.style.cssText = 'position:fixed;left:0;right:0;top:0;z-index:999999;background:#2563eb;color:#fff;padding:10px 14px;box-shadow:0 2px 10px rgba(0,0,0,.35);font-size:13px;';
+        d.innerHTML =
+          '<div style="max-width:560px;margin:0 auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:center;">' +
+            '<div style="flex:1;min-width:170px;text-align:left;line-height:1.35;">' +
+              '<div style="font-weight:700;">🔄 Versión nueva disponible</div>' +
+              '<div style="font-size:11px;opacity:.9;">Tienes v' + cur + ' · Nueva v' + deployed + '</div>' +
+            '</div>' +
+            '<div style="display:flex;gap:8px;flex-shrink:0;">' +
+              '<button id="_updNow" style="background:#fff;color:#2563eb;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer;">Actualizar</button>' +
+              '<button id="_updLater" style="background:transparent;color:#fff;border:1px solid rgba(255,255,255,.6);border-radius:8px;padding:8px 12px;font-size:13px;font-weight:600;cursor:pointer;">Ahora no</button>' +
+            '</div>' +
+          '</div>';
         document.body.appendChild(d);
+        var bNow = document.getElementById('_updNow'), bLater = document.getElementById('_updLater');
+        if (bNow) bNow.onclick = function () {
+          try { sessionStorage.removeItem('_verTry'); } catch (e) {}
+          try { sessionStorage.removeItem('_updPostpone'); } catch (e) {}
+          window._applyUpdate(deployed);
+        };
+        if (bLater) bLater.onclick = function () {
+          try { sessionStorage.setItem('_updPostpone', deployed); } catch (e) {}
+          if (d.parentNode) d.parentNode.removeChild(d);
+        };
       };
 
       // Register service worker for offline caching
