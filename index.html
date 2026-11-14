@@ -3573,7 +3573,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-11-14a';
+    var APP_BUILD = '2026-11-14b';
 
     // ===== Selectores de fecha entrada→salida: la salida siempre mínimo el día siguiente =====
     function _nextDayStr(ymd) {
@@ -23727,7 +23727,12 @@
       var acts = '';
       acts += '<button class="form-button secondary" onclick="grpRefreshNames(\'' + groupId + '\')" style="width:100%;">🔄 Actualizar nombres del grupo</button>';
       var _ckRooms = t.reservas.filter(function(r){ return r.estado === 'Reservada' || r.estado === 'Confirmada'; });
-      if (_ckRooms.length) acts += '<button class="form-button" onclick="grpBulkCheckin(\'' + groupId + '\')" style="width:100%;background:var(--blue);color:#fff;">🔑 Check-in de las seleccionadas</button>';
+      if (_ckRooms.length) {
+        acts += '<div style="display:flex;gap:8px;">';
+        acts += '<button class="form-button secondary" onclick="grpSelectAllCheckin()" style="flex:0 0 auto;width:auto;padding-left:14px;padding-right:14px;">☑️ Todas</button>';
+        acts += '<button class="form-button" onclick="grpBulkCheckin(\'' + groupId + '\')" style="flex:1;background:var(--blue);color:#fff;">🔑 Check-in de las seleccionadas</button>';
+        acts += '</div>';
+      }
       var _pendConfirm = t.reservas.filter(function(r){ return r.estado === 'Reservada'; });
       if (_pendConfirm.length) acts += '<button class="form-button" onclick="confirmarGrupo(\'' + groupId + '\')" style="width:100%;background:var(--green);color:#fff;">✅ Confirmar ' + _pendConfirm.length + ' habitación(es) del grupo</button>';
       if (t.balance > 0.01) acts += '<button class="form-button" onclick="openGroupPayment(\'' + groupId + '\')" style="width:100%;background:var(--accent);color:var(--bg);">💰 Cobrar grupo ($' + _fmt(t.balance) + ')</button>';
@@ -23762,6 +23767,15 @@
     }
 
     // Check-in masivo de las habitaciones seleccionadas del grupo, usando los datos ya pre-registrados.
+    // Marca/desmarca todas las habitaciones seleccionables para check-in.
+    function grpSelectAllCheckin() {
+      var boxes = document.querySelectorAll('._grpCoSel');
+      if (!boxes.length) { toast('No hay habitaciones por hospedar', false); return; }
+      var anyUnchecked = false;
+      for (var i = 0; i < boxes.length; i++) { if (!boxes[i].checked) { anyUnchecked = true; break; } }
+      for (var j = 0; j < boxes.length; j++) { boxes[j].checked = anyUnchecked; }
+    }
+
     async function grpBulkCheckin(groupId) {
       var boxes = document.querySelectorAll('._grpCoSel');
       var selIds = [];
@@ -23776,10 +23790,13 @@
         var paid = (S.cobros || []).filter(function (c) { return c.reservaId === res.id; }).reduce(function (s, c) { return s + c.monto; }, 0);
         var bal = (typeof _snapBal === 'function') ? _snapBal(res.tarifaTotal - paid) : (res.tarifaTotal - paid);
         if (bal > 0.01) conAdeudo.push('Hab. ' + res.habitacionNum + ' ($' + _fmt(bal) + ')');
-        items.push({ res: res, room: room });
+        // Titular registrado por el encargado (persona 1 del cuarto): pasa a ser el huésped de la reserva.
+        var _regs = _resGuests(res.id).filter(function (g) { return String(g.nombre || '').trim(); });
+        var nuevoHuesped = _regs.length ? _regs[0].nombre.trim() : res.huesped;
+        items.push({ res: res, room: room, nuevoHuesped: nuevoHuesped });
       });
       if (!items.length) { toast('No hay habitaciones válidas para check-in', true); return; }
-      var msg = 'Vas a hacer check-in de ' + items.length + ' habitación(es):\n' + items.map(function (it) { return '• Hab. ' + it.res.habitacionNum + ' — ' + it.res.huesped; }).join('\n');
+      var msg = 'Vas a hacer check-in de ' + items.length + ' habitación(es):\n' + items.map(function (it) { return '• Hab. ' + it.res.habitacionNum + ' — ' + it.nuevoHuesped; }).join('\n');
       if (conAdeudo.length) msg += '\n\n⚠️ Con saldo pendiente: ' + conAdeudo.join(', ') + '.\n(Se registrará el check-in con adeudo.)';
       msg += '\n\n¿Confirmar?';
       if (!confirm(msg)) return;
@@ -23788,14 +23805,14 @@
         var ops = [];
         items.forEach(function (it) {
           var res = it.res, room = it.room;
-          ops.push({ type: 'updateById', sheet: '📋 Reservas', id: res.id, values: [res.id, res.habitacionNum, res.huesped, res.telefono, res.email, res.fechaEntrada, res.fechaSalida, res.adultos, res.niños, res.tarifa, res.tarifaTotal, 'Check-in', res.notas, res.creadoPor, res.fechaCreacion] });
+          ops.push({ type: 'updateById', sheet: '📋 Reservas', id: res.id, values: [res.id, res.habitacionNum, it.nuevoHuesped, res.telefono, res.email, res.fechaEntrada, res.fechaSalida, res.adultos, res.niños, res.tarifa, res.tarifaTotal, 'Check-in', res.notas, res.creadoPor, res.fechaCreacion] });
           ops.push({ type: 'updateById', sheet: '🏨 Habitaciones', id: room.id, values: [room.id, room.numero, room.tipo, room.tarifa, 'Ocupada', room.notas] });
         });
         ops.push({ type: 'append', sheet: '📜 Bitácora', values: [normDate(new Date()), n.split(' ')[1], S.user.usuario, 'Check-in de grupo', 'Check-in de ' + items.length + ' habitación(es) del grupo (' + _groupTitular(groupId) + ')', 'info'] });
         await sheets.multi(ops);
         items.forEach(function (it) {
           var ri = S.reservas.findIndex(function (r) { return r.id === it.res.id; });
-          if (ri !== -1) S.reservas[ri].estado = 'Check-in';
+          if (ri !== -1) { S.reservas[ri].estado = 'Check-in'; S.reservas[ri].huesped = it.nuevoHuesped; }
           var ki = S.rooms.findIndex(function (r) { return r.numero === it.res.habitacionNum; });
           if (ki !== -1) S.rooms[ki].estado = 'Ocupada';
         });
