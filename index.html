@@ -3573,7 +3573,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-11-14d';
+    var APP_BUILD = '2026-11-14e';
 
     // ===== Selectores de fecha entrada→salida: la salida siempre mínimo el día siguiente =====
     function _nextDayStr(ymd) {
@@ -23913,41 +23913,57 @@
         .slice().sort(function (a, b) { return (parseInt(a.habitacionNum) || 0) - (parseInt(b.habitacionNum) || 0) || String(a.habitacionNum).localeCompare(String(b.habitacionNum)); });
     }
 
-    // Genera desayunos POR HABITACIÓN según el tipo de cuarto (config actual), por cada noche.
+    // Genera desayunos POR HABITACIÓN según el tipo de cuarto (config actual).
+    // UN código por cuarto por noche, con personas = desayunos del tipo (sencilla 1, doble 2, etc.).
+    // Reemplaza los pendientes previos del grupo; nunca toca los ya consumidos.
     async function generarDesayunosGrupoPorHabitacion(groupId) {
       var rs = _groupRoomsSorted(groupId);
       if (!rs.length) { toast('Grupo no encontrado', true); return; }
-      var plan = [], yaCon = [];
+      var plan = [], hadPend = false;
       rs.forEach(function (r) {
-        if ((S.desayunos || []).some(function (d) { return d.reservaId === r.id; })) { yaCon.push('Hab. ' + r.habitacionNum); return; }
         var room = S.rooms.find(function (x) { return x.numero === r.habitacionNum; });
         var pers = 0; try { pers = getBreakfastPersonas(room ? room.tipo : '') || 0; } catch (e) {}
         if (!pers) pers = _bfPersonasSugeridas(room);
         var nights = Math.max(daysUntil(r.fechaEntrada, r.fechaSalida), 1);
-        plan.push({ res: r, pers: pers, nights: nights, total: pers * nights });
+        var existing = (S.desayunos || []).filter(function (d) { return d.reservaId === r.id; });
+        var delCodes = existing.filter(function (d) { return d.estado === 'Pendiente'; }).map(function (d) { return d.codigo; });
+        if (delCodes.length) hadPend = true;
+        var consumidas = {};
+        existing.forEach(function (d) { if (d.estado === 'Consumido') consumidas[d.fecha] = true; });
+        var fechas = [];
+        for (var di = 0; di < nights; di++) {
+          var d = new Date(r.fechaEntrada + 'T12:00:00'); d.setDate(d.getDate() + di + 1);
+          var ds = normDate(d);
+          if (!consumidas[ds]) fechas.push(ds); // respeta mañanas ya consumidas
+        }
+        plan.push({ res: r, tipo: room ? room.tipo : '', pers: pers, fechas: fechas, delCodes: delCodes });
       });
-      if (!plan.length) { toast('Todas las habitaciones ya tienen desayunos' + (yaCon.length ? ': ' + yaCon.join(', ') : ''), false); return; }
-      var totalCodes = plan.reduce(function (s, p) { return s + p.total; }, 0);
-      var resumen = plan.map(function (p) { return 'Hab. ' + p.res.habitacionNum + ': ' + p.pers + '/noche × ' + p.nights + ' = ' + p.total; }).join('\n');
-      if (!confirm('Generar desayunos POR HABITACIÓN (según tipo de cuarto):\n\n' + resumen + '\n\nTotal: ' + totalCodes + ' código(s).' + (yaCon.length ? '\n\n(Ya tenían, se omiten: ' + yaCon.join(', ') + ')' : '') + '\n\n¿Continuar?')) return;
+      var activos = plan.filter(function (p) { return p.fechas.length && p.pers > 0; });
+      if (!activos.length) { toast('No hay desayunos por generar (¿ya consumidos?)', false); return; }
+      var totalCodes = activos.reduce(function (s, p) { return s + p.fechas.length; }, 0);
+      var totalPers = activos.reduce(function (s, p) { return s + p.pers * p.fechas.length; }, 0);
+      var resumen = activos.map(function (p) { return 'Hab. ' + p.res.habitacionNum + ' (' + (p.tipo || 's/tipo') + '): ' + p.pers + ' desayuno(s)/día × ' + p.fechas.length + ' día(s) = ' + (p.pers * p.fechas.length); }).join('\n');
+      if (!confirm((hadPend ? '⚠️ Se reemplazarán los desayunos PENDIENTES del grupo por los correctos según el tipo de cuarto.\n\n' : '') + 'Desayunos por habitación (según tipo de cuarto):\n\n' + resumen + '\n\nTotal: ' + totalPers + ' desayuno(s) en ' + totalCodes + ' código(s).\n\n¿Continuar?')) return;
       await busy(async function () {
+        // 1) borra pendientes previos del grupo
+        var toDel = [];
+        plan.forEach(function (p) { p.delCodes.forEach(function (c) { toDel.push(c); }); });
+        for (var i = 0; i < toDel.length; i++) { try { await sheets.deleteById('🍳 Desayunos', toDel[i]); } catch (e) {} }
+        if (toDel.length) S.desayunos = (S.desayunos || []).filter(function (d) { return toDel.indexOf(d.codigo) === -1; });
+        // 2) genera UN código por cuarto por noche con personas = conteo por tipo
         var ops = [], added = [], n = now();
-        plan.forEach(function (p) {
+        activos.forEach(function (p) {
           var r = p.res;
-          for (var di = 0; di < p.nights; di++) {
-            var d = new Date(r.fechaEntrada + 'T12:00:00'); d.setDate(d.getDate() + di + 1);
-            var ds = normDate(d);
-            for (var k = 0; k < p.pers; k++) {
-              var code = generateBreakfastCode();
-              ops.push({ type: 'append', sheet: '🍳 Desayunos', values: [code, r.id, r.huesped, r.habitacionNum, ds, 1, 'Pendiente', '', '', ''] });
-              added.push({ codigo: code, reservaId: r.id, huesped: r.huesped, habitacion: r.habitacionNum, fecha: ds, personas: 1, estado: 'Pendiente', validadoPor: '', horaValidacion: '', regId: '' });
-            }
-          }
+          p.fechas.forEach(function (ds) {
+            var code = generateBreakfastCode();
+            ops.push({ type: 'append', sheet: '🍳 Desayunos', values: [code, r.id, r.huesped, r.habitacionNum, ds, p.pers, 'Pendiente', '', '', ''] });
+            added.push({ codigo: code, reservaId: r.id, huesped: r.huesped, habitacion: r.habitacionNum, fecha: ds, personas: p.pers, estado: 'Pendiente', validadoPor: '', horaValidacion: '', regId: '' });
+          });
         });
-        ops.push({ type: 'append', sheet: '📜 Bitácora', values: [normDate(new Date()), n.split(' ')[1], (S.user && S.user.usuario) || '', 'Desayunos de grupo', added.length + ' código(s) por habitación (' + _groupTitular(groupId) + ')', 'info'] });
+        ops.push({ type: 'append', sheet: '📜 Bitácora', values: [normDate(new Date()), n.split(' ')[1], (S.user && S.user.usuario) || '', 'Desayunos de grupo', added.length + ' código(s) por habitación · ' + totalPers + ' desayuno(s) (' + _groupTitular(groupId) + ')', 'info'] });
         await sheets.multi(ops);
         S.desayunos = (S.desayunos || []).concat(added);
-        toast('🍳 ' + added.length + ' desayuno(s) generados por habitación');
+        toast('🍳 ' + totalPers + ' desayuno(s) por habitación generados');
         render();
         setTimeout(function () { openGroupSummary(groupId); }, 300);
       }, 'Generando desayunos del grupo...');
