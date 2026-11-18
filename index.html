@@ -3490,6 +3490,11 @@
         icon: '🕚',
         texto: '*{hotel}*\n\nEstimado(a) {huesped}:\n\nEsperamos que esté disfrutando de su estancia con nosotros.\n\nLe recordamos amablemente que la hora de salida (check-out) es a las {checkout_hora}. Si necesita un poco más de tiempo, por favor háganoslo saber con toda confianza; con gusto buscaremos la manera de acomodarle según la disponibilidad.\n\nQuedamos a sus órdenes.\n\nCon aprecio,\n{hotel}'
       },
+      mp_hora_llegada: {
+        nombre: 'Hora de llegada (Mensajería)',
+        icon: '🕒',
+        texto: '*{hotel}*\n\nEstimado(a) {huesped}:\n\nSerá un gusto recibirle. Le comentamos que el check-in está disponible a partir de las {checkin_hora}.\n\nPara poder recibirle de la mejor manera y tener todo listo a su llegada, nos sería de gran ayuda conocer, de forma aproximada, a qué hora tiene planeado llegar.\n\nQuedamos atentos a su respuesta. Cualquier duda, con gusto le atendemos.\n\nCon aprecio,\n{hotel}'
+      },
       mp_wifi: {
         nombre: 'WiFi (Mensajería)',
         icon: '📶',
@@ -3585,7 +3590,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-11-18a';
+    var APP_BUILD = '2026-11-18b';
 
     // ===== Selectores de fecha entrada→salida: la salida siempre mínimo el día siguiente =====
     function _nextDayStr(ymd) {
@@ -22033,6 +22038,7 @@
       document.getElementById('taskDetailModal').querySelector('.modal-title').textContent = '💬 Contactar huésped';
       var acts = '';
       acts += '<button class="form-button" onclick="sendTemplateWhatsApp(\'instrucciones\',\'' + resId + '\')" style="width:100%;background:#25D366;color:#fff;">Enviar instrucciones + pre-registro</button>';
+      acts += '<button class="form-button secondary" onclick="sendTemplateWhatsApp(\'mp_hora_llegada\',\'' + resId + '\')" style="width:100%;">Preguntar hora de llegada</button>';
       acts += '<button class="form-button secondary" onclick="sendTemplateWhatsApp(\'recordatorio\',\'' + resId + '\')" style="width:100%;">Enviar recordatorio de llegada</button>';
       acts += '<button class="form-button secondary" onclick="_sendRegLinkOnly(\'' + resId + '\')" style="width:100%;">Enviar solo el link de pre-registro</button>';
       acts += '<button class="form-button secondary" onclick="copyGuestLink(\'' + resId + '\')" style="width:100%;">Copiar link de pre-registro</button>';
