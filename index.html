@@ -3590,7 +3590,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-11-18b';
+    var APP_BUILD = '2026-11-18c';
 
     // ===== Selectores de fecha entrada→salida: la salida siempre mínimo el día siguiente =====
     function _nextDayStr(ymd) {
@@ -21992,9 +21992,14 @@
       function row(r, hoy) {
         var pax = (parseInt(r.adultos) || 0) + (parseInt(r.niños != null ? r.niños : r.ninos) || 0);
         var sinConf = (r.estado === 'Reservada') ? ' · <span style="color:#fde68a;">sin confirmar</span>' : '';
+        var _pre = _resPreRegistrado(r.id);
+        var preBadge = _pre
+          ? '<div style="margin-top:4px;"><span style="font-size:10.5px;font-weight:800;color:#0b2a1e;background:#34d399;padding:2px 9px;border-radius:20px;">✅ Pre-registro listo</span></div>'
+          : '<div style="margin-top:4px;"><span style="font-size:10.5px;color:rgba(255,255,255,.72);">⏳ Sin pre-registro aún</span></div>';
         return '<div class="arr-item">'
           + '<div class="arr-info"><div class="arr-name">' + (hoy ? '🛎️ ' : '📅 ') + _wbEsc(r.huesped || '') + '</div>'
-          + '<div class="arr-meta">Hab. ' + _wbEsc(r.habitacionNum || '') + ' · ' + (pax || 1) + ' huésped(es)' + sinConf + '</div></div>'
+          + '<div class="arr-meta">Hab. ' + _wbEsc(r.habitacionNum || '') + ' · ' + (pax || 1) + ' huésped(es)' + sinConf + '</div>'
+          + preBadge + '</div>'
           + '<div style="display:flex;flex-direction:column;gap:6px;flex:0 0 auto;">'
           + '<button class="arr-btn" onclick="openArrivalContact(\'' + r.id + '\')" style="background:#25D366;color:#fff;">Contactar</button>'
           + '<button class="arr-btn" onclick="openReservaModal(\'' + r.id + '\')">Preparar</button>'
@@ -22003,8 +22008,11 @@
       }
       var hoyList = list.filter(function (r) { return String(r.fechaEntrada).substring(0, 10) === today; });
       var manList = list.filter(function (r) { return String(r.fechaEntrada).substring(0, 10) === manana; });
+      var _preCount = list.filter(function (r) { return _resPreRegistrado(r.id); }).length;
       var html = '<div class="arr-alert">';
-      html += '<div class="arr-head"><span class="arr-ic">🛎️</span> <span>Llegadas próximas</span></div>';
+      html += '<div class="arr-head"><span class="arr-ic">🛎️</span> <span>Llegadas próximas</span>'
+        + '<button onclick="_refreshArrivals()" title="Actualizar pre-registros" style="margin-left:auto;background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:20px;padding:5px 12px;font-size:11px;font-weight:800;cursor:pointer;">🔄 Actualizar</button></div>';
+      if (_preCount) html += '<div style="font-size:11px;color:#34d399;font-weight:800;margin:-4px 0 8px;">✅ ' + _preCount + ' de ' + list.length + ' ya hicieron su pre-registro</div>';
       if (hoyList.length) {
         html += '<div class="arr-sub arr-hoy">HOY (' + hoyList.length + ') — ten todo listo</div>';
         html += hoyList.map(function (r) { return row(r, true); }).join('');
@@ -22016,6 +22024,13 @@
       html += '</div>';
       el.innerHTML = html;
       el.style.display = '';
+    }
+
+    // Actualiza desde la hoja quién ya hizo su pre-registro y repinta la alerta de llegadas.
+    async function _refreshArrivals() {
+      await busy(async function () { await _refreshRegistros(); }, 'Actualizando pre-registros...');
+      try { _renderArrivalsAlert(); } catch (e) {}
+      toast('Pre-registros actualizados');
     }
 
     // ============ CONTACTAR AL HUÉSPED DESDE LA ALERTA DE LLEGADAS ============
@@ -22031,6 +22046,28 @@
       h += '<div style="font-weight:700;font-size:15px;">' + _wbEscC(res.huesped || '') + '</div>';
       h += '<div style="font-size:12px;color:var(--text2);margin-top:2px;">Hab. ' + _wbEscC(res.habitacionNum || '') + ' · ' + (phoneDigits ? '📱 ' + _wbEscC(res.telefono || 'tel. registrado') : 'sin teléfono registrado') + '</div>';
       h += '</div>';
+      // Estado del pre-registro: si ya lo llenó, muestra los datos que envió
+      var _pre = _resGuests(resId).filter(function (g) { return String(g.nombre || '').trim(); });
+      if (_pre.length) {
+        h += '<div style="background:rgba(52,211,153,.12);border:1px solid var(--green);padding:12px;border-radius:var(--radius);margin-bottom:12px;">';
+        h += '<div style="font-size:12px;font-weight:800;color:var(--green);margin-bottom:8px;">✅ Pre-registro completado (' + _pre.length + ' persona' + (_pre.length === 1 ? '' : 's') + ')</div>';
+        _pre.forEach(function (g) {
+          var doc = [g.tipoId, g.numId].filter(Boolean).join(' ');
+          h += '<div style="font-size:12px;color:var(--text);line-height:1.5;padding:6px 0;border-top:1px dashed var(--surface3);">';
+          h += '<b>' + _wbEscC(g.nombre) + '</b>';
+          var det = [];
+          if (doc) det.push(doc);
+          if (g.nacionalidad) det.push(_wbEscC(g.nacionalidad));
+          if (g.procedencia) det.push(_wbEscC(g.procedencia));
+          if (g.motivo) det.push(_wbEscC(g.motivo));
+          if (det.length) h += '<div style="font-size:11px;color:var(--text2);">' + det.join(' · ') + '</div>';
+          if (String(g.observaciones || '').trim()) h += '<div style="font-size:11px;color:var(--text2);margin-top:2px;">📝 ' + _wbEscC(g.observaciones) + '</div>';
+          h += '</div>';
+        });
+        h += '</div>';
+      } else {
+        h += '<div style="background:rgba(251,191,36,.1);border:1px solid var(--yellow);padding:10px 12px;border-radius:var(--radius);margin-bottom:12px;font-size:12px;color:var(--text);"><b style="color:var(--yellow);">⏳ Aún sin pre-registro.</b> Envíale el enlace para que complete sus datos antes de llegar.</div>';
+      }
       h += '<div style="font-size:11px;color:var(--text2);margin-bottom:6px;">VISTA PREVIA · Instrucciones + pre-registro</div>';
       h += '<div style="white-space:pre-wrap;font-size:12px;line-height:1.55;color:var(--text);background:var(--surface2);padding:12px;border-radius:10px;max-height:240px;overflow-y:auto;">' + _wbEsc(preview) + '</div>';
       if (!phoneDigits) h += '<div style="font-size:11px;color:var(--yellow);margin-top:8px;">Esta reserva no tiene teléfono. WhatsApp abrirá sin número para que elijas el contacto.</div>';
@@ -23289,6 +23326,10 @@
     // ============ HUÉSPEDES MÚLTIPLES POR RESERVA (nombre + documento) ============
     function _resGuests(resId) {
       return (S.registros || []).filter(function (g) { return String(g.resId) === String(resId); });
+    }
+    // ¿El huésped ya completó su pre-registro? (hay al menos una persona registrada con nombre)
+    function _resPreRegistrado(resId) {
+      return _resGuests(resId).some(function (g) { return String(g.nombre || '').trim(); });
     }
     function _resGuestsSectionHTML(res) {
       if (!res || res.estado === 'Cancelada') return '';
