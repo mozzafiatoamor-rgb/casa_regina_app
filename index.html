@@ -3590,7 +3590,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-11-18c';
+    var APP_BUILD = '2026-11-18d';
 
     // ===== Selectores de fecha entrada→salida: la salida siempre mínimo el día siguiente =====
     function _nextDayStr(ymd) {
@@ -21976,11 +21976,12 @@
       if (!S.user || (S.user.rol !== 'admin' && S.user.rol !== 'recepcion')) { el.innerHTML = ''; el.style.display = 'none'; return; }
       var today = normDate(new Date());
       var manana = normDate(new Date(Date.now() + 86400000));
-      // Reservas que aún NO han hecho check-in y llegan hoy o mañana
+      var pasado = normDate(new Date(Date.now() + 2 * 86400000));
+      // Reservas que aún NO han hecho check-in y llegan hoy, mañana o en 2 días
       var list = (S.reservas || []).filter(function (r) {
         if (r.estado !== 'Confirmada' && r.estado !== 'Reservada') return false;
         var fe = String(r.fechaEntrada || '').substring(0, 10);
-        return fe === today || fe === manana;
+        return fe === today || fe === manana || fe === pasado;
       });
       if (!list.length) { el.innerHTML = ''; el.style.display = 'none'; return; }
       // Orden: primero las de hoy, luego mañana; por habitación
@@ -22008,6 +22009,7 @@
       }
       var hoyList = list.filter(function (r) { return String(r.fechaEntrada).substring(0, 10) === today; });
       var manList = list.filter(function (r) { return String(r.fechaEntrada).substring(0, 10) === manana; });
+      var pasList = list.filter(function (r) { return String(r.fechaEntrada).substring(0, 10) === pasado; });
       var _preCount = list.filter(function (r) { return _resPreRegistrado(r.id); }).length;
       var html = '<div class="arr-alert">';
       html += '<div class="arr-head"><span class="arr-ic">🛎️</span> <span>Llegadas próximas</span>'
@@ -22020,6 +22022,10 @@
       if (manList.length) {
         html += '<div class="arr-sub arr-man">MAÑANA (' + manList.length + ')</div>';
         html += manList.map(function (r) { return row(r, false); }).join('');
+      }
+      if (pasList.length) {
+        html += '<div class="arr-sub arr-man">EN 2 DÍAS · ' + formatDate(pasado) + ' (' + pasList.length + ')</div>';
+        html += pasList.map(function (r) { return row(r, false); }).join('');
       }
       html += '</div>';
       el.innerHTML = html;
