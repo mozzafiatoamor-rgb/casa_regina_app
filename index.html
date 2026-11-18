@@ -3590,7 +3590,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-11-18d';
+    var APP_BUILD = '2026-11-18e';
 
     // ===== Selectores de fecha entrada→salida: la salida siempre mínimo el día siguiente =====
     function _nextDayStr(ymd) {
@@ -22052,8 +22052,8 @@
       h += '<div style="font-weight:700;font-size:15px;">' + _wbEscC(res.huesped || '') + '</div>';
       h += '<div style="font-size:12px;color:var(--text2);margin-top:2px;">Hab. ' + _wbEscC(res.habitacionNum || '') + ' · ' + (phoneDigits ? '📱 ' + _wbEscC(res.telefono || 'tel. registrado') : 'sin teléfono registrado') + '</div>';
       h += '</div>';
-      // Estado del pre-registro: si ya lo llenó, muestra los datos que envió
-      var _pre = _resGuests(resId).filter(function (g) { return String(g.nombre || '').trim(); });
+      // Estado del pre-registro: si ya lo llenó (con datos reales), muestra lo que envió
+      var _pre = _resGuests(resId).filter(_isRealPreReg);
       if (_pre.length) {
         h += '<div style="background:rgba(52,211,153,.12);border:1px solid var(--green);padding:12px;border-radius:var(--radius);margin-bottom:12px;">';
         h += '<div style="font-size:12px;font-weight:800;color:var(--green);margin-bottom:8px;">✅ Pre-registro completado (' + _pre.length + ' persona' + (_pre.length === 1 ? '' : 's') + ')</div>';
@@ -23333,9 +23333,20 @@
     function _resGuests(resId) {
       return (S.registros || []).filter(function (g) { return String(g.resId) === String(resId); });
     }
-    // ¿El huésped ya completó su pre-registro? (hay al menos una persona registrada con nombre)
+    // Una fila de registro cuenta como pre-registro REAL solo si trae datos que el huésped
+    // captura en el formulario (ID, nacionalidad, procedencia o motivo). La fila del titular
+    // que se crea sola al hacer la reserva tiene esos campos vacíos y NO cuenta.
+    function _isRealPreReg(g) {
+      return String(g.nombre || '').trim() && (
+        String(g.numId || '').trim() ||
+        String(g.nacionalidad || '').trim() ||
+        String(g.procedencia || '').trim() ||
+        String(g.motivo || '').trim()
+      );
+    }
+    // ¿El huésped ya completó su pre-registro? (hay al menos una persona con datos reales)
     function _resPreRegistrado(resId) {
-      return _resGuests(resId).some(function (g) { return String(g.nombre || '').trim(); });
+      return _resGuests(resId).some(_isRealPreReg);
     }
     function _resGuestsSectionHTML(res) {
       if (!res || res.estado === 'Cancelada') return '';
