@@ -3463,53 +3463,64 @@
       confirmacion: {
         nombre: 'Confirmación de Reserva',
         icon: '✅',
-        texto: '🏨 *{hotel}*\n_Confirmación de Reservación_\n\nHola *{huesped}* 👋\n\n{estadoLeyenda}\n\n*No. Reservación:* {reservaId}\n*Habitación:* {habitacion} ({tipoHab})\n*Entrada:* {entrada} ({checkin_hora})\n*Salida:* {salida} ({checkout_hora})\n*Noches:* {noches}\n*Huéspedes:* {huespedes}\n─────────────\n*Tarifa/noche:* ${tarifa}\n*Total estancia:* ${total}\n{infoPago}\n─────────────\n\n📍 *Dirección:* {direccion}\n\n_Gracias por elegirnos_ 🌿'
+        texto: '*{hotel}*\nConfirmación de reservación\n\nEstimado(a) {huesped}:\n\n{estadoLeyenda}\n\nNo. de reservación: {reservaId}\nHabitación: {habitacion} ({tipoHab})\nEntrada: {entrada} ({checkin_hora})\nSalida: {salida} ({checkout_hora})\nNoches: {noches}\nHuéspedes: {huespedes}\n\nTarifa por noche: ${tarifa}\nTotal de la estancia: ${total}\n{infoPago}\n\nDirección: {direccion}\n\nSerá un gusto recibirle. Quedamos atentos a cualquier consulta que desee hacernos.\n\nCon aprecio,\n{hotel}'
       },
       recordatorio: {
         nombre: 'Recordatorio (1 día antes)',
         icon: '🔔',
-        texto: '🏨 *{hotel}*\n\nHola *{huesped}* 👋\n\n¡Te esperamos mañana!\n\n*Reservación:* {reservaId}\n*Habitación:* {habitacion} ({tipoHab})\n*Fecha de llegada:* {entrada}\n*Hora de check-in:* {checkin_hora}\n\n📍 *Dirección:* {direccion}\n\n📋 *Recuerda traer:*\n• Identificación oficial\n• Comprobante de pago\n\n{infoPago}\n\n¿Tienes alguna duda? Escríbenos con confianza 😊\n\n_{hotel}_ 🌿'
+        texto: '*{hotel}*\n\nEstimado(a) {huesped}:\n\nLe recordamos con gusto que su llegada está programada para mañana. Será un verdadero placer recibirle.\n\nReservación: {reservaId}\nHabitación: {habitacion} ({tipoHab})\nFecha de llegada: {entrada}\nHora de check-in: {checkin_hora}\n\nDirección: {direccion}\n\nLe agradeceremos tener a la mano una identificación oficial y su comprobante de pago para agilizar su registro.\n{infoPago}\n\nSi tiene cualquier duda, con gusto le atenderemos.\n\nCon aprecio,\n{hotel}'
       },
       instrucciones: {
         nombre: 'Instrucciones de Llegada',
         icon: '📍',
-        texto: '🏨 *{hotel}*\n_Instrucciones de llegada_\n\nHola *{huesped}* 👋\n\n¡Bienvenido(a)! Aquí tienes la info para tu llegada:\n\n📍 *Ubicación:* {direccion}\n🕐 *Check-in:* {checkin_hora}\n🔑 *Check-out:* {checkout_hora}\n\n📶 *WiFi:*\nRed: {wifi_red}\nContraseña: {wifi_pass}\n\n📋 *Políticas:*\n• No fumar en habitaciones\n• Horario de silencio: 10 PM - 8 AM\n• Mascotas: consultar disponibilidad\n\nCualquier duda estamos para servirte 😊\n\n_{hotel}_ 🌿'
+        texto: '*{hotel}*\nInstrucciones de llegada\n\nEstimado(a) {huesped}:\n\nSerá un gusto recibirle. A continuación le compartimos la información necesaria para su llegada.\n\nDirección: {direccion}\nCheck-in: {checkin_hora}\nCheck-out: {checkout_hora}\n\nPara agilizar su registro, le agradeceremos completar su pre-registro en el siguiente enlace antes de su llegada:\n{linkRegistro}\n\nWiFi\nRed: {wifi_red}\nContraseña: {wifi_pass}\n\nQuedamos a sus órdenes para cualquier necesidad durante su estancia.\n\nCon aprecio,\n{hotel}'
       },
       despedida: {
         nombre: 'Despedida + Reseña',
         icon: '⭐',
-        texto: '🏨 *{hotel}*\n\nHola *{huesped}* 👋\n\n¡Gracias por hospedarte con nosotros! Esperamos que tu estancia haya sido muy agradable.\n\nNos encantaría conocer tu opinión. Si tienes un momento, déjanos tu reseña aquí:\n⭐ {reviewLink}\n\n¡Tu feedback nos ayuda a mejorar! 🙏\n\nEsperamos verte pronto de nuevo 🌿\n\n_{hotel}_'
+        texto: '*{hotel}*\n\nEstimado(a) {huesped}:\n\nLe agradecemos sinceramente por habernos permitido ser sus anfitriones. Esperamos de corazón que su estancia haya sido cómoda y placentera.\n\nSi lo desea, nos encantaría conocer su opinión; su comentario nos ayuda a seguir mejorando:\n{reviewLink}\n\nSerá un honor recibirle nuevamente.\n\nCon aprecio,\n{hotel}'
       },
       mp_welcome: {
         nombre: 'Bienvenida (Mensajería)',
         icon: '👋',
-        texto: '🏨 *{hotel}*\n\n¡Hola *{huesped}*! 👋\n\n¡Bienvenido(a)! Nos da mucho gusto recibirte.\n\nTu habitación *{habitacion}* está lista para ti.\n\n📅 Salida: {salida}\n🕐 Hora de check-out: {checkout_hora}\n\nCualquier cosa que necesites, estamos a tus órdenes 😊\n\n_{hotel}_ 🌿'
+        texto: '*{hotel}*\n\nEstimado(a) {huesped}:\n\nLe damos la más cordial bienvenida. Es un gusto tenerle con nosotros.\n\nSu habitación {habitacion} está lista para recibirle.\n\nSalida: {salida}\nHora de check-out: {checkout_hora}\n\nQuedamos a sus órdenes para cualquier cosa que necesite durante su estancia.\n\nCon aprecio,\n{hotel}'
+      },
+      mp_checkout_flex: {
+        nombre: 'Check-out flexible (Mensajería)',
+        icon: '🕚',
+        texto: '*{hotel}*\n\nEstimado(a) {huesped}:\n\nEsperamos que esté disfrutando de su estancia con nosotros.\n\nLe recordamos amablemente que la hora de salida (check-out) es a las {checkout_hora}. Si necesita un poco más de tiempo, por favor háganoslo saber con toda confianza; con gusto buscaremos la manera de acomodarle según la disponibilidad.\n\nQuedamos a sus órdenes.\n\nCon aprecio,\n{hotel}'
       },
       mp_wifi: {
         nombre: 'WiFi (Mensajería)',
         icon: '📶',
-        texto: '📶 *WiFi {hotel}*\n\n🌐 Red: *{wifi_red}*\n🔑 Contraseña: *{wifi_pass}*\n\n¡Disfruta tu conexión! 😊'
+        texto: '*{hotel}*\nAcceso a la red WiFi\n\nRed: {wifi_red}\nContraseña: {wifi_pass}\n\nCon gusto le asistimos si requiere apoyo para conectarse.'
       },
       mp_horarios: {
         nombre: 'Horarios e Info (Mensajería)',
         icon: '🕐',
-        texto: '🏨 *{hotel}*\n_Información importante_\n\n🔑 *Check-in:* {checkin_hora}\n👋 *Check-out:* {checkout_hora}\n\n📍 *Dirección:* {direccion}\n📞 *Teléfono:* {telefono}\n\n_Estamos para servirte_ 🌿'
+        texto: '*{hotel}*\nInformación de su estancia\n\nCheck-in: {checkin_hora}\nCheck-out: {checkout_hora}\n\nDirección: {direccion}\nTeléfono: {telefono}\n\nQuedamos a sus órdenes para lo que necesite.\n\nCon aprecio,\n{hotel}'
       },
       mp_reglamento: {
         nombre: 'Reglamento (Mensajería)',
         icon: '📋',
-        texto: '📋 *Reglamento {hotel}*\n\n1️⃣ Horario de silencio: 10:00 PM – 8:00 AM\n2️⃣ No fumar dentro de las habitaciones\n3️⃣ No se permiten fiestas o reuniones\n4️⃣ Mascotas: consultar disponibilidad\n5️⃣ Respetar las áreas comunes\n6️⃣ Reportar cualquier daño\n7️⃣ Objetos de valor en caja de seguridad\n\nGracias por tu comprensión 🙏\n_{hotel}_ 🌿'
+        texto: '*{hotel}*\nReglamento interno\n\nCon el fin de que todos nuestros huéspedes disfruten de una estancia agradable, le agradecemos considerar lo siguiente:\n\n1. Horario de silencio: 10:00 p. m. a 8:00 a. m.\n2. No está permitido fumar dentro de las habitaciones.\n3. No se permiten fiestas ni reuniones.\n4. Mascotas: sujeto a disponibilidad, favor de consultar.\n5. Le pedimos cuidar las áreas comunes.\n6. Agradecemos reportar cualquier desperfecto.\n7. Puede resguardar objetos de valor en recepción.\n\nAgradecemos su comprensión.\n\nCon aprecio,\n{hotel}'
       }
     };
+    // Versión de las plantillas: al cambiar, se aplican los nuevos textos por defecto
+    // aunque exista una copia anterior guardada (a menos que el usuario las haya re-editado).
+    var MSG_TPL_VERSION = 'v2-2026-11-18';
 
     // Obtener/guardar plantillas (localStorage)
     function getMsgTemplates() {
       var defaults = JSON.parse(JSON.stringify(DEFAULT_MSG_TEMPLATES));
       try {
+        var ver = localStorage.getItem('msgTplVer');
         var saved = localStorage.getItem('msgTemplates');
-        if (saved) {
+        // Solo respeta la copia guardada si fue editada en ESTA versión de plantillas.
+        // Si es de una versión anterior (o no hay versión), se usan los nuevos textos por defecto.
+        if (saved && ver === MSG_TPL_VERSION) {
           var parsed = JSON.parse(saved);
-          // Merge: saved keys override defaults, new default keys are added
+          // Merge: las guardadas mandan, y se agregan las nuevas plantillas por defecto
           Object.keys(defaults).forEach(function(k) {
             if (!parsed[k]) parsed[k] = defaults[k];
           });
@@ -3521,6 +3532,7 @@
 
     function saveMsgTemplates(templates) {
       localStorage.setItem('msgTemplates', JSON.stringify(templates));
+      try { localStorage.setItem('msgTplVer', MSG_TPL_VERSION); } catch(e) {}
       syncConfigToSheet('msgTemplates', templates);
     }
 
@@ -3573,7 +3585,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-11-14g';
+    var APP_BUILD = '2026-11-18a';
 
     // ===== Selectores de fecha entrada→salida: la salida siempre mínimo el día siguiente =====
     function _nextDayStr(ymd) {
@@ -3773,27 +3785,27 @@
       var _st = _resConfStatus(res);
 
       var estadoLeyenda = _st.confirmed
-        ? 'Tu reservación está *confirmada* ✅:'
-        : '⏳ Tu reservación quedó *apartada*, pero *aún NO está confirmada*. Se confirma únicamente al recibir el anticipo o la liquidación:';
+        ? 'Nos complace confirmar su reservación con los siguientes detalles:'
+        : 'Su reservación ha quedado apartada. Para confirmarla es necesario recibir el anticipo o la liquidación total; en cuanto se registre el pago, le enviaremos la confirmación correspondiente:';
 
       var _pagos = _resPagos(res.id);
       var infoPago = '';
       if (_pagos.length) {
-        infoPago += '💳 *Abonos:*\n';
+        infoPago += '*Pagos registrados:*\n';
         _pagos.forEach(function (p) { infoPago += '• ' + _resPagoLabel(p) + ': $' + _fmt(p.monto) + '\n'; });
         infoPago += '*Total abonado:* $' + _fmt(totalPaid) + '\n';
         if (_st.liquidado) {
-          infoPago += '*Saldo:* $0.00 ✅ _(liquidado)_';
+          infoPago += '*Saldo:* $0.00 (liquidado)';
         } else {
           infoPago += '*Saldo pendiente:* $' + _fmt(balance);
           if (!_st.confirmed && aPct > 0 && totalPaid < anticipoMin) {
-            infoPago += '\n⏳ *Falta para confirmar (anticipo ' + aPct + '%):* $' + _fmt(Math.round((anticipoMin - totalPaid) * 100) / 100);
+            infoPago += '\n*Falta para confirmar (anticipo ' + aPct + '%):* $' + _fmt(Math.round((anticipoMin - totalPaid) * 100) / 100);
           }
         }
       } else if (aPct > 0) {
-        infoPago = '*Anticipo para confirmar (' + aPct + '%):* $' + _fmt(anticipoMin) + '\n*o liquidación total:* $' + _fmt(res.tarifaTotal) + '\n\n⚠️ _Sin abonos todavía. Tu reservación se confirma al recibir el anticipo o el pago total._';
+        infoPago = '*Anticipo para confirmar (' + aPct + '%):* $' + _fmt(anticipoMin) + '\n*o liquidación total:* $' + _fmt(res.tarifaTotal) + '\n\n_Aún no se registran abonos. Su reservación se confirma al recibir el anticipo o el pago total._';
       } else {
-        infoPago = '*Total a pagar:* $' + _fmt(res.tarifaTotal) + '\n_Sin abonos todavía._';
+        infoPago = '*Total a pagar:* $' + _fmt(res.tarifaTotal) + '\n_Aún no se registran abonos._';
       }
 
       var huespedes = res.adultos + ' adulto(s)';
@@ -3830,6 +3842,7 @@
       text = text.replace(/\{reviewLink\}/g, hi.reviewLink || '[Configura tu link de reseñas en Ajustes]');
       text = text.replace(/\{wifi_red\}/g, hi.wifi_red || '[Configura WiFi en Ajustes]');
       text = text.replace(/\{wifi_pass\}/g, hi.wifi_pass || '[Configura WiFi en Ajustes]');
+      text = text.replace(/\{linkRegistro\}/g, (typeof getGuestRegistrationLink === 'function' ? getGuestRegistrationLink(res.id) : ''));
       return text;
     }
 
@@ -14387,7 +14400,7 @@
 
       var h = '<div style="margin-bottom:16px">';
       h += '<div class="section-title">Plantillas de Mensajes</div>';
-      h += '<div style="font-size:12px;color:var(--text2);margin-bottom:16px">Edita las plantillas que se envían por WhatsApp a los huéspedes. Usa variables entre llaves: {huesped}, {habitacion}, {entrada}, {salida}, {noches}, {tarifa}, {total}, {infoPago}, {huespedes}, {reservaId}, {tipoHab}</div>';
+      h += '<div style="font-size:12px;color:var(--text2);margin-bottom:16px">Edita las plantillas que se envían por WhatsApp a los huéspedes. Usa variables entre llaves: {huesped}, {habitacion}, {entrada}, {salida}, {noches}, {tarifa}, {total}, {infoPago}, {huespedes}, {reservaId}, {tipoHab}, {checkin_hora}, {checkout_hora}, {direccion}, {telefono}, {wifi_red}, {wifi_pass}, {reviewLink}, {linkRegistro}</div>';
       h += '</div>';
 
       keys.forEach(function(key) {
@@ -21977,7 +21990,10 @@
         return '<div class="arr-item">'
           + '<div class="arr-info"><div class="arr-name">' + (hoy ? '🛎️ ' : '📅 ') + _wbEsc(r.huesped || '') + '</div>'
           + '<div class="arr-meta">Hab. ' + _wbEsc(r.habitacionNum || '') + ' · ' + (pax || 1) + ' huésped(es)' + sinConf + '</div></div>'
+          + '<div style="display:flex;flex-direction:column;gap:6px;flex:0 0 auto;">'
+          + '<button class="arr-btn" onclick="openArrivalContact(\'' + r.id + '\')" style="background:#25D366;color:#fff;">Contactar</button>'
           + '<button class="arr-btn" onclick="openReservaModal(\'' + r.id + '\')">Preparar</button>'
+          + '</div>'
           + '</div>';
       }
       var hoyList = list.filter(function (r) { return String(r.fechaEntrada).substring(0, 10) === today; });
@@ -21995,6 +22011,45 @@
       html += '</div>';
       el.innerHTML = html;
       el.style.display = '';
+    }
+
+    // ============ CONTACTAR AL HUÉSPED DESDE LA ALERTA DE LLEGADAS ============
+    // Abre un panel para enviar instrucciones + link de pre-registro por WhatsApp.
+    function openArrivalContact(resId) {
+      var res = S.reservas.find(function (r) { return r.id === resId; });
+      if (!res) { toast('Reserva no encontrada', true); return; }
+      var phoneDigits = getGuestPhone(res).replace(/\D/g, '');
+      var preview = renderMsgTemplate('instrucciones', resId);
+      var h = '';
+      h += '<div style="background:var(--surface3);padding:12px;border-radius:var(--radius);margin-bottom:12px;">';
+      h += '<div style="font-size:11px;color:var(--text2);">HUÉSPED</div>';
+      h += '<div style="font-weight:700;font-size:15px;">' + _wbEscC(res.huesped || '') + '</div>';
+      h += '<div style="font-size:12px;color:var(--text2);margin-top:2px;">Hab. ' + _wbEscC(res.habitacionNum || '') + ' · ' + (phoneDigits ? '📱 ' + _wbEscC(res.telefono || 'tel. registrado') : 'sin teléfono registrado') + '</div>';
+      h += '</div>';
+      h += '<div style="font-size:11px;color:var(--text2);margin-bottom:6px;">VISTA PREVIA · Instrucciones + pre-registro</div>';
+      h += '<div style="white-space:pre-wrap;font-size:12px;line-height:1.55;color:var(--text);background:var(--surface2);padding:12px;border-radius:10px;max-height:240px;overflow-y:auto;">' + _wbEsc(preview) + '</div>';
+      if (!phoneDigits) h += '<div style="font-size:11px;color:var(--yellow);margin-top:8px;">Esta reserva no tiene teléfono. WhatsApp abrirá sin número para que elijas el contacto.</div>';
+      document.getElementById('taskDetailContent').innerHTML = h;
+      document.getElementById('taskDetailModal').querySelector('.modal-title').textContent = '💬 Contactar huésped';
+      var acts = '';
+      acts += '<button class="form-button" onclick="sendTemplateWhatsApp(\'instrucciones\',\'' + resId + '\')" style="width:100%;background:#25D366;color:#fff;">Enviar instrucciones + pre-registro</button>';
+      acts += '<button class="form-button secondary" onclick="sendTemplateWhatsApp(\'recordatorio\',\'' + resId + '\')" style="width:100%;">Enviar recordatorio de llegada</button>';
+      acts += '<button class="form-button secondary" onclick="_sendRegLinkOnly(\'' + resId + '\')" style="width:100%;">Enviar solo el link de pre-registro</button>';
+      acts += '<button class="form-button secondary" onclick="copyGuestLink(\'' + resId + '\')" style="width:100%;">Copiar link de pre-registro</button>';
+      acts += '<button class="form-button secondary" onclick="closeModal()" style="width:100%;">Cerrar</button>';
+      document.getElementById('taskDetailActions').innerHTML = acts;
+      openModal('taskDetailModal');
+    }
+    // Mensaje breve y formal solo con el link de pre-registro.
+    function _sendRegLinkOnly(resId) {
+      var res = S.reservas.find(function (r) { return r.id === resId; });
+      if (!res) { toast('Reserva no encontrada', true); return; }
+      var link = getGuestRegistrationLink(resId);
+      var hi = getHotelInfo();
+      var nombre = (typeof _firstName === 'function' ? _firstName(res.huesped) : res.huesped) || '';
+      var msg = '*' + (hi.nombre || HOTEL_NAME) + '*\n\nEstimado(a) ' + nombre + ':\n\nPara agilizar su registro a la llegada, le agradeceremos completar su pre-registro en el siguiente enlace:\n' + link + '\n\nQuedamos a sus órdenes para cualquier duda.\n\nCon aprecio,\n' + (hi.nombre || HOTEL_NAME);
+      var phone = getGuestPhone(res).replace(/\D/g, '');
+      window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(msg), '_blank');
     }
 
     // ============ FACTURA POR HUÉSPED (mensaje/enlace guardado en la reserva) ============
@@ -23879,6 +23934,8 @@
         acts += '<button class="form-button" onclick="grpBulkCheckin(\'' + groupId + '\')" style="flex:1;background:var(--blue);color:#fff;">🔑 Check-in de las seleccionadas</button>';
         acts += '</div>';
       }
+      var _coRooms = t.reservas.filter(function(r){ return r.estado === 'Check-in'; });
+      if (_coRooms.length) acts += '<button class="form-button" onclick="grpBulkCheckout(\'' + groupId + '\')" style="width:100%;background:#b45309;color:#fff;">🚪 Check-out del grupo (' + _coRooms.length + ' habitación(es))</button>';
       var _pendConfirm = t.reservas.filter(function(r){ return r.estado === 'Reservada'; });
       if (_pendConfirm.length) acts += '<button class="form-button" onclick="confirmarGrupo(\'' + groupId + '\')" style="width:100%;background:var(--green);color:#fff;">✅ Confirmar ' + _pendConfirm.length + ' habitación(es) del grupo</button>';
       if (t.balance > 0.01) acts += '<button class="form-button" onclick="openGroupPayment(\'' + groupId + '\')" style="width:100%;background:var(--accent);color:var(--bg);">💰 Cobrar grupo ($' + _fmt(t.balance) + ')</button>';
@@ -23977,6 +24034,60 @@
         render();
         setTimeout(function () { openGroupSummary(groupId); }, 300);
       }, 'Haciendo check-in del grupo...');
+    }
+
+    // Check-out de TODAS las habitaciones del grupo que están en check-in, de un solo movimiento.
+    async function grpBulkCheckout(groupId) {
+      var rs = _groupRoomsSorted(groupId).filter(function (r) { return r.estado === 'Check-in'; });
+      if (!rs.length) { toast('No hay habitaciones del grupo en check-in para dar salida', false); return; }
+      var items = [], conAdeudo = [], early = [];
+      rs.forEach(function (res) {
+        var room = S.rooms.find(function (r) { return r.numero === res.habitacionNum; });
+        if (!room) return;
+        var paid = (S.cobros || []).filter(function (c) { return c.reservaId === res.id; }).reduce(function (s, c) { return s + c.monto; }, 0);
+        var bal = res.tarifaTotal - paid;
+        if (bal > 0.01) conAdeudo.push('Hab. ' + res.habitacionNum + ' ($' + _fmt(bal) + ')');
+        var isEarly = (typeof _resIsEarlyDeparture === 'function') ? _resIsEarlyDeparture(res) : false;
+        if (isEarly) early.push('Hab. ' + res.habitacionNum);
+        items.push({ res: res, room: room, early: isEarly });
+      });
+      if (!items.length) { toast('No hay habitaciones válidas para check-out', true); return; }
+      var msg = 'Vas a dar check-out a ' + items.length + ' habitación(es) del grupo:\n' + items.map(function (it) { return '• Hab. ' + it.res.habitacionNum + ' — ' + it.res.huesped; }).join('\n');
+      if (conAdeudo.length) msg += '\n\n⚠️ Con saldo pendiente: ' + conAdeudo.join(', ') + '.';
+      if (early.length) msg += '\n\n🚪 Salida anticipada, sin reembolso: ' + early.join(', ') + '.';
+      msg += '\n\nCada habitación pasará a limpieza. ¿Confirmar el check-out del grupo?';
+      if (!confirm(msg)) return;
+      await busy(async function () {
+        var n = now();
+        var today = normDate(new Date());
+        var _hkNums = (S.housekeeping || []).map(function (x) { return parseInt((x.id || '0').replace(/\D/g, '')) || 0; });
+        var _hkNext = (_hkNums.length ? Math.max.apply(null, _hkNums) : 0) + 1;
+        var ops = [];
+        items.forEach(function (it) {
+          var res = it.res, room = it.room;
+          var notas = res.notas;
+          if (it.early && String(notas || '').indexOf('[SALIDA_ANTICIPADA') === -1) {
+            notas = (notas ? notas + ' | ' : '') + '[SALIDA_ANTICIPADA:' + today + ' sin reembolso]';
+          }
+          it._notas = notas;
+          it._taskId = 'HK' + String(_hkNext++).padStart(4, '0');
+          ops.push({ type: 'updateById', sheet: '📋 Reservas', id: res.id, values: [res.id, res.habitacionNum, res.huesped, res.telefono, res.email, res.fechaEntrada, res.fechaSalida, res.adultos, res.niños, res.tarifa, res.tarifaTotal, 'Check-out', notas, res.creadoPor, res.fechaCreacion] });
+          ops.push({ type: 'updateById', sheet: '🏨 Habitaciones', id: room.id, values: [room.id, room.numero, room.tipo, room.tarifa, 'Limpieza', room.notas] });
+          ops.push({ type: 'append', sheet: '🧹 Housekeeping', values: [it._taskId, today, res.habitacionNum, 'Limpieza Check-out', 'Alta', 'Pendiente', '', '', '', '', '', ''] });
+        });
+        ops.push({ type: 'append', sheet: '📜 Bitácora', values: [today, n.split(' ')[1], S.user.usuario, 'Check-out de grupo', 'Check-out de ' + items.length + ' habitación(es) del grupo (' + _groupTitular(groupId) + ')' + (conAdeudo.length ? ' · con adeudo: ' + conAdeudo.join(', ') : '') + (early.length ? ' · salida anticipada: ' + early.join(', ') : ''), (conAdeudo.length || early.length) ? 'warning' : 'info'] });
+        await sheets.multi(ops);
+        items.forEach(function (it) {
+          var ri = S.reservas.findIndex(function (r) { return r.id === it.res.id; });
+          if (ri !== -1) { S.reservas[ri].estado = 'Check-out'; S.reservas[ri].notas = it._notas; }
+          var ki = S.rooms.findIndex(function (r) { return r.numero === it.res.habitacionNum; });
+          if (ki !== -1) S.rooms[ki].estado = 'Limpieza';
+          S.housekeeping.push({ id: it._taskId, fecha: today, habitacionNum: it.res.habitacionNum, tarea: 'Limpieza Check-out', prioridad: 'Alta', estado: 'Pendiente', asignadoA: '', notas: '', horaInicio: '', horaFin: '', verificado: '', checklist: '' });
+        });
+        toast('✅ Check-out de ' + items.length + ' habitación(es) del grupo');
+        closeModal();
+        render();
+      }, 'Haciendo check-out del grupo...');
     }
 
     // Inserta/actualiza la etiqueta [TITULAR:...] en las notas (justo tras [GRUPO:...] si existe).
