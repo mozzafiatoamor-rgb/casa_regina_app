@@ -3590,7 +3590,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-11-18e';
+    var APP_BUILD = '2026-11-19a';
 
     // ===== Selectores de fecha entrada→salida: la salida siempre mínimo el día siguiente =====
     function _nextDayStr(ymd) {
@@ -4226,10 +4226,34 @@
 
       try {
         var regRow = [regId, r.id, nombre, r.habitacionNum, today, tipoId, numId, nacionalidad, procedencia, motivo, observaciones, ts];
-        await fetch(S.scriptUrl, {
-          method: 'POST',
-          body: JSON.stringify({ sheet: '📝 Registro', values: [regRow] })
-        });
+        // Evitar DUPLICADO: al crear la reserva se genera una fila del titular solo con el
+        // nombre (sin datos). Si existe esa fila, actualizamos ESA en vez de agregar una nueva.
+        var _existingRegId = '';
+        try {
+          var _rdG = S._publicMode ? function (sh, rg) { return publicRead(S.scriptUrl, sh, rg); } : function (sh, rg) { return sheets.read(sh, rg); };
+          var _regs = await _rdG('📝 Registro', 'A2:M5000').catch(function () { return []; });
+          var _nn = function (s) { return String(s || '').trim().toLowerCase(); };
+          var _sinDatos = function (rr) {
+            return !(String(rr[6] || '').trim() || String(rr[7] || '').trim() || String(rr[8] || '').trim() || String(rr[9] || '').trim());
+          };
+          var _mios = (_regs || []).filter(function (rr) { return String(rr[1]) === String(r.id) && _sinDatos(rr); });
+          var _pick = _mios.filter(function (rr) { return _nn(rr[2]) === _nn(r.huesped); })[0]
+                   || _mios.filter(function (rr) { return _nn(rr[2]) === _nn(nombre); })[0]
+                   || _mios[0];
+          if (_pick && _pick[0]) _existingRegId = String(_pick[0]);
+        } catch (e) {}
+        if (_existingRegId) {
+          regRow[0] = _existingRegId; // conservar el mismo regId del titular
+          await fetch(S.scriptUrl, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'multi', operations: [{ type: 'updateById', sheet: '📝 Registro', id: _existingRegId, values: regRow }] })
+          });
+        } else {
+          await fetch(S.scriptUrl, {
+            method: 'POST',
+            body: JSON.stringify({ sheet: '📝 Registro', values: [regRow] })
+          });
+        }
         showGuestConfirmation(nombre, telefono, r);
       } catch(e) {
         btn.disabled = false;
@@ -4243,7 +4267,7 @@
       h += '<div style="text-align:center;margin-bottom:20px;">';
       h += '<img src="' + LOGO_V_DARK + '" style="width:180px;object-fit:contain;margin-bottom:14px;">';
       h += '<div style="font-size:48px;margin-bottom:8px;">✅</div>';
-      h += '<h2 style="margin:0 0 6px;font-size:20px;">¡Gracias, ' + nombre + '!</h2>';
+      h += '<h2 style="margin:0 0 6px;font-size:20px;">¡Gracias, ' + (typeof _firstName === 'function' ? _firstName(nombre) : nombre) + '!</h2>';
       h += '<div style="font-size:13px;color:var(--text2);">Tu pre-registro ha sido enviado con éxito.</div>';
       h += '</div>';
 
@@ -4566,7 +4590,8 @@
     function shareGuestLinkWhatsApp(resId) {
       var res = S.reservas.find(function(r) { return r.id === resId; });
       var link = getGuestRegistrationLink(resId);
-      var text = '¡Hola ' + res.huesped + '! 🏨\n\nPara agilizar tu check-in en *' + HOTEL_NAME + '*, por favor completa tu pre-registro en este enlace:\n\n' + link + '\n\n¡Te esperamos! 🌟';
+      var _hn = (getHotelInfo().nombre || HOTEL_NAME);
+      var text = '*' + _hn + '*\n\nEstimado(a) ' + _firstName(res.huesped) + ':\n\nSerá un gusto recibirle. Para agilizar su registro a la llegada, le agradeceremos completar su pre-registro en el siguiente enlace:\n\n' + link + '\n\nQuedamos a sus órdenes para cualquier duda.\n\nCon aprecio,\n' + _hn;
       var phone = getGuestPhone(res).replace(/[^0-9]/g, '');
       if (phone.length === 10) phone = '52' + phone;
       window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(text), '_blank');
@@ -20328,12 +20353,13 @@
       h += '<div style="font-size:12px;color:var(--text2);">' + res.huesped + ' · Hab. ' + res.habitacionNum + '</div>';
       h += '</div>';
 
-      // Thank you + review message
-      var thankText = '¡Hola ' + res.huesped.split(' ')[0] + '! 🌟\n\nGracias por hospedarte en *' + HOTEL_NAME + '*. Esperamos que tu estancia haya sido increíble.\n\n';
+      // Thank you + review message (solo nombre, cálido y formal)
+      var _hnPS = (getHotelInfo().nombre || HOTEL_NAME);
+      var thankText = '*' + _hnPS + '*\n\nEstimado(a) ' + _firstName(res.huesped) + ':\n\nLe agradecemos sinceramente por habernos permitido ser sus anfitriones. Esperamos de corazón que su estancia haya sido muy placentera.\n\n';
       if (reviewUrl) {
-        thankText += '¿Nos ayudarías con una reseña? Significa mucho para nosotros:\n' + reviewUrl + '\n\n';
+        thankText += 'Si lo desea, nos encantaría conocer su opinión; su comentario nos ayuda a seguir mejorando:\n' + reviewUrl + '\n\n';
       }
-      thankText += '¡Esperamos verte de nuevo pronto! 🏨';
+      thankText += 'Será un honor recibirle nuevamente.\n\nCon aprecio,\n' + _hnPS;
 
       h += '<div style="background:var(--surface3);padding:12px;border-radius:var(--radius);margin-bottom:10px;">';
       h += '<div style="font-size:12px;color:var(--text2);margin-bottom:6px;">MENSAJE DE AGRADECIMIENTO' + (reviewUrl ? ' + RESEÑA' : '') + '</div>';
@@ -21639,7 +21665,7 @@
     // Lista de huéspedes de una reserva para generar UN código por huésped por noche.
     // Usa los huéspedes registrados; si no hay, usa el conteo de adultos con nombres genéricos.
     function _resGuestList(res) {
-      var reg = (typeof _resGuests === 'function') ? _resGuests(res.id) : [];
+      var reg = (typeof _resGuestsDedup === 'function') ? _resGuestsDedup(res.id) : [];
       if (reg && reg.length) return reg.map(function (g) { return { nombre: g.nombre, regId: g.regId }; });
       var num = parseInt(res.adultos) || 1;
       var arr = [];
@@ -22193,7 +22219,7 @@
       if (!res) { toast('Reserva no encontrada', true); return; }
       var guests = _resGuestList(res);
       var nights = Math.max(daysUntil(res.fechaEntrada, res.fechaSalida), 1);
-      var reg = (typeof _resGuests === 'function') ? _resGuests(res.id) : [];
+      var reg = (typeof _resGuestsDedup === 'function') ? _resGuestsDedup(res.id) : [];
       var fuente = reg.length ? (guests.length + ' huésped(es) registrado(s)') : (guests.length + ' huésped(es) por adultos de la reserva');
       if (!confirm('Se generará UN código por huésped por noche:\n\n' + guests.length + ' huésped(es) × ' + nights + ' noche(s) = ' + (guests.length * nights) + ' códigos.\n(' + fuente + ')\n\n' + (reg.length ? '' : 'Tip: registra los nombres de los huéspedes en la ficha para códigos personalizados.\n\n') + '¿Continuar?')) return;
       await busy(async function() {
@@ -23348,9 +23374,18 @@
     function _resPreRegistrado(resId) {
       return _resGuests(resId).some(_isRealPreReg);
     }
+    // Lista de huéspedes SIN duplicados: si existe una fila con datos reales, se oculta la
+    // fila "placeholder" (solo nombre) del mismo huésped que se creó al hacer la reserva.
+    function _resGuestsDedup(resId) {
+      var gs = _resGuests(resId);
+      var nn = function (s) { return String(s || '').trim().toLowerCase(); };
+      var real = {};
+      gs.forEach(function (g) { if (_isRealPreReg(g)) real[nn(g.nombre)] = true; });
+      return gs.filter(function (g) { return !(!_isRealPreReg(g) && real[nn(g.nombre)]); });
+    }
     function _resGuestsSectionHTML(res) {
       if (!res || res.estado === 'Cancelada') return '';
-      var guests = _resGuests(res.id);
+      var guests = _resGuestsDedup(res.id);
       var adultos = parseInt(res.adultos) || 0;
       var ninos = parseInt(res.niños != null ? res.niños : res.ninos) || 0;
       var target = (adultos + ninos) || adultos || 1;
@@ -23949,7 +23984,7 @@
         h += '<div style="text-align:right;font-size:12px;"><div style="color:var(--green);">Pagado $' + _fmt(b.paid) + '</div><div style="color:' + (b.balance > 0 ? 'var(--red)' : 'var(--green)') + ';font-weight:700;">Saldo $' + _fmt(b.balance) + '</div></div>';
         h += '</div>';
         // Huéspedes ya pre-registrados (del link del encargado o del registro manual)
-        var _rg = _resGuests(r.id).filter(function (g) { return String(g.nombre || '').trim(); });
+        var _rg = _resGuestsDedup(r.id).filter(function (g) { return String(g.nombre || '').trim(); });
         if (_rg.length) {
           h += '<div style="margin-top:7px;padding:7px 9px;background:var(--surface3);border-radius:6px;">';
           h += '<div style="font-size:10px;color:var(--text2);margin-bottom:3px;">👤 Registrados (' + _rg.length + '):</div>';
