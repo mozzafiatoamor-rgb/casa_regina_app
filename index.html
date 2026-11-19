@@ -3590,7 +3590,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-11-19a';
+    var APP_BUILD = '2026-11-19c';
 
     // ===== Selectores de fecha entrada→salida: la salida siempre mínimo el día siguiente =====
     function _nextDayStr(ymd) {
@@ -14845,6 +14845,13 @@
       h += '<button class="form-button" onclick="syncAllConfigToSheet()" style="width:100%;background:var(--accent);color:var(--bg)">☁️ Subir config de este dispositivo al Sheet</button>';
       h += '</div>';
 
+      // Mantenimiento de datos
+      h += '<div style="background:var(--surface2);border-radius:var(--radius);padding:16px;margin-bottom:12px">';
+      h += '<div style="font-weight:700;font-size:14px;margin-bottom:6px">🧹 Mantenimiento de datos</div>';
+      h += '<div style="font-size:11px;color:var(--text2);margin-bottom:10px">Revisa y une nombres de huéspedes repetidos en una misma reservación (conserva el registro más completo y elimina los duplicados).</div>';
+      h += '<button class="form-button secondary" onclick="limpiarRegistrosDuplicados()" style="width:100%;">🔎 Revisar y limpiar duplicados</button>';
+      h += '</div>';
+
       // Session info
       h += '<div style="background:var(--surface2);border-radius:var(--radius);padding:16px;margin-bottom:12px">';
       h += '<div style="font-weight:700;font-size:14px;margin-bottom:10px">👤 Sesión Actual</div>';
@@ -23383,6 +23390,60 @@
       gs.forEach(function (g) { if (_isRealPreReg(g)) real[nn(g.nombre)] = true; });
       return gs.filter(function (g) { return !(!_isRealPreReg(g) && real[nn(g.nombre)]); });
     }
+    // Qué tan "completo" está un registro (para elegir cuál conservar al unir duplicados).
+    function _regScore(g) {
+      var s = 0;
+      if (String(g.numId || '').trim()) s += 4;
+      if (String(g.nacionalidad || '').trim()) s += 2;
+      if (String(g.tipoId || '').trim()) s += 1;
+      if (String(g.procedencia || '').trim()) s += 1;
+      if (String(g.motivo || '').trim()) s += 1;
+      if (String(g.observaciones || '').trim()) s += 1;
+      if (String(g.telefono || '').trim()) s += 1;
+      return s;
+    }
+    // Encuentra grupos de registros duplicados: misma reservación + mismo nombre (normalizado).
+    function _findRegDuplicates() {
+      var byKey = {};
+      (S.registros || []).forEach(function (g) {
+        var name = String(g.nombre || '').trim();
+        if (!name) return;
+        var key = String(g.resId) + '||' + name.toLowerCase();
+        (byKey[key] = byKey[key] || []).push(g);
+      });
+      var dups = [];
+      Object.keys(byKey).forEach(function (k) { if (byKey[k].length > 1) dups.push(byKey[k]); });
+      return dups;
+    }
+    // Revisa y une los registros duplicados por reservación (conserva el más completo).
+    async function limpiarRegistrosDuplicados() {
+      var dups = _findRegDuplicates();
+      if (!dups.length) { toast('No se encontraron huéspedes duplicados', false); return; }
+      var toRemove = [], resumen = [];
+      dups.forEach(function (arr) {
+        var keep = arr.slice().sort(function (a, b) { return _regScore(b) - _regScore(a); })[0];
+        arr.forEach(function (g) { if (g.regId !== keep.regId) toRemove.push(g); });
+        var res = (S.reservas || []).find(function (r) { return String(r.id) === String(keep.resId); });
+        var hab = keep.habitacionNum || (res ? res.habitacionNum : '?');
+        resumen.push('• ' + arr[0].nombre + ' (Hab. ' + hab + '): ' + arr.length + ' → 1');
+      });
+      if (!toRemove.length) { toast('No hay duplicados que unir', false); return; }
+      if (!confirm('Se encontraron ' + toRemove.length + ' registro(s) duplicado(s):\n\n' + resumen.join('\n') + '\n\nSe conservará el más completo de cada huésped y se eliminarán los repetidos. Esta acción no se puede deshacer.\n\n¿Continuar?')) return;
+      await busy(async function () {
+        var okIds = {}, failed = 0;
+        for (var i = 0; i < toRemove.length; i++) {
+          try { await sheets.deleteById('📝 Registro', toRemove[i].regId); okIds[toRemove[i].regId] = 1; }
+          catch (e) { failed++; }
+        }
+        S.registros = (S.registros || []).filter(function (g) { return !okIds[g.regId]; });
+        try {
+          var n = now();
+          await sheets.multi([{ type: 'append', sheet: '📜 Bitácora', values: [normDate(new Date()), n.split(' ')[1], (S.user && S.user.usuario) || '', 'Limpieza de duplicados', Object.keys(okIds).length + ' registro(s) duplicado(s) eliminados', 'info'] }]);
+        } catch (e) {}
+        toast('✅ ' + Object.keys(okIds).length + ' duplicado(s) eliminados' + (failed ? ' · ' + failed + ' no se pudieron borrar' : ''));
+        render();
+      }, 'Limpiando duplicados...');
+    }
     function _resGuestsSectionHTML(res) {
       if (!res || res.estado === 'Cancelada') return '';
       var guests = _resGuestsDedup(res.id);
@@ -23772,6 +23833,17 @@
     document.addEventListener('click', function (e) {
       var dd = document.getElementById('grpAcDropdown');
       if (dd && dd.style.display !== 'none' && !dd.contains(e.target) && e.target.id !== 'grp_nombre') { dd.style.display = 'none'; }
+      // Cerrar los buscadores de huésped por cuarto al tocar fuera
+      try {
+        var open = document.querySelectorAll('[id^="grpRoomAc_"]');
+        for (var i = 0; i < open.length; i++) {
+          var o = open[i];
+          if (o.style.display === 'none') continue;
+          var num = o.id.replace('grpRoomAc_', '');
+          var inp = document.getElementById('grpGuest_' + num);
+          if (!o.contains(e.target) && e.target !== inp) { o.style.display = 'none'; }
+        }
+      } catch (err) {}
     });
     function _groupRefreshRooms() {
       var checkin = document.getElementById('grp_checkin').value;
@@ -23796,11 +23868,17 @@
         h += '<input type="checkbox" ' + (sel ? 'checked' : '') + ' ' + (avail ? '' : 'disabled') + ' onchange="_groupToggleRoom(\'' + rm.numero + '\',this.checked)" style="width:18px;height:18px;flex-shrink:0;">';
         h += '<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:600;">Hab. ' + rm.numero + ' · ' + _wbEsc(rm.tipo) + '</div><div style="font-size:11px;color:var(--text2);">$' + _fmt(rm.tarifa) + '/noche' + reason + '</div></div>';
         if (sel) {
-          h += '<input type="text" value="' + _wbEsc(sel.guest || '') + '" placeholder="Huésped" onchange="_groupSetGuest(\'' + rm.numero + '\',this.value)" style="width:78px;font-size:11px;padding:5px;border-radius:6px;border:1px solid var(--surface3);background:var(--surface3);color:var(--text);">';
           h += '<input type="number" min="0" step="1" value="' + cur + '" title="Tarifa por noche" onchange="_groupSetTarifa(\'' + rm.numero + '\',this.value)" style="width:64px;font-size:11px;padding:5px;border-radius:6px;border:1px solid ' + (esp ? 'var(--accent)' : 'var(--surface3)') + ';background:var(--surface3);color:' + (esp ? 'var(--accent)' : 'var(--text)') + ';font-weight:' + (esp ? '700' : '400') + ';">';
           h += '<label style="display:flex;align-items:center;gap:3px;font-size:11px;color:' + (sel.factura ? 'var(--accent)' : 'var(--text2)') + ';cursor:pointer;white-space:nowrap;flex-shrink:0;"><input type="checkbox" ' + (sel.factura ? 'checked' : '') + ' onchange="_groupSetFactura(\'' + rm.numero + '\',this.checked)" style="width:15px;height:15px;accent-color:var(--accent);">🧾</label>';
         }
         h += '</div>';
+        // Huésped de este cuarto: buscador de clientes/huéspedes anteriores (o escribir uno nuevo)
+        if (sel) {
+          h += '<div style="padding:0 8px 8px 8px;position:relative;">';
+          h += '<input type="text" id="grpGuest_' + rm.numero + '" value="' + _wbEsc(sel.guest || '') + '" placeholder="Huésped de este cuarto (busca uno anterior o escribe)" autocomplete="off" oninput="onGrpRoomGuestInput(\'' + rm.numero + '\')" onfocus="onGrpRoomGuestInput(\'' + rm.numero + '\')" style="width:100%;box-sizing:border-box;font-size:12px;padding:7px 9px;border-radius:6px;border:1px solid var(--surface3);background:var(--surface3);color:var(--text);">';
+          h += '<div id="grpRoomAc_' + rm.numero + '" style="display:none;position:absolute;left:8px;right:8px;top:100%;z-index:50;background:var(--surface2);border:1px solid var(--surface3);border-top:none;border-radius:0 0 8px 8px;max-height:180px;overflow-y:auto;box-shadow:0 8px 18px rgba(0,0,0,.25);"></div>';
+          h += '</div>';
+        }
         if (esp) {
           h += '<div style="padding:0 8px 8px 8px;">';
           h += '<div style="font-size:10.5px;color:var(--accent);margin-bottom:4px;">⭐ Precio especial: estándar $' + _fmt(std) + ' → cobrando $' + _fmt(cur) + ' (−$' + _fmt(std - cur) + '/noche)</div>';
@@ -23819,6 +23897,37 @@
       _groupRefreshRooms();
     }
     function _groupSetGuest(num, val) { if (window._groupSel[num]) window._groupSel[num].guest = val; }
+    // Autocompletar el huésped de un cuarto del grupo con clientes/huéspedes anteriores.
+    function onGrpRoomGuestInput(num) {
+      var input = document.getElementById('grpGuest_' + num);
+      var dd = document.getElementById('grpRoomAc_' + num);
+      if (!input || !dd) return;
+      var val = input.value.trim();
+      if (window._groupSel[num]) window._groupSel[num].guest = input.value; // sincroniza mientras escribe
+      if (val.length < 1) { dd.style.display = 'none'; dd.innerHTML = ''; return; }
+      var matches = [];
+      try { matches = searchClients(val); } catch (e) { matches = []; }
+      if (!matches.length) { dd.style.display = 'none'; dd.innerHTML = ''; return; }
+      var html = '';
+      matches.slice(0, 12).forEach(function (c) {
+        var vb = c.visitas > 0 ? '<span class="ac-item-badge repeat">🔁 ' + c.visitas + '</span>' : '';
+        html += '<div class="ac-item" style="cursor:pointer;padding:8px 10px;" onclick="selectGrpRoomGuest(\'' + num + '\',\'' + escapeAttr(c.nombre) + '\')">';
+        html += '<div class="ac-item-name" style="font-size:12.5px;">' + highlightMatch(c.nombre, val) + vb + '</div>';
+        var meta = '';
+        if (c.telefono) meta += '📞 ' + escapeHtml(c.telefono);
+        if (c.telefono && c.email) meta += ' · ';
+        if (c.email) meta += '✉️ ' + escapeHtml(c.email);
+        if (meta) html += '<div class="ac-item-meta" style="font-size:10.5px;">' + meta + '</div>';
+        html += '</div>';
+      });
+      dd.innerHTML = html;
+      dd.style.display = 'block';
+    }
+    function selectGrpRoomGuest(num, nombre) {
+      if (window._groupSel[num]) window._groupSel[num].guest = nombre;
+      var input = document.getElementById('grpGuest_' + num); if (input) input.value = nombre;
+      var dd = document.getElementById('grpRoomAc_' + num); if (dd) { dd.style.display = 'none'; dd.innerHTML = ''; }
+    }
     function _groupSetTarifa(num, val) {
       if (window._groupSel[num]) {
         var v = parseFloat(val);
