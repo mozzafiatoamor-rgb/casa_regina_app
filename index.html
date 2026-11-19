@@ -3590,7 +3590,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-11-19e';
+    var APP_BUILD = '2026-11-19f';
 
     // ===== Selectores de fecha entrada→salida: la salida siempre mínimo el día siguiente =====
     function _nextDayStr(ymd) {
@@ -24222,7 +24222,7 @@
       acts += '</div>';
       acts += '<button class="form-button secondary" onclick="closeModal();shareGroupRegLink(\'' + groupId + '\')" style="width:100%;">🔗 Link de registro (encargado)</button>';
       acts += '<button class="form-button secondary" onclick="openGroupBroadcast(\'' + groupId + '\')" style="width:100%;">📣 Mensaje al grupo</button>';
-      acts += '<button class="form-button secondary" onclick="generarDesayunosGrupoPorHabitacion(\'' + groupId + '\')" style="width:100%;border-color:#2e7d32;color:#2e7d32;">🍳 Generar desayunos por habitación</button>';
+      acts += '<button class="form-button secondary" onclick="editarDesayunosGrupo(\'' + groupId + '\')" style="width:100%;border-color:#2e7d32;color:#2e7d32;">🍳 Desayunos por habitación (ajustar)</button>';
       acts += '<button class="form-button secondary" onclick="sendGroupReceptionList(\'' + groupId + '\')" style="width:100%;">📋 Lista para recepción (verificar personas)</button>';
       acts += '<div style="display:flex;gap:8px;">';
       acts += '<button class="form-button secondary" onclick="generateGroupGuestInfoPDF(\'' + groupId + '\',\'download\')" style="flex:1;">📄 Info del grupo PDF</button>';
@@ -24453,6 +24453,91 @@
         render();
         setTimeout(function () { openGroupSummary(groupId); }, 300);
       }, 'Generando desayunos del grupo...');
+    }
+
+    // Desayunos por noche actuales de un cuarto: de los códigos ya generados, o el valor por tipo.
+    function _grpRoomBfPerNight(res, room) {
+      var codes = (S.desayunos || []).filter(function (d) { return d.reservaId === res.id && d.estado !== 'Cancelado'; });
+      if (codes.length) {
+        var byDate = {};
+        codes.forEach(function (d) { byDate[d.fecha] = (byDate[d.fecha] || 0) + (parseInt(d.personas) || 1); });
+        var mx = 0; Object.keys(byDate).forEach(function (k) { if (byDate[k] > mx) mx = byDate[k]; });
+        return mx || 1;
+      }
+      var pers = 0; try { pers = getBreakfastPersonas(room ? room.tipo : '') || 0; } catch (e) {}
+      if (!pers) pers = _bfPersonasSugeridas(room);
+      return pers;
+    }
+    // Editor: ajusta cuántos desayunos por noche lleva CADA habitación del grupo y genera/actualiza.
+    function editarDesayunosGrupo(groupId) {
+      var rs = _groupRoomsSorted(groupId);
+      if (!rs.length) { toast('Grupo no encontrado', true); return; }
+      var h = '';
+      h += '<div style="font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.5;">Ajusta cuántos <b>desayunos por noche</b> enviar al restaurante por cada habitación. Por ejemplo, una habitación doble con un solo huésped puede llevar 1. Pon 0 si una habitación no lleva desayuno.</div>';
+      rs.forEach(function (r) {
+        var room = S.rooms.find(function (x) { return x.numero === r.habitacionNum; });
+        var nights = Math.max(daysUntil(r.fechaEntrada, r.fechaSalida), 1);
+        var cur = _grpRoomBfPerNight(r, room);
+        var consumidas = (S.desayunos || []).filter(function (d) { return d.reservaId === r.id && d.estado === 'Consumido'; }).length;
+        var tipoDef = 0; try { tipoDef = getBreakfastPersonas(room ? room.tipo : '') || 0; } catch (e) {}
+        h += '<div style="display:flex;align-items:center;gap:10px;background:var(--surface2);border-radius:10px;padding:10px 12px;margin-bottom:8px;">';
+        h += '<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:700;">🛏️ Hab. ' + _wbEsc(r.habitacionNum) + ' · ' + _wbEsc(room ? room.tipo : '') + '</div>';
+        h += '<div style="font-size:11px;color:var(--text2);">' + nights + ' noche(s)' + (tipoDef ? ' · tipo sugiere ' + tipoDef : '') + (consumidas ? ' · ' + consumidas + ' ya consumido(s)' : '') + '</div></div>';
+        h += '<input type="number" min="0" step="1" id="grpBf_' + r.id + '" value="' + cur + '" style="width:62px;font-size:15px;text-align:center;padding:8px;border-radius:8px;border:1px solid var(--surface3);background:var(--surface3);color:var(--text);font-weight:700;">';
+        h += '<span style="font-size:11px;color:var(--text2);white-space:nowrap;">/ noche</span>';
+        h += '</div>';
+      });
+      document.getElementById('taskDetailContent').innerHTML = h;
+      document.getElementById('taskDetailModal').querySelector('.modal-title').textContent = '🍳 Desayunos del grupo';
+      document.getElementById('taskDetailActions').innerHTML = '<button class="form-button" onclick="aplicarDesayunosGrupo(\'' + groupId + '\')" style="width:100%;background:#2e7d32;color:#fff;">Guardar desayunos</button>';
+      openModal('taskDetailModal');
+    }
+    async function aplicarDesayunosGrupo(groupId) {
+      var rs = _groupRoomsSorted(groupId);
+      if (!rs.length) { toast('Grupo no encontrado', true); return; }
+      var plan = [];
+      rs.forEach(function (r) {
+        var el = document.getElementById('grpBf_' + r.id);
+        var pers = el ? parseInt(el.value) : NaN;
+        if (isNaN(pers) || pers < 0) pers = 0;
+        var nights = Math.max(daysUntil(r.fechaEntrada, r.fechaSalida), 1);
+        var existing = (S.desayunos || []).filter(function (d) { return d.reservaId === r.id; });
+        var delCodes = existing.filter(function (d) { return d.estado === 'Pendiente'; }).map(function (d) { return d.codigo; });
+        var consumidas = {};
+        existing.forEach(function (d) { if (d.estado === 'Consumido') consumidas[d.fecha] = true; });
+        var fechas = [];
+        for (var di = 0; di < nights; di++) {
+          var d = new Date(r.fechaEntrada + 'T12:00:00'); d.setDate(d.getDate() + di + 1);
+          var ds = normDate(d);
+          if (!consumidas[ds]) fechas.push(ds);
+        }
+        plan.push({ res: r, pers: pers, fechas: fechas, delCodes: delCodes });
+      });
+      var totalPers = plan.reduce(function (s, p) { return s + p.pers * p.fechas.length; }, 0);
+      var resumen = plan.map(function (p) { return 'Hab. ' + p.res.habitacionNum + ': ' + p.pers + '/noche × ' + p.fechas.length + ' = ' + (p.pers * p.fechas.length); }).join('\n');
+      if (!confirm('Se enviarán al restaurante estos desayunos:\n\n' + resumen + '\n\nTotal: ' + totalPers + ' desayuno(s).\n\nSe reemplazan los pendientes actuales (los ya consumidos no se tocan). ¿Continuar?')) return;
+      await busy(async function () {
+        var toDel = [];
+        plan.forEach(function (p) { p.delCodes.forEach(function (c) { toDel.push(c); }); });
+        for (var i = 0; i < toDel.length; i++) { try { await sheets.deleteById('🍳 Desayunos', toDel[i]); } catch (e) {} }
+        if (toDel.length) S.desayunos = (S.desayunos || []).filter(function (d) { return toDel.indexOf(d.codigo) === -1; });
+        var ops = [], added = [], n = now();
+        plan.forEach(function (p) {
+          if (p.pers <= 0) return; // 0 = esta habitación no lleva desayuno
+          var r = p.res;
+          p.fechas.forEach(function (ds) {
+            var code = generateBreakfastCode();
+            ops.push({ type: 'append', sheet: '🍳 Desayunos', values: [code, r.id, r.huesped, r.habitacionNum, ds, p.pers, 'Pendiente', '', '', ''] });
+            added.push({ codigo: code, reservaId: r.id, huesped: r.huesped, habitacion: r.habitacionNum, fecha: ds, personas: p.pers, estado: 'Pendiente', validadoPor: '', horaValidacion: '', regId: '' });
+          });
+        });
+        if (ops.length) ops.push({ type: 'append', sheet: '📜 Bitácora', values: [normDate(new Date()), n.split(' ')[1], (S.user && S.user.usuario) || '', 'Desayunos de grupo (ajuste)', totalPers + ' desayuno(s) (' + _groupTitular(groupId) + ')', 'info'] });
+        if (ops.length) await sheets.multi(ops);
+        S.desayunos = (S.desayunos || []).concat(added);
+        toast('🍳 Desayunos actualizados: ' + totalPers + ' en total');
+        render();
+        setTimeout(function () { openGroupSummary(groupId); }, 300);
+      }, 'Guardando desayunos del grupo...');
     }
 
     // Lista para la recepcionista (texto de WhatsApp): personas por cuarto a verificar.
