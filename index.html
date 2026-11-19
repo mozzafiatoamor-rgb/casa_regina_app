@@ -3590,7 +3590,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-11-19g';
+    var APP_BUILD = '2026-11-19h';
 
     // ===== Selectores de fecha entrada→salida: la salida siempre mínimo el día siguiente =====
     function _nextDayStr(ymd) {
@@ -14385,6 +14385,7 @@
       h += '<input id="np_nombre" class="login-input" placeholder="Nombre completo" style="width:100%;box-sizing:border-box;margin-bottom:8px;">';
       h += '<select id="np_rol" class="login-input" style="width:100%;box-sizing:border-box;margin-bottom:8px;padding:10px;">' + roles.map(function (r) { return '<option value="' + r[0] + '">' + r[1] + '</option>'; }).join('') + '</select>';
       h += '<input id="np_pin" class="login-input" inputmode="numeric" placeholder="PIN (mínimo 6 dígitos)" maxlength="12" style="width:100%;box-sizing:border-box;margin-bottom:8px;">';
+      h += '<input id="np_tel" class="login-input" type="tel" inputmode="numeric" placeholder="WhatsApp (opcional, para enviarle su acceso)" style="width:100%;box-sizing:border-box;margin-bottom:8px;">';
       h += '<button class="form-button" onclick="personalCreate()" style="width:100%;background:var(--accent);color:var(--bg);">Crear usuario</button>';
       h += '</div>';
       h += staff.map(function (s) {
@@ -14405,24 +14406,77 @@
       var nombre = (document.getElementById('np_nombre').value || '').trim();
       var rol = document.getElementById('np_rol').value;
       var pin = (document.getElementById('np_pin').value || '').trim();
+      var tel = (document.getElementById('np_tel') ? document.getElementById('np_tel').value : '').trim();
       if (!nombre) { toast('Escribe el nombre', true); return; }
       if (pin.length < 6) { toast('El PIN debe tener al menos 6 dígitos', true); return; }
+      var created = false;
       await busy(async function () {
         var r = await _staffAdminCall('create', { nombre: nombre, rol: rol, pin: pin });
         if (!r.success) { toast(r.error || 'No se pudo crear', true); return; }
+        created = true;
         toast('✅ Usuario creado');
-        renderPersonalConfig();
       }, 'Creando usuario…');
+      if (created) _offerStaffAccess(nombre, pin, rol, tel);
+    }
+    // Enlace base de la app (para que el personal entre con su nombre + PIN).
+    function _appBaseLink() { return window.location.origin + window.location.pathname; }
+    // Mensaje de acceso para un miembro del personal (cálido, con enlace, usuario y PIN).
+    function _staffAccessMsg(nombre, pin, rol) {
+      var hi = getHotelInfo();
+      var link = _appBaseLink();
+      var rolLabel = (typeof ROLES !== 'undefined' && ROLES[rol]) ? ROLES[rol] : rol;
+      var m = '*' + (hi.nombre || HOTEL_NAME) + '* — Acceso al sistema\n\n';
+      m += 'Hola ' + _firstName(nombre) + ':\n\n';
+      m += 'Te damos acceso al sistema del hotel. Entra desde este enlace, elige tu nombre e ingresa tu PIN:\n' + link + '\n\n';
+      m += 'Tus datos de acceso:\n';
+      m += 'Usuario: ' + nombre + '\n';
+      m += 'PIN: ' + pin + '\n';
+      if (rolLabel) m += 'Rol: ' + rolLabel + '\n';
+      m += '\nPor seguridad, no compartas tu PIN con nadie. Cualquier duda, con gusto te apoyamos.';
+      return m;
+    }
+    // Ofrece enviar el acceso recién creado/actualizado por WhatsApp o copiarlo.
+    function _offerStaffAccess(nombre, pin, rol, tel) {
+      var msg = _staffAccessMsg(nombre, pin, rol);
+      var phone = String(tel || '').replace(/[^0-9]/g, '');
+      if (phone && phone.length === 10) phone = '52' + phone;
+      window._staffAccessPending = { msg: msg, phone: phone };
+      var h = '';
+      h += '<div style="background:var(--surface3);padding:12px;border-radius:var(--radius);margin-bottom:12px;">';
+      h += '<div style="font-size:12px;color:var(--text2);margin-bottom:4px;">ACCESO DE ' + _wbEscC(nombre.toUpperCase()) + '</div>';
+      h += '<div style="font-size:12px;color:var(--yellow);line-height:1.4;">Este mensaje incluye el PIN. El PIN no se puede volver a ver después; si no lo envías ahora, tendrás que generar uno nuevo.</div>';
+      h += '</div>';
+      h += '<div style="white-space:pre-wrap;font-size:12px;line-height:1.55;color:var(--text);background:var(--surface2);padding:12px;border-radius:10px;max-height:260px;overflow-y:auto;">' + _wbEsc(msg) + '</div>';
+      document.getElementById('taskDetailContent').innerHTML = h;
+      document.getElementById('taskDetailModal').querySelector('.modal-title').textContent = '🔑 Enviar acceso';
+      var acts = '';
+      acts += '<button class="form-button" onclick="_sendStaffAccessWA()" style="width:100%;background:#25D366;color:#fff;">' + (phone ? 'Enviar por WhatsApp' : 'Abrir WhatsApp (elige el contacto)') + '</button>';
+      acts += '<button class="form-button secondary" onclick="_copyStaffAccess()" style="width:100%;">Copiar acceso</button>';
+      acts += '<button class="form-button secondary" onclick="closeModal();renderPersonalConfig();" style="width:100%;">Cerrar</button>';
+      document.getElementById('taskDetailActions').innerHTML = acts;
+      openModal('taskDetailModal');
+    }
+    function _sendStaffAccessWA() {
+      var p = window._staffAccessPending; if (!p) return;
+      window.open('https://wa.me/' + (p.phone || '') + '?text=' + encodeURIComponent(p.msg), '_blank');
+    }
+    function _copyStaffAccess() {
+      var p = window._staffAccessPending; if (!p) return;
+      try { navigator.clipboard.writeText(p.msg).then(function () { toast('Acceso copiado'); }, function () { toast('No se pudo copiar', true); }); }
+      catch (e) { toast('No se pudo copiar', true); }
     }
     async function personalSetPin(uid, nombre) {
       var pin = prompt('Nuevo PIN para ' + nombre + ' (mínimo 6 dígitos):');
       if (pin === null) return; pin = String(pin).trim();
       if (pin.length < 6) { toast('El PIN debe tener al menos 6 dígitos', true); return; }
+      var done = false;
       await busy(async function () {
         var r = await _staffAdminCall('setPin', { user_id: uid, pin: pin });
         if (!r.success) { toast(r.error || 'No se pudo cambiar', true); return; }
+        done = true;
         toast('✅ PIN actualizado');
       }, 'Cambiando PIN…');
+      if (done) _offerStaffAccess(nombre, pin, '', '');
     }
     async function personalSetRole(uid, rol) {
       var r = await _staffAdminCall('update', { user_id: uid, rol: rol });
