@@ -3590,7 +3590,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-11-19d';
+    var APP_BUILD = '2026-11-19e';
 
     // ===== Selectores de fecha entrada→salida: la salida siempre mínimo el día siguiente =====
     function _nextDayStr(ymd) {
@@ -23512,11 +23512,48 @@
       h += '</div>';
       return h;
     }
+    // Autocompletar el nombre del huésped con clientes/huéspedes guardados (en el editor ✏️).
+    function onGeNombreInput() {
+      var input = document.getElementById('ge_nombre');
+      var dd = document.getElementById('geAcDropdown');
+      if (!input || !dd) return;
+      var val = input.value.trim();
+      if (val.length < 1) { dd.style.display = 'none'; dd.innerHTML = ''; return; }
+      var matches = [];
+      try { matches = searchClients(val); } catch (e) { matches = []; }
+      if (!matches.length) { dd.style.display = 'none'; dd.innerHTML = ''; return; }
+      var html = '';
+      matches.slice(0, 10).forEach(function (c) {
+        var vb = c.visitas > 0 ? '<span class="ac-item-badge repeat">🔁 ' + c.visitas + '</span>' : '';
+        html += '<div class="ac-item" style="cursor:pointer;padding:8px 10px;" onclick="selectGeClient(\'' + escapeAttr(c.nombre) + '\')">';
+        html += '<div class="ac-item-name" style="font-size:12.5px;">' + highlightMatch(c.nombre, val) + vb + '</div>';
+        var meta = '';
+        if (c.telefono) meta += '📞 ' + escapeHtml(c.telefono);
+        if (c.telefono && c.email) meta += ' · ';
+        if (c.email) meta += '✉️ ' + escapeHtml(c.email);
+        if (meta) html += '<div class="ac-item-meta" style="font-size:10.5px;">' + meta + '</div>';
+        html += '</div>';
+      });
+      dd.innerHTML = html;
+      dd.style.display = 'block';
+    }
+    function selectGeClient(nombre) {
+      var input = document.getElementById('ge_nombre'); if (input) input.value = nombre;
+      var client = (getClients() || []).find(function (c) { return c.nombre === nombre; });
+      if (client) {
+        var tel = document.getElementById('ge_tel');
+        if (tel && !tel.value.trim() && client.telefono) tel.value = client.telefono;
+      }
+      var dd = document.getElementById('geAcDropdown'); if (dd) { dd.style.display = 'none'; dd.innerHTML = ''; }
+    }
     function openGuestEditor(resId, regId) {
       var g = regId ? _resGuests(resId).find(function (x) { return x.regId === regId; }) : null;
       var h = '';
       h += '<label class="form-label" style="font-size:12px;">Nombre completo</label>';
-      h += '<input type="text" id="ge_nombre" class="login-input" value="' + _wbEsc(g ? g.nombre : '') + '" style="margin-bottom:10px;">';
+      h += '<div style="position:relative;margin-bottom:10px;">';
+      h += '<input type="text" id="ge_nombre" class="login-input" autocomplete="off" oninput="onGeNombreInput()" onfocus="onGeNombreInput()" value="' + _wbEsc(g ? g.nombre : '') + '" placeholder="Busca un huésped guardado o escribe" style="margin-bottom:0;">';
+      h += '<div id="geAcDropdown" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:60;background:var(--surface2);border:1px solid var(--surface3);border-top:none;border-radius:0 0 10px 10px;max-height:200px;overflow-y:auto;box-shadow:0 8px 18px rgba(0,0,0,.25);"></div>';
+      h += '</div>';
       h += '<label class="form-label" style="font-size:12px;">📱 Celular (para enviarle su libro y sus códigos)</label>';
       h += '<input type="tel" id="ge_tel" class="login-input" value="' + _wbEsc(g ? (g.telefono || '') : '') + '" placeholder="Ej: 9981234567" style="margin-bottom:10px;">';
       h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">';
@@ -23869,6 +23906,12 @@
           if (!o.contains(e.target) && e.target !== inp) { o.style.display = 'none'; }
         }
       } catch (err) {}
+      // Cerrar el buscador del editor de huésped (✏️) al tocar fuera
+      try {
+        var ged = document.getElementById('geAcDropdown');
+        var gei = document.getElementById('ge_nombre');
+        if (ged && ged.style.display !== 'none' && !ged.contains(e.target) && e.target !== gei) { ged.style.display = 'none'; }
+      } catch (err2) {}
     });
     function _groupRefreshRooms() {
       var checkin = document.getElementById('grp_checkin').value;
