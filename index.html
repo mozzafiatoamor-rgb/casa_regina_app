@@ -3590,7 +3590,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-11-19c';
+    var APP_BUILD = '2026-11-19d';
 
     // ===== Selectores de fecha entrada→salida: la salida siempre mínimo el día siguiente =====
     function _nextDayStr(ymd) {
@@ -18790,6 +18790,11 @@
     // ============ RESPUESTAS A PREGUNTAS COMUNES (FAQ, con datos de la app) ============
     var _faqCurrentId = '';
     var _FAQ_ITEMS = [
+      { group: 'Antes de la llegada', items: [
+        { id: 'instrucciones_llegada', icon: '🧭', label: 'Instrucciones de llegada' },
+        { id: 'hora_llegada', icon: '🕒', label: 'Preguntar hora de llegada' },
+        { id: 'recordatorio_llegada', icon: '🔔', label: 'Recordatorio de llegada' }
+      ]},
       { group: 'Precios y disponibilidad', items: [
         { id: 'precios', icon: '💲', label: 'Precios y tipos de habitación' },
         { id: 'disponibilidad', icon: '📅', label: 'Disponibilidad por fechas' }
@@ -18940,11 +18945,14 @@
     }
 
     // Saludo (una sola línea, sin contenido)
-    function _faqSaludo(nombre) { return (nombre && nombre.trim()) ? ('¡Hola ' + nombre.trim() + '! 👋') : '¡Hola! 👋'; }
-    // Despedida persuasiva (una sola vez)
+    function _faqSaludo(nombre) {
+      var n = (nombre && nombre.trim()) ? _firstName(nombre.trim()) : '';
+      return n ? ('Estimado(a) ' + n + ', es un gusto saludarle.') : 'Es un gusto saludarle.';
+    }
+    // Despedida cálida (una sola vez)
     function _faqDespedida() {
       var hi = getHotelInfo();
-      return 'Quedo al pendiente para ayudarte con tu reservación. 💛\n' + (hi.nombre || '') + ' 🌿';
+      return 'Quedamos atentos para ayudarle con su reservación. Será un gusto recibirle.\n\nCon aprecio,\n' + (hi.nombre || '');
     }
 
     // Arma UN mensaje con saludo (opcional) + contenidos elegidos + despedida (opcional)
@@ -18963,7 +18971,24 @@
       var msg = '';
       var _ishP = Math.round((typeof ISH_RATE !== 'undefined' ? ISH_RATE : 0.05) * 100);
       var _ivaP = Math.round((typeof IVA_RATE !== 'undefined' ? IVA_RATE : 0.16) * 100);
-      if (id === 'precios') {
+      if (id === 'instrucciones_llegada') {
+        msg = '*Instrucciones de llegada*\n';
+        msg += 'Será un gusto recibirle. A continuación le compartimos la información para su llegada.\n';
+        if (hi.direccion) msg += '\nDirección: ' + hi.direccion;
+        msg += '\nCheck-in: a partir de las ' + formatHoraDisplay(hi.checkin_hora);
+        msg += '\nCheck-out: hasta las ' + formatHoraDisplay(hi.checkout_hora);
+        if (hi.wifi_red) { msg += '\n\nWiFi\nRed: ' + hi.wifi_red + '\nContraseña: ' + (hi.wifi_pass || '(sin contraseña)'); }
+        msg += '\n\nQuedamos a sus órdenes para cualquier necesidad durante su estancia.';
+      } else if (id === 'hora_llegada') {
+        msg = 'Será un gusto recibirle. Le comentamos que el check-in está disponible a partir de las ' + formatHoraDisplay(hi.checkin_hora) + '.\n\n';
+        msg += 'Para poder recibirle de la mejor manera y tener todo listo a su llegada, nos sería de gran ayuda conocer, de forma aproximada, a qué hora tiene planeado llegar.\n\n';
+        msg += 'Quedamos atentos a su respuesta.';
+      } else if (id === 'recordatorio_llegada') {
+        msg = 'Le recordamos con gusto su próxima llegada. Será un verdadero placer recibirle.\n\n';
+        msg += 'Check-in: a partir de las ' + formatHoraDisplay(hi.checkin_hora) + '.\n';
+        if (hi.direccion) msg += 'Dirección: ' + hi.direccion + '\n';
+        msg += '\nLe agradeceremos tener a la mano una identificación oficial para agilizar su registro. Si tiene cualquier duda, con gusto le atendemos.';
+      } else if (id === 'precios') {
         var promoP = isBreakfastPromoActive();
         var byType = {};
         (S.rooms || []).forEach(function(r) {
@@ -18974,21 +18999,21 @@
         });
         var tiposP = Object.keys(byType);
         if (!tiposP.length) {
-          msg = '💲 *Precios*\nCuéntame tus fechas y número de personas y te preparo una cotización a tu medida.';
+          msg = '*Precios*\nCon gusto le preparamos una cotización a su medida. Indíquenos sus fechas y el número de personas.';
         } else {
-          msg = '💲 *Habitaciones y tarifas*';
+          msg = '*Habitaciones y tarifas*';
           tiposP.forEach(function(t) {
             var base = byType[t].min, tb = _taxBreak(base, true), pre = byType[t].varia ? 'desde ' : '';
-            msg += '\n🛏️ ' + t.toUpperCase() + '\n   • ' + pre + _infoReplyMoney(base) + '/noche (sin impuestos)\n   • Con factura: ' + _infoReplyMoney(tb.total) + ' (ISH ' + _ishP + '% + IVA ' + _ivaP + '%)';
-            if (promoP) { var persP = getBreakfastPersonas(t); if (persP > 0) msg += '\n   • Incluye desayuno para ' + persP + (persP === 1 ? ' persona' : ' personas') + ' 🍳'; }
+            msg += '\n\n' + t.toUpperCase() + '\n   • ' + pre + _infoReplyMoney(base) + '/noche (sin impuestos)\n   • Con factura: ' + _infoReplyMoney(tb.total) + ' (ISH ' + _ishP + '% + IVA ' + _ivaP + '%)';
+            if (promoP) { var persP = getBreakfastPersonas(t); if (persP > 0) msg += '\n   • Incluye desayuno para ' + persP + (persP === 1 ? ' persona' : ' personas'); }
           });
-          if (promoP) msg += '\n🍳 El desayuno ya viene incluido en tu estancia.';
+          if (promoP) msg += '\n\nEl desayuno ya viene incluido en su estancia.';
         }
       } else if (id === 'disponibilidad') {
         var ciEl = document.getElementById('faqCheckin'), coEl = document.getElementById('faqCheckout');
         var ci = ciEl ? ciEl.value : '', co = coEl ? coEl.value : '';
         if (!(ci && co && co > ci)) {
-          msg = '📅 *Disponibilidad*\nDime tu fecha de entrada y salida y te confirmo la disponibilidad al momento.';
+          msg = '*Disponibilidad*\nIndíquenos su fecha de entrada y salida y con gusto le confirmamos la disponibilidad al momento.';
         } else {
           var nights = daysUntil(ci, co);
           var rango = _infoReplyRangeLabel(ci, co);
@@ -19001,22 +19026,22 @@
             // Disponibilidad de UNA habitación específica (cliente que ya la conoce)
             var room = (S.rooms || []).find(function(r) { return String(r.numero) === String(selRoom); });
             if (!room) {
-              msg = '📅 *Disponibilidad ' + rango + '*\nNo encontré esa habitación. Elige otra o deja "Todas las habitaciones".';
+              msg = '*Disponibilidad ' + rango + '*\nNo encontré esa habitación. Elija otra o deje "Todas las habitaciones".';
             } else {
               var baseR = parseFloat(room.tarifa) || 0, totR = baseR * nights, tbR = _taxBreak(totR, true);
-              msg = '📅 *Disponibilidad ' + rango + ' (' + nochesTxt + ')*\n';
+              msg = '*Disponibilidad ' + rango + ' (' + nochesTxt + ')*\n';
               if (!hasOverlap(room.numero, ci, co)) {
-                msg += '✅ Hab. ' + room.numero + ' · ' + room.tipo + ' — *DISPONIBLE*\n';
+                msg += 'Hab. ' + room.numero + ' · ' + room.tipo + ' — disponible\n';
                 msg += '   • ' + _infoReplyMoney(baseR) + '/noche · ' + nochesTxt + ' = ' + _infoReplyMoney(totR) + ' (sin impuestos)\n';
                 msg += '   • Con factura: ' + _infoReplyMoney(tbR.total) + ' (ISH ' + _ishP + '% + IVA ' + _ivaP + '%)';
-                if (promoAct) { var persR = getBreakfastPersonas(room.tipo); if (persR > 0) msg += '\n   • Incluye desayuno para ' + persR + (persR === 1 ? ' persona' : ' personas') + ' 🍳'; }
+                if (promoAct) { var persR = getBreakfastPersonas(room.tipo); if (persR > 0) msg += '\n   • Incluye desayuno para ' + persR + (persR === 1 ? ' persona' : ' personas'); }
               } else {
-                msg += '❌ Hab. ' + room.numero + ' · ' + room.tipo + ' — *No disponible* en esas fechas.';
+                msg += 'Hab. ' + room.numero + ' · ' + room.tipo + ' — no disponible en esas fechas.';
                 var alt = (S.rooms || []).filter(function(r) { return r.tipo === room.tipo && String(r.numero) !== String(room.numero) && !hasOverlap(r.numero, ci, co); });
                 if (alt.length) {
-                  msg += '\nPero sí tengo libre del mismo tipo: ' + alt.map(function(r) { return 'Hab. ' + r.numero; }).join(', ') + '.';
+                  msg += '\nSí tenemos libre del mismo tipo: ' + alt.map(function(r) { return 'Hab. ' + r.numero; }).join(', ') + '.';
                 } else {
-                  msg += '\n¿Tienes flexibilidad con las fechas, o te muestro otro tipo de habitación?';
+                  msg += '\n¿Tiene flexibilidad con las fechas, o le mostramos otro tipo de habitación?';
                 }
               }
             }
@@ -19032,43 +19057,43 @@
             });
             var aTipos = Object.keys(availByType);
             if (!aTipos.length) {
-              msg = '📅 *Disponibilidad ' + rango + '*\nJusto en esas fechas no tengo habitaciones libres 😔. ¿Tienes flexibilidad? Con gusto reviso opciones cercanas.';
+              msg = '*Disponibilidad ' + rango + '*\nJusto en esas fechas no tenemos habitaciones libres. Si tiene algo de flexibilidad, con gusto revisamos opciones cercanas.';
             } else {
-              msg = '📅 *Disponibilidad ' + rango + ' (' + nochesTxt + ')*';
+              msg = '*Disponibilidad ' + rango + ' (' + nochesTxt + ')*';
               aTipos.forEach(function(t) {
                 var base = availByType[t].min, totBase = base * nights, tbT = _taxBreak(totBase, true), pre = availByType[t].varia ? 'desde ' : '', cnt = availByType[t].count;
-                msg += '\n🛏️ ' + t.toUpperCase() + ' (' + cnt + (cnt === 1 ? ' disponible' : ' disponibles') + ')\n   • ' + pre + _infoReplyMoney(base) + '/noche · ' + nochesTxt + ' = ' + _infoReplyMoney(totBase) + ' (sin impuestos)\n   • Con factura: ' + _infoReplyMoney(tbT.total) + ' (ISH ' + _ishP + '% + IVA ' + _ivaP + '%)';
-                if (promoAct) { var persD = getBreakfastPersonas(t); if (persD > 0) msg += '\n   • Incluye desayuno para ' + persD + (persD === 1 ? ' persona' : ' personas') + ' 🍳'; }
+                msg += '\n\n' + t.toUpperCase() + ' (' + cnt + (cnt === 1 ? ' disponible' : ' disponibles') + ')\n   • ' + pre + _infoReplyMoney(base) + '/noche · ' + nochesTxt + ' = ' + _infoReplyMoney(totBase) + ' (sin impuestos)\n   • Con factura: ' + _infoReplyMoney(tbT.total) + ' (ISH ' + _ishP + '% + IVA ' + _ivaP + '%)';
+                if (promoAct) { var persD = getBreakfastPersonas(t); if (persD > 0) msg += '\n   • Incluye desayuno para ' + persD + (persD === 1 ? ' persona' : ' personas'); }
               });
             }
           }
         }
       } else if (id === 'ubicacion') {
-        msg = '📍 *Cómo llegar a ' + hotel + '*\n';
+        msg = '*Cómo llegar a ' + hotel + '*\n';
         if (hi.direccion) msg += hi.direccion + '\n';
         var q = encodeURIComponent((hotel + ' ' + (hi.direccion || '')).trim());
         msg += 'Mapa: https://www.google.com/maps/search/?api=1&query=' + q;
-        if (hi.telefono) msg += '\nSi se te complica llegar, llámanos al ' + hi.telefono + '.';
+        if (hi.telefono) msg += '\nSi se le complica llegar, con gusto le orientamos al ' + hi.telefono + '.';
       } else if (id === 'horarios') {
-        msg = '🕐 *Horarios*\n';
-        msg += '🛎️ Check-in: a partir de las ' + formatHoraDisplay(hi.checkin_hora) + '\n';
-        msg += '🔑 Check-out: hasta las ' + formatHoraDisplay(hi.checkout_hora) + '\n';
-        msg += 'Early check-in / late check-out sujetos a disponibilidad (puede aplicar un cargo).';
+        msg = '*Horarios*\n';
+        msg += 'Check-in: a partir de las ' + formatHoraDisplay(hi.checkin_hora) + '\n';
+        msg += 'Check-out: hasta las ' + formatHoraDisplay(hi.checkout_hora) + '\n';
+        msg += 'El early check-in y el late check-out están sujetos a disponibilidad y pueden tener un cargo.';
       } else if (id === 'wifi') {
         if (hi.wifi_red) {
-          msg = '📶 *WiFi*\nRed: ' + hi.wifi_red + '\nContraseña: ' + (hi.wifi_pass || '(sin contraseña)');
+          msg = '*WiFi*\nRed: ' + hi.wifi_red + '\nContraseña: ' + (hi.wifi_pass || '(sin contraseña)');
         } else {
-          msg = '📶 *WiFi*\nContamos con WiFi gratis en todo el hotel; los datos de acceso te los damos a tu llegada.';
+          msg = '*WiFi*\nContamos con WiFi sin costo en todo el hotel; con gusto le damos los datos de acceso a su llegada.';
         }
       } else if (id === 'parking') {
-        msg = '🅿️ *Estacionamiento*\nContamos con estacionamiento para huéspedes, sujeto a disponibilidad de lugares.';
-        if (hi.telefono) msg += '\nPara asegurar lugar, escríbenos o llámanos al ' + hi.telefono + '.';
+        msg = '*Estacionamiento*\nContamos con estacionamiento para huéspedes, sujeto a disponibilidad de lugares.';
+        if (hi.telefono) msg += '\nPara asegurar un lugar, con gusto le atendemos al ' + hi.telefono + '.';
       } else if (id === 'apartar') {
         var pct = getAnticipoPct();
-        msg = '💳 *Cómo apartar*\nPara dejar tu reservación confirmada pedimos un anticipo del ' + pct + '% del total; el ' + (100 - pct) + '% restante lo cubres al llegar (check-in). Puedes pagar por transferencia y enviarnos tu comprobante.';
+        msg = '*Cómo apartar su reservación*\nPara dejar su reservación confirmada pedimos un anticipo del ' + pct + '% del total; el ' + (100 - pct) + '% restante lo cubre a su llegada (check-in). Puede pagar por transferencia y enviarnos su comprobante.';
       } else if (id === 'pago') {
         var g = getGuestGuide();
-        msg = '🏦 *Datos para transferencia*\n';
+        msg = '*Datos para transferencia*\n';
         var pn = (g.pagosNotas && g.pagosNotas.es) ? String(g.pagosNotas.es).trim() : '';
         if (pn) msg += pn + '\n';
         var any = false;
@@ -19080,29 +19105,29 @@
           if (c.clabe) msg += '   CLABE: ' + c.clabe + '\n';
           if (c.cuenta) msg += '   Cuenta: ' + c.cuenta + '\n';
         });
-        if (!any) msg += 'Escríbenos y con gusto te compartimos los datos bancarios.\n';
-        msg += 'Cuando hagas tu transferencia, mándanos el comprobante para confirmar tu reserva 🙌';
+        if (!any) msg += 'Con gusto le compartimos los datos bancarios cuando lo requiera.\n';
+        msg += 'Una vez realizada su transferencia, le agradeceremos enviarnos el comprobante para confirmar su reservación.';
         if (g.pagosTel) msg += '\nDudas de pago: ' + g.pagosTel;
       } else if (id === 'cancelacion') {
         var terms = getTerms();
         var T = function(t) { var f = terms.find(function(x) { return x.title === t; }); return f ? f.text : ''; };
-        msg = '📋 *Política de cancelación*';
+        msg = '*Política de cancelación*';
         var c1 = T('Cancelación con más de 7 días de anticipación');
         var c2 = T('Cancelación entre 3 y 7 días antes');
         var c3 = T('Cancelación con menos de 3 días / No Show');
         var cm = T('Modificaciones');
-        if (c1) msg += '\n✅ Más de 7 días antes: ' + c1;
-        if (c2) msg += '\n⚠️ Entre 3 y 7 días antes: ' + c2;
-        if (c3) msg += '\n❌ Menos de 3 días / No Show: ' + c3;
-        if (cm) msg += '\n🔄 Cambios de fecha: ' + cm;
+        if (c1) msg += '\n• Más de 7 días antes: ' + c1;
+        if (c2) msg += '\n• Entre 3 y 7 días antes: ' + c2;
+        if (c3) msg += '\n• Menos de 3 días / No Show: ' + c3;
+        if (cm) msg += '\n• Cambios de fecha: ' + cm;
       } else if (id === 'mascotas') {
-        msg = '🐾 *Mascotas*\nSujeto a disponibilidad y confirmación previa. Cuéntanos qué mascota y de qué tamaño es, para revisar si podemos recibirla.';
+        msg = '*Mascotas*\nSujeto a disponibilidad y confirmación previa. Con gusto lo revisamos; cuéntenos qué mascota es y de qué tamaño, para ver si podemos recibirla.';
       } else if (id === 'extra') {
         var pe = hi.persona_extra || 150, base = hi.ocupacionBase || 2, menor = hi.menoresEdadLimite || 11;
-        msg = '👥 *Huéspedes adicionales y niños*\n';
+        msg = '*Huéspedes adicionales y niños*\n';
         msg += '• La tarifa cubre hasta ' + base + ' persona(s) por habitación.\n';
         msg += '• Persona adicional: $' + _fmt(pe) + ' MXN + impuestos por persona, por noche (cama extra sujeta a disponibilidad).\n';
-        msg += '• Niños menores de ' + menor + ' años no pagan compartiendo cama con sus papás (máx. 1 menor gratis por habitación). Desde los ' + (menor + 1) + ' años cuentan como adulto.';
+        msg += '• Los niños menores de ' + menor + ' años no pagan compartiendo cama con sus papás (máximo 1 menor sin costo por habitación). A partir de los ' + (menor + 1) + ' años cuentan como adulto.';
         var rules = hi.occupancyRules || [];
         if (rules.length) {
           msg += '\nCapacidad máxima por tipo:';
@@ -19112,13 +19137,13 @@
         var active = isBreakfastPromoActive();
         var p = getBreakfastPromo();
         if (active) {
-          msg = '🍳 *Desayuno incluido*\n';
+          msg = '*Desayuno incluido*\n';
           if (p.descripcion) msg += p.descripcion + '\n';
-          if (p.horario) msg += '🕐 Horario: ' + p.horario + '\n';
-          if (p.partner) msg += '📍 En: ' + p.partner + '\n';
-          msg += 'El desayuno ya viene incluido en tu tarifa.';
+          if (p.horario) msg += 'Horario: ' + p.horario + '\n';
+          if (p.partner) msg += 'En: ' + p.partner + '\n';
+          msg += 'El desayuno ya viene incluido en su tarifa.';
         } else {
-          msg = '🍳 *Desayuno*\n';
+          msg = '*Desayuno*\n';
           if (p.precioPorPersona) msg += '• $' + _fmt(p.precioPorPersona) + ' MXN por persona' + (p.partner ? (' en ' + p.partner) : '') + '.\n';
           if (p.horario) msg += '• Horario: ' + p.horario + '\n';
           if (p.descripcion) msg += p.descripcion;
