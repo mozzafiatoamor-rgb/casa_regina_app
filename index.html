@@ -3590,7 +3590,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-11-21a';
+    var APP_BUILD = '2026-11-21b';
 
     // ===== Selectores de fecha entrada→salida: la salida siempre mínimo el día siguiente =====
     function _nextDayStr(ymd) {
@@ -14024,6 +14024,82 @@
       }
     }
 
+    // ===== CRÉDITO DE CORTESÍA (excepción, no regla) — guardado en el cliente =====
+    function _clientForRes(res) {
+      if (!res) return null;
+      var key = String(res.huesped || '').toLowerCase().trim();
+      var c = (S.clientes || []).find(function (x) { return String(x.nombre || '').toLowerCase().trim() === key; });
+      if (c) return c;
+      var tel = String(res.telefono || '').replace(/\D/g, '');
+      if (tel && tel.length >= 7) c = (S.clientes || []).find(function (x) { return String(x.telefono || '').replace(/\D/g, '') === tel; });
+      return c || null;
+    }
+    function _parseCreditos(notas) {
+      var out = [], re = /\[CREDITO:([^\]]*)\]/g, m;
+      while ((m = re.exec(String(notas || '')))) {
+        var p = m[1].split('|');
+        out.push({ raw: m[0], monto: parseFloat(p[0]) || 0, vence: p[1] || '', origen: p[2] || '' });
+      }
+      return out;
+    }
+    function _creditoDisponible(client) {
+      if (!client) return 0;
+      var hoy = normDate(new Date());
+      return _parseCreditos(client.notas).reduce(function (s, c) { return s + ((!c.vence || c.vence >= hoy) ? c.monto : 0); }, 0);
+    }
+    async function _setClientNotas(client, newNotas) {
+      client.notas = newNotas;
+      var row = [client.id, client.nombre, client.telefono, client.email, client.notas, client.primeraVisita, client.ultimaVisita, client.visitas, client.totalGastado];
+      await sheets.updateById('👥 Clientes', client.id, row);
+    }
+    async function _addCreditoCliente(client, monto, vence, origen) {
+      var tag = '[CREDITO:' + monto + '|' + vence + '|' + (origen || '') + ']';
+      var n = String(client.notas || '').trim();
+      await _setClientNotas(client, n ? (n + ' ' + tag) : tag);
+    }
+    async function _consumeCredito(client, monto) {
+      var creds = _parseCreditos(client.notas);
+      var base = String(client.notas || '').replace(/\s*\[CREDITO:[^\]]*\]/g, '').trim();
+      creds.sort(function (a, b) { return String(a.vence).localeCompare(String(b.vence)); });
+      var rem = monto, kept = [];
+      creds.forEach(function (c) {
+        if (rem <= 0.001) { kept.push(c); return; }
+        if (c.monto <= rem + 0.001) { rem -= c.monto; }
+        else { kept.push({ monto: Math.round((c.monto - rem) * 100) / 100, vence: c.vence, origen: c.origen }); rem = 0; }
+      });
+      var tags = kept.map(function (c) { return '[CREDITO:' + c.monto + '|' + c.vence + '|' + (c.origen || '') + ']'; }).join(' ');
+      await _setClientNotas(client, (base + (tags ? ' ' + tags : '')).trim());
+    }
+    function _creditVence(meses) {
+      var d = new Date(); d.setMonth(d.getMonth() + (meses || 3)); return normDate(d);
+    }
+    async function aplicarCreditoCortesia(resId) {
+      var res = S.reservas.find(function (r) { return r.id === resId; });
+      if (!res) { toast('Reserva no encontrada', true); return; }
+      var cl = _clientForRes(res);
+      var cred = _creditoDisponible(cl);
+      if (!cl || cred <= 0.01) { toast('Este cliente no tiene crédito de cortesía disponible', true); return; }
+      var payments = (S.cobros || []).filter(function (c) { return c.reservaId === resId; });
+      var paid = payments.reduce(function (s, c) { return s + (c.monto || 0); }, 0);
+      var balance = _snapBal(res.tarifaTotal - paid);
+      var ap = Math.min(cred, balance);
+      if (ap <= 0.01) { toast('Esta reserva ya está cubierta', false); return; }
+      if (!confirm('¿Aplicar $' + _fmt(ap) + ' de crédito de cortesía a la reserva de ' + res.huesped + '?')) return;
+      await busy(async function () {
+        var n = now(), fecha = normDate(new Date()), hora = n.split(' ')[1];
+        var payId = nextId('PAY', S.cobros);
+        await sheets.multi([
+          { type: 'append', sheet: '💰 Cobros', values: [payId, resId, fecha, hora, ap, 'Crédito de cortesía', 'Crédito de cortesía (reagenda)', '', (S.user && S.user.usuario) || ''] },
+          { type: 'append', sheet: '📜 Bitácora', values: [fecha, hora, (S.user && S.user.usuario) || '', 'Crédito de cortesía aplicado', res.huesped + ' Hab. ' + res.habitacionNum + ' — $' + _fmt(ap), 'info'] }
+        ]);
+        S.cobros.push({ id: payId, reservaId: resId, fecha: fecha, hora: hora, monto: ap, metodoPago: 'Crédito de cortesía', concepto: 'Crédito de cortesía (reagenda)', notas: '', responsable: (S.user && S.user.usuario) || '' });
+        await _consumeCredito(cl, ap);
+        toast('🎟️ Crédito aplicado: $' + _fmt(ap));
+        closeModal();
+        render();
+      }, 'Aplicando crédito...');
+    }
+
     function searchClients(query) {
       var clients = getClients();
       if (!query || query.length < 1) return [];
@@ -16732,7 +16808,8 @@
         h += '<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:10px;"><span style="color:var(--text2);">Pagos registrados</span><b style="font-family:Space Mono,monospace;color:var(--green);">$' + _fmt(totalPaid) + '</b></div>';
         h += '<div style="font-size:11px;color:var(--text2);margin-bottom:8px;">¿Qué hago con ese dinero?</div>';
         h += '<label style="display:flex;align-items:flex-start;gap:9px;background:var(--surface3);border:1px solid var(--surface3);border-radius:8px;padding:10px;cursor:pointer;margin-bottom:8px;"><input type="radio" name="cancelPago" value="cargo" checked style="margin-top:2px;"><span><b style="font-size:13px;">Dejar como cargo (penalización / no-show)</b><br><span style="font-size:11px;color:var(--text2);">El dinero se queda como ingreso.</span></span></label>';
-        h += '<label style="display:flex;align-items:flex-start;gap:9px;background:var(--surface3);border:1px solid var(--surface3);border-radius:8px;padding:10px;cursor:pointer;"><input type="radio" name="cancelPago" value="reembolso" style="margin-top:2px;"><span><b style="font-size:13px;">Marcar como reembolso</b><br><span style="font-size:11px;color:var(--text2);">Se resta de ingresos (−$' + _fmt(totalPaid) + ').</span></span></label>';
+        h += '<label style="display:flex;align-items:flex-start;gap:9px;background:var(--surface3);border:1px solid var(--surface3);border-radius:8px;padding:10px;cursor:pointer;margin-bottom:8px;"><input type="radio" name="cancelPago" value="reembolso" style="margin-top:2px;"><span><b style="font-size:13px;">Marcar como reembolso</b><br><span style="font-size:11px;color:var(--text2);">Se resta de ingresos (−$' + _fmt(totalPaid) + ').</span></span></label>';
+        h += '<label style="display:flex;align-items:flex-start;gap:9px;background:var(--surface3);border:1px solid var(--accent);border-radius:8px;padding:10px;cursor:pointer;"><input type="radio" name="cancelPago" value="credito" style="margin-top:2px;"><span><b style="font-size:13px;color:var(--accent);">🎟️ Crédito de cortesía (30%) — excepción</b><br><span style="font-size:11px;color:var(--text2);">Como cortesía, se le guarda un crédito de <b>$' + _fmt(Math.round(totalPaid * 0.30 * 100) / 100) + '</b> para una próxima reserva (vence en 3 meses). El resto se queda como cargo. Úsalo solo en casos especiales.</span></span></label>';
         h += '</div>';
       }
 
@@ -16754,11 +16831,13 @@
       if (!motivo) { toast('Escribe el motivo de la cancelación', true); return; }
       var payments = (S.cobros || []).filter(function(c){ return c.reservaId === resId; });
       var totalPaid = payments.reduce(function(s,c){ return s + (c.monto||0); }, 0);
-      var refund = false;
+      var refund = false, grantCredit = false;
       if (totalPaid > 0) {
         var _r = document.querySelector('input[name="cancelPago"]:checked');
         refund = _r && _r.value === 'reembolso';
+        grantCredit = _r && _r.value === 'credito';
       }
+      var creditAmount = grantCredit ? Math.round(totalPaid * 0.30 * 100) / 100 : 0;
       var isCheckedIn = res.estado === 'Check-in';
 
       window._cancelBusy = true;
@@ -16811,7 +16890,22 @@
           }
           if (refundCobro) { S.cobros = S.cobros || []; S.cobros.push(refundCobro); }
 
-          toast('Reserva cancelada' + (refund ? ' · reembolso registrado' : ''));
+          // Crédito de cortesía (excepción): se guarda un 30% de lo pagado en el cliente para una próxima reserva.
+          var creditOk = false;
+          if (grantCredit && creditAmount > 0.01) {
+            try {
+              var cl = _clientForRes(res);
+              if (!cl && res.huesped) { try { await addOrUpdateClient(res.huesped, res.telefono, res.email); } catch (e) {} cl = _clientForRes(res); }
+              if (cl) {
+                var _vc = _creditVence(3);
+                await _addCreditoCliente(cl, creditAmount, _vc, 'R' + resId);
+                await sheets.multi([{ type: 'append', sheet: '📜 Bitácora', values: [fecha, hora, (S.user && S.user.usuario) || '', 'Crédito de cortesía otorgado', res.huesped + ' — $' + _fmt(creditAmount) + ' (vence ' + _vc + ')', 'info'] }]);
+                creditOk = true;
+              }
+            } catch (e) { console.warn('No se pudo guardar el crédito:', e.message); }
+          }
+
+          toast('Reserva cancelada' + (refund ? ' · reembolso registrado' : (creditOk ? ' · crédito de cortesía $' + _fmt(creditAmount) + ' guardado' : '')));
           closeModal();
           render();
         }, 'Cancelando reserva...');
@@ -16877,6 +16971,18 @@
         var _addF = '<button onclick="addFacturaFromPayment(\'' + resId + '\')" style="width:100%;margin-bottom:12px;background:var(--surface2);border:1px dashed var(--accent);border-radius:var(--radius);padding:10px;font-size:12px;color:var(--accent);font-weight:600;cursor:pointer;">\ud83e\uddfe \u00bfEl cliente pedir\u00e1 factura? Agregar impuestos</button>';
         document.getElementById('paymentResInfo').insertAdjacentHTML('beforeend', _addF);
       }
+      // Cr\u00e9dito de cortes\u00eda disponible del cliente (de una cancelaci\u00f3n previa): opci\u00f3n de aplicarlo
+      try {
+        var _clP = _clientForRes(res);
+        var _credP = _creditoDisponible(_clP);
+        if (_credP > 0.01 && balance > 0.01) {
+          var _apP = Math.min(_credP, balance);
+          var _cb = '<div style="background:rgba(107,138,74,.12);border:1px solid var(--accent);border-radius:var(--radius);padding:11px 12px;margin-bottom:12px;">'
+            + '<div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:6px;">\ud83c\udf9f\ufe0f Cr\u00e9dito de cortes\u00eda disponible: $' + _fmt(_credP) + '</div>'
+            + '<button onclick="aplicarCreditoCortesia(\'' + resId + '\')" style="width:100%;background:var(--accent);color:var(--bg);border:none;border-radius:8px;padding:9px;font-size:12px;font-weight:700;cursor:pointer;">Aplicar $' + _fmt(_apP) + ' a esta reserva</button></div>';
+          document.getElementById('paymentResInfo').insertAdjacentHTML('beforeend', _cb);
+        }
+      } catch (e) {}
       openModal('paymentModal');
     }
 
@@ -19192,7 +19298,7 @@
         msg = '*Sobre su solicitud de reembolso*\n';
         msg += 'Entendemos que a veces los planes cambian, y lamentamos de verdad que en esta ocasión no pueda acompañarnos. Con gusto le explicamos cómo funciona, con toda transparencia.\n\n';
         msg += 'Cuando se confirma una reservación, apartamos su habitación en exclusiva para usted y dejamos de ofrecerla a otras personas en esas fechas. Por ello, conforme a la política de cancelación que aceptó al momento de reservar, esas noches no son reembolsables. No es una regla para incomodarle: es la manera en que un hotel pequeño y familiar como el nuestro puede garantizar que su espacio esté siempre listo y reservado únicamente para usted.\n\n';
-        msg += 'Aun así, queremos apoyarle en lo que esté a nuestro alcance. Si sus planes solo cambiaron de fecha, con gusto revisamos la posibilidad de reagendar su estancia. Y si más adelante decide visitarnos, será un verdadero honor recibirle.';
+        msg += 'Dicho esto, y de manera excepcional, nos gustaría apoyarle: podemos guardarle un crédito equivalente al 30% de lo que pagó, para que lo use en una próxima estancia dentro de los siguientes 3 meses (sujeto a disponibilidad). Así no pierde todo y tenemos la oportunidad de recibirle como se merece.\n\nSerá un verdadero gusto darle la bienvenida pronto.';
       } else if (id === 'cancelacion') {
         var terms = getTerms();
         var T = function(t) { var f = terms.find(function(x) { return x.title === t; }); return f ? f.text : ''; };
