@@ -3590,7 +3590,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-11-20a';
+    var APP_BUILD = '2026-11-21a';
 
     // ===== Selectores de fecha entrada→salida: la salida siempre mínimo el día siguiente =====
     function _nextDayStr(ymd) {
@@ -18879,6 +18879,7 @@
       ]},
       { group: 'Políticas', items: [
         { id: 'cancelacion', icon: '↩️', label: 'Cancelación' },
+        { id: 'reembolso', icon: '💛', label: 'Reembolso / salida anticipada' },
         { id: 'mascotas', icon: '🐾', label: 'Mascotas' },
         { id: 'extra', icon: '👥', label: 'Persona extra / niños' }
       ]},
@@ -19187,6 +19188,11 @@
         if (!any) msg += 'Con gusto le compartimos los datos bancarios cuando lo requiera.\n';
         msg += 'Una vez realizada su transferencia, le agradeceremos enviarnos el comprobante para confirmar su reservación.';
         if (g.pagosTel) msg += '\nDudas de pago: ' + g.pagosTel;
+      } else if (id === 'reembolso') {
+        msg = '*Sobre su solicitud de reembolso*\n';
+        msg += 'Entendemos que a veces los planes cambian, y lamentamos de verdad que en esta ocasión no pueda acompañarnos. Con gusto le explicamos cómo funciona, con toda transparencia.\n\n';
+        msg += 'Cuando se confirma una reservación, apartamos su habitación en exclusiva para usted y dejamos de ofrecerla a otras personas en esas fechas. Por ello, conforme a la política de cancelación que aceptó al momento de reservar, esas noches no son reembolsables. No es una regla para incomodarle: es la manera en que un hotel pequeño y familiar como el nuestro puede garantizar que su espacio esté siempre listo y reservado únicamente para usted.\n\n';
+        msg += 'Aun así, queremos apoyarle en lo que esté a nuestro alcance. Si sus planes solo cambiaron de fecha, con gusto revisamos la posibilidad de reagendar su estancia. Y si más adelante decide visitarnos, será un verdadero honor recibirle.';
       } else if (id === 'cancelacion') {
         var terms = getTerms();
         var T = function(t) { var f = terms.find(function(x) { return x.title === t; }); return f ? f.text : ''; };
