@@ -3590,7 +3590,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-11-21d';
+    var APP_BUILD = '2026-11-21e';
 
     // ===== Selectores de fecha entrada→salida: la salida siempre mínimo el día siguiente =====
     function _nextDayStr(ymd) {
@@ -16365,6 +16365,10 @@
         buttons += '<button class="form-button secondary" onclick="revertirCheckin(\'' + resId + '\')" style="border-color:var(--yellow);color:var(--yellow)">\u21a9\ufe0f Revertir Check-in (corregir)</button>';
         buttons += '<button class="form-button secondary" onclick="cancelReserva(\'' + resId + '\')" style="border-color:var(--red);color:var(--red)">\u274c Cancelar reserva</button>';
       } else if (res.estado === 'Cancelada' || res.estado === 'Check-out' || res.estado === 'Completada') {
+        // El hu\u00e9sped se arrepinti\u00f3 de irse: revertir el check-out y dejarlo hospedado.
+        if (res.estado === 'Check-out' || res.estado === 'Completada') {
+          buttons += '<button class="form-button secondary" onclick="revertirCheckout(\'' + resId + '\')" style="border-color:var(--blue);color:var(--blue)">\u21a9\ufe0f Revertir check-out (el hu\u00e9sped se queda)</button>';
+        }
         // Cr\u00e9dito de cortes\u00eda retroactivo (excepci\u00f3n): reservas canceladas o con check-out (p. ej. salida anticipada).
         var _clC = _clientForRes(res);
         var _yaCred = _clC && _parseCreditos(_clC.notas).some(function (x) { return x.origen === 'R' + resId; });
@@ -22788,6 +22792,49 @@
     }
 
     // Revertir un check-in hecho por error: vuelve la reserva a "Confirmada" y libera la habitación
+    // El huésped se arrepintió de irse: revierte un check-out (incl. salida anticipada) y lo deja hospedado.
+    async function revertirCheckout(resId) {
+      var res = S.reservas.find(function (r) { return r.id === resId; });
+      if (!res) { toast('Reserva no encontrada', true); return; }
+      if (res.estado !== 'Check-out' && res.estado !== 'Completada') { toast('Esta reserva no tiene check-out', true); return; }
+      // La habitación no debe estar ocupada por otra reserva activa
+      var otra = (S.reservas || []).find(function (r) { return r.id !== resId && String(r.habitacionNum) === String(res.habitacionNum) && r.estado === 'Check-in'; });
+      if (otra) { toast('La habitación ' + res.habitacionNum + ' ya está ocupada por ' + otra.huesped + '. Libérala o cámbialo de habitación primero.', true); return; }
+      if (!confirm('El huésped decidió quedarse.\n\n¿Revertir el check-out? La reserva volverá a "Check-in", la habitación quedará ocupada y se quitará la marca de salida anticipada.')) return;
+      var room = S.rooms.find(function (r) { return r.numero === res.habitacionNum; });
+      await busy(async function () {
+        var n = now(), fecha = normDate(new Date()), hora = n.split(' ')[1];
+        var newNotas = String(res.notas || '').replace(/\s*\|\s*\[SALIDA_ANTICIPADA:[^\]]*\]/g, '').replace(/\[SALIDA_ANTICIPADA:[^\]]*\]\s*/g, '').replace(/^\s*\|\s*/, '').trim();
+        var resRow = [res.id, res.habitacionNum, res.huesped, res.telefono, res.email, res.fechaEntrada, res.fechaSalida, res.adultos, res.niños, res.tarifa, res.tarifaTotal, 'Check-in', newNotas, res.creadoPor, res.fechaCreacion];
+        var ops = [{ type: 'updateById', sheet: '📋 Reservas', id: res.id, values: resRow }];
+        if (room) ops.push({ type: 'updateById', sheet: '🏨 Habitaciones', id: room.id, values: [room.id, room.numero, room.tipo, room.tarifa, 'Ocupada', room.notas] });
+        ops.push({ type: 'append', sheet: '📜 Bitácora', values: [fecha, hora, (S.user && S.user.usuario) || '', 'Check-out revertido', res.huesped + ' Hab. ' + res.habitacionNum + ' — el huésped se queda', 'warning'] });
+        await sheets.multi(ops);
+        // Eliminar la tarea de limpieza de check-out pendiente de esa habitación (ya no aplica)
+        var hk = (S.housekeeping || []).filter(function (t) { return String(t.habitacionNum) === String(res.habitacionNum) && t.estado === 'Pendiente' && /Check-?out|cancelaci/i.test(t.tarea || ''); });
+        for (var i = 0; i < hk.length; i++) { try { await sheets.deleteById('🧹 Housekeeping', hk[i].id); } catch (e) {} }
+        var delIds = {}; hk.forEach(function (t) { delIds[t.id] = 1; });
+        S.housekeeping = (S.housekeeping || []).filter(function (t) { return !delIds[t.id]; });
+        // Si se había otorgado crédito de cortesía por esta reserva, se quita (ya no aplica, se queda).
+        try {
+          var cl = _clientForRes(res);
+          if (cl && _parseCreditos(cl.notas).some(function (x) { return x.origen === 'R' + resId; })) {
+            var creds = _parseCreditos(cl.notas);
+            var base = String(cl.notas || '').replace(/\s*\[CREDITO:[^\]]*\]/g, '').trim();
+            var keep = creds.filter(function (c) { return c.origen !== 'R' + resId; });
+            var tags = keep.map(function (c) { return '[CREDITO:' + c.monto + '|' + c.vence + '|' + (c.origen || '') + ']'; }).join(' ');
+            await _setClientNotas(cl, (base + (tags ? ' ' + tags : '')).trim());
+          }
+        } catch (e) {}
+        var ri = S.reservas.findIndex(function (r) { return r.id === resId; });
+        if (ri !== -1) { S.reservas[ri].estado = 'Check-in'; S.reservas[ri].notas = newNotas; }
+        if (room) { var rmi = S.rooms.findIndex(function (r) { return r.numero === res.habitacionNum; }); if (rmi !== -1) S.rooms[rmi].estado = 'Ocupada'; }
+        toast('Check-out revertido — el huésped se queda ↩️');
+        closeModal();
+        render();
+      }, 'Revirtiendo check-out...');
+    }
+
     async function revertirCheckin(resId) {
       if (!confirm('¿Revertir el check-in? La reserva volverá a "Confirmada" y la habitación quedará disponible.')) return;
       var res = S.reservas.find(function(r) { return r.id === resId; });
