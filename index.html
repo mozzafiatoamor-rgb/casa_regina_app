@@ -3590,7 +3590,7 @@
 
     // ============ CONFIG SYNC (Sheet ↔ localStorage) ============
     // Config keys stored in ⚙️ Config tab: [key, JSON_value]
-    var APP_BUILD = '2026-11-21c';
+    var APP_BUILD = '2026-11-21d';
 
     // ===== Selectores de fecha entrada→salida: la salida siempre mínimo el día siguiente =====
     function _nextDayStr(ymd) {
@@ -16364,14 +16364,16 @@
         buttons += '<button class="form-button secondary" onclick="closeModal();executeCheckout(\'' + res.habitacionNum + '\')" style="background:var(--red)">Ejecutar Check-out</button>';
         buttons += '<button class="form-button secondary" onclick="revertirCheckin(\'' + resId + '\')" style="border-color:var(--yellow);color:var(--yellow)">\u21a9\ufe0f Revertir Check-in (corregir)</button>';
         buttons += '<button class="form-button secondary" onclick="cancelReserva(\'' + resId + '\')" style="border-color:var(--red);color:var(--red)">\u274c Cancelar reserva</button>';
-      } else if (res.estado === 'Cancelada') {
-        // Cr\u00e9dito de cortes\u00eda retroactivo: si qued\u00f3 dinero retenido y a\u00fan no se otorg\u00f3 cr\u00e9dito por esta reserva.
+      } else if (res.estado === 'Cancelada' || res.estado === 'Check-out' || res.estado === 'Completada') {
+        // Cr\u00e9dito de cortes\u00eda retroactivo (excepci\u00f3n): reservas canceladas o con check-out (p. ej. salida anticipada).
         var _clC = _clientForRes(res);
         var _yaCred = _clC && _parseCreditos(_clC.notas).some(function (x) { return x.origen === 'R' + resId; });
+        var _esAnticipada = /\[SALIDA_ANTICIPADA/.test(String(res.notas || ''));
         if (_yaCred) {
           buttons += '<div style="text-align:center;padding:10px;color:var(--accent);font-weight:600">\ud83c\udf9f\ufe0f Cr\u00e9dito de cortes\u00eda ya otorgado para esta reserva</div>';
         } else if (totalPaid > 0.01) {
-          buttons += '<button class="form-button secondary" onclick="otorgarCreditoCortesiaDesdeRes(\'' + resId + '\')" style="border-color:var(--accent);color:var(--accent)">\ud83c\udf9f\ufe0f Otorgar cr\u00e9dito de cortes\u00eda (30%)</button>';
+          var _lblC = (res.estado !== 'Cancelada' && _esAnticipada) ? '\ud83c\udf9f\ufe0f Cr\u00e9dito de cortes\u00eda por salida anticipada (30%)' : '\ud83c\udf9f\ufe0f Otorgar cr\u00e9dito de cortes\u00eda (30%)';
+          buttons += '<button class="form-button secondary" onclick="otorgarCreditoCortesiaDesdeRes(\'' + resId + '\')" style="border-color:var(--accent);color:var(--accent)">' + _lblC + '</button>';
         }
       }
 
